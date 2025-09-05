@@ -1,0 +1,20 @@
+# Unity meta files (we want to keep them in packages)
+# *.meta
+
+# macOS
+.DS_Store
+.DS_Store?
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
