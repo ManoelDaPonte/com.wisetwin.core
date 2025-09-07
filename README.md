@@ -59,6 +59,15 @@ Système complet de gestion des métadonnées d'objets Unity avec chargement dep
 
 - Unity 2021.3+
 - Support WebGL pour les notifications JavaScript
+- Newtonsoft.Json package requis (installé automatiquement)
+
+## Dépendances
+
+- `com.unity.nuget.newtonsoft-json`: 3.2.1+
+
+## Note technique
+
+Les scripts Metadata utilisent `UnityEngine.Networking` (legacy) pour les requêtes HTTP. Pour les nouveaux projets, considérez migrer vers `UnityWebRequest` moderne.
 
 ## Contribution
 
