@@ -7,23 +7,23 @@ using UnityEngine.Networking;
 
 public class MetadataLoader : MonoBehaviour
 {
-    [Header("🎯 Configuration")]
-    public bool USE_LOCAL_METADATA = true;
-    
-    [Header("📋 Projet")]
-    [SerializeField, Tooltip("Nom du projet Unity (automatique)")]
-    private string projectName;
-    
-    [Header("🌐 Configuration API Azure")]
-    public string apiBaseUrl = "https://votre-domaine.com/api/unity/metadata";
+    [Header("🌐 Configuration (managed by WiseTwinManager)")]
+    [SerializeField, Tooltip("API URL for Azure metadata")]
+    public string apiBaseUrl = "https://your-domain.com/api/unity/metadata";
+    [SerializeField, Tooltip("Container ID for Azure")]
     public string containerId = "";
+    [SerializeField, Tooltip("Build type identifier")]
     public string buildType = "wisetrainer";
-    
-    [Header("⚙️ Paramètres")]
-    public bool enableDebugLogs = true;
+    [SerializeField, Tooltip("Request timeout in seconds")]
     public float requestTimeout = 30f;
+    [SerializeField, Tooltip("Maximum retry attempts")]
     public int maxRetryAttempts = 3;
+    [SerializeField, Tooltip("Delay between retries")]
     public float retryDelay = 2f;
+    
+    [Header("📋 Project Info")]
+    [SerializeField, Tooltip("Project name (auto-generated)")]
+    private string projectName;
     
     // Events simples
     public System.Action<Dictionary<string, object>> OnMetadataLoaded;
@@ -58,12 +58,25 @@ public class MetadataLoader : MonoBehaviour
     
     void InitializeProjectName()
     {
+        // Try to get project name from WiseTwinManager first
+        if (WiseTwin.WiseTwinManager.Instance != null)
+        {
+            string managerProjectName = WiseTwin.WiseTwinManager.Instance.ProjectName;
+            if (!string.IsNullOrEmpty(managerProjectName))
+            {
+                projectName = managerProjectName;
+                DebugLog($"📋 Project name from WiseTwinManager: {projectName}");
+                return;
+            }
+        }
+        
+        // Fallback to Unity project name
         projectName = Application.productName;
         if (string.IsNullOrEmpty(projectName))
         {
             projectName = "unity-project";
         }
-        DebugLog($"📋 Nom du projet: {projectName}");
+        DebugLog($"📋 Project name (fallback): {projectName}");
     }
     
     void Start()
@@ -73,9 +86,10 @@ public class MetadataLoader : MonoBehaviour
     
     public void LoadMetadata()
     {
-        DebugLog($"🔄 Début du chargement - Mode: {(USE_LOCAL_METADATA ? "Local" : "Azure")}");
+        bool useLocalMode = GetUseLocalMode();
+        DebugLog($"🔄 Starting metadata load - Mode: {(useLocalMode ? "Local" : "Production")}");
         
-        if (USE_LOCAL_METADATA)
+        if (useLocalMode)
         {
             StartCoroutine(LoadLocalMetadata());
         }
@@ -334,9 +348,40 @@ public class MetadataLoader : MonoBehaviour
         return "";
     }
     
+    /// <summary>
+    /// Update settings from WiseTwinManager
+    /// </summary>
+    public void UpdateSettingsFromManager()
+    {
+        // Settings are now managed by WiseTwinManager
+        // This method exists for future extensibility
+    }
+    
+    bool GetUseLocalMode()
+    {
+        if (WiseTwin.WiseTwinManager.Instance != null)
+        {
+            return !WiseTwin.WiseTwinManager.Instance.IsProductionMode();
+        }
+        
+        // Fallback: assume local mode if WiseTwinManager not available
+        return true;
+    }
+    
+    bool ShouldLogDebug()
+    {
+        if (WiseTwin.WiseTwinManager.Instance != null)
+        {
+            return WiseTwin.WiseTwinManager.Instance.EnableDebugLogs;
+        }
+        
+        // Fallback: enable debug logs if WiseTwinManager not available
+        return true;
+    }
+    
     void DebugLog(string message)
     {
-        if (enableDebugLogs)
+        if (ShouldLogDebug())
         {
             Debug.Log($"[MetadataLoader] {message}");
         }
@@ -345,7 +390,7 @@ public class MetadataLoader : MonoBehaviour
     // Interface de debug simple
     void OnGUI()
     {
-        if (!enableDebugLogs) return;
+        if (!ShouldLogDebug()) return;
         
         GUILayout.BeginArea(new Rect(10, 10, 350, 200));
         GUILayout.BeginVertical("box");
@@ -354,28 +399,25 @@ public class MetadataLoader : MonoBehaviour
         boldStyle.fontStyle = FontStyle.Bold;
         
         GUILayout.Label("🎯 MetadataLoader", boldStyle);
-        GUILayout.Label($"Mode: {(USE_LOCAL_METADATA ? "Local" : "Azure")}");
-        GUILayout.Label($"Projet: {projectName}");
-        GUILayout.Label($"Chargé: {(IsLoaded ? "✅" : "❌")}");
+        bool useLocalMode = GetUseLocalMode();
+        GUILayout.Label($"Mode: {(useLocalMode ? "Local" : "Production")}");
+        GUILayout.Label($"Project: {projectName}");
+        GUILayout.Label($"Loaded: {(IsLoaded ? "✅" : "❌")}");
         
         if (IsLoaded)
         {
-            GUILayout.Label($"Objets Unity: {unityData.Count}");
-            GUILayout.Label($"Titre: {GetProjectInfo("title")}");
+            GUILayout.Label($"Unity Objects: {unityData.Count}");
+            GUILayout.Label($"Title: {GetProjectInfo("title")}");
         }
         
         GUILayout.Space(10);
         
-        if (GUILayout.Button("🔄 Recharger"))
+        if (GUILayout.Button("🔄 Reload"))
         {
             ReloadMetadata();
         }
         
-        if (GUILayout.Button($"🔄 {(USE_LOCAL_METADATA ? "→ Azure" : "→ Local")}"))
-        {
-            USE_LOCAL_METADATA = !USE_LOCAL_METADATA;
-            ReloadMetadata();
-        }
+        GUILayout.Label("Mode controlled by WiseTwinManager", GUI.skin.box);
         
         GUILayout.EndVertical();
         GUILayout.EndArea();
