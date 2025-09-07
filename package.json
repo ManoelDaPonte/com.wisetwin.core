@@ -5,9 +5,9 @@
   "description": "Core utilities and components for WiseTwin Unity projects",
   "unity": "2021.3",
   "unityRelease": "0f1",
-  "documentationUrl": "https://github.com/username/wisetwin-package",
-  "changelogUrl": "https://github.com/username/wisetwin-package/blob/main/CHANGELOG.md",
-  "licensesUrl": "https://github.com/username/wisetwin-package/blob/main/LICENSE.md",
+  "documentationUrl": "https://github.com/ManoelDaPonte/com.wisetwin.core",
+  "changelogUrl": "https://github.com/ManoelDaPonte/com.wisetwin.core/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/ManoelDaPonte/com.wisetwin.core/blob/main/LICENSE.md",
   "keywords": [
     "utility",
     "core",
@@ -16,7 +16,7 @@
   "author": {
     "name": "Your Name",
     "email": "your.email@example.com",
-    "url": "https://github.com/username"
+    "url": "https://github.com/ManoelDaPonte"
   },
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1"
