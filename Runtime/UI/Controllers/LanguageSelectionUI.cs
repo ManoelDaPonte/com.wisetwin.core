@@ -103,6 +103,29 @@ namespace WiseTwin
                 // Initialiser et afficher immédiatement
                 Initialize();
                 ShowLanguageSelection();
+
+                // Charger les métadonnées si disponibles
+                StartCoroutine(LoadMetadataWhenReady());
+            }
+        }
+
+        IEnumerator LoadMetadataWhenReady()
+        {
+            // Attendre que WiseTwinManager soit prêt
+            while (wiseTwinManager == null || !wiseTwinManager.IsMetadataLoaded)
+            {
+                yield return null;
+                if (wiseTwinManager == null)
+                {
+                    wiseTwinManager = WiseTwinManager.Instance;
+                }
+            }
+
+            // Récupérer les métadonnées
+            trainingMetadata = wiseTwinManager.MetadataLoader.GetMetadata();
+            if (debugMode && trainingMetadata != null)
+            {
+                Debug.Log($"[LanguageSelectionUI] Metadata loaded with {trainingMetadata.Count} entries");
             }
         }
 
@@ -549,15 +572,27 @@ namespace WiseTwin
 
         void UpdateDisclaimerTexts()
         {
-            if (trainingMetadata == null) return;
-
             string lang = selectedLanguage;
+
+            // Si pas de métadonnées, utiliser des valeurs par défaut
+            string title = "Formation Test";
+            string description = "Formation interactive de test";
+            string duration = "30 minutes";
+            string difficulty = "Débutant";
+
+            // Essayer de charger depuis les métadonnées si disponibles
+            if (trainingMetadata != null)
+            {
+                title = GetMetadataValue<string>(trainingMetadata, "title", title);
+                description = GetMetadataValue<string>(trainingMetadata, "description", description);
+                duration = GetMetadataValue<string>(trainingMetadata, "duration", duration);
+                difficulty = GetMetadataValue<string>(trainingMetadata, "difficulty", difficulty);
+            }
 
             // Titre
             var titleLabel = disclaimerPanel.Q<Label>("training-title");
             if (titleLabel != null)
             {
-                string title = GetMetadataValue<string>(trainingMetadata, "title", "Training");
                 titleLabel.text = title;
             }
 
@@ -565,15 +600,13 @@ namespace WiseTwin
             var descLabel = disclaimerPanel.Q<Label>("training-description");
             if (descLabel != null)
             {
-                string desc = GetMetadataValue<string>(trainingMetadata, "description", "");
-                descLabel.text = desc;
+                descLabel.text = description;
             }
 
             // Durée
             var durationLabel = disclaimerPanel.Q<Label>("training-duration");
             if (durationLabel != null)
             {
-                string duration = GetMetadataValue<string>(trainingMetadata, "duration", "30 minutes");
                 string durationText = lang == "fr" ? $"⏱️ Durée : {duration}" : $"⏱️ Duration: {duration}";
                 durationLabel.text = durationText;
             }
@@ -582,8 +615,19 @@ namespace WiseTwin
             var difficultyLabel = disclaimerPanel.Q<Label>("training-difficulty");
             if (difficultyLabel != null)
             {
-                string difficulty = GetMetadataValue<string>(trainingMetadata, "difficulty", "Intermediate");
-                string diffText = lang == "fr" ? $"📊 Difficulté : {difficulty}" : $"📊 Difficulty: {difficulty}";
+                // Traduire la difficulté si nécessaire
+                string localizedDifficulty = difficulty;
+                if (lang == "fr")
+                {
+                    switch(difficulty.ToLower())
+                    {
+                        case "beginner": localizedDifficulty = "Débutant"; break;
+                        case "intermediate": localizedDifficulty = "Intermédiaire"; break;
+                        case "advanced": localizedDifficulty = "Avancé"; break;
+                        case "expert": localizedDifficulty = "Expert"; break;
+                    }
+                }
+                string diffText = lang == "fr" ? $"📊 Difficulté : {localizedDifficulty}" : $"📊 Difficulty: {difficulty}";
                 difficultyLabel.text = diffText;
             }
 
@@ -602,7 +646,7 @@ namespace WiseTwin
                 {
                     disclaimerText.text =
                         "• Cette formation collecte vos temps de réponse pour personnaliser votre expérience d'apprentissage.\n\n" +
-                        "• Assurez-vous d'avoir le temps nécessaire devant vous (environ " + GetMetadataValue<string>(trainingMetadata, "duration", "30 minutes") + ").\n\n" +
+                        "• Assurez-vous d'avoir le temps nécessaire devant vous (environ " + duration + ").\n\n" +
                         "• Pour une expérience optimale, évitez les interruptions pendant la formation.\n\n" +
                         "• Vos données sont utilisées uniquement pour améliorer votre parcours de formation.";
                 }
@@ -610,7 +654,7 @@ namespace WiseTwin
                 {
                     disclaimerText.text =
                         "• This training collects your response times to personalize your learning experience.\n\n" +
-                        "• Please ensure you have the necessary time available (approximately " + GetMetadataValue<string>(trainingMetadata, "duration", "30 minutes") + ").\n\n" +
+                        "• Please ensure you have the necessary time available (approximately " + duration + ").\n\n" +
                         "• For an optimal experience, avoid interruptions during the training.\n\n" +
                         "• Your data is used solely to improve your training journey.";
                 }
@@ -626,7 +670,7 @@ namespace WiseTwin
             var startButton = disclaimerPanel.Q<Button>("start-button");
             if (startButton != null)
             {
-                startButton.text = lang == "fr" ? "Commencer la Formation" : "Start Training";
+                startButton.text = lang == "fr" ? "Commencer" : "Start Training";
             }
         }
 
@@ -670,11 +714,34 @@ namespace WiseTwin
             // Masquer les panels
             StartCoroutine(HideAllPanels());
 
-            // Démarrer la formation dans le UIManager
+            // Afficher le HUD de formation
+            ShowTrainingHUD();
+
+            // Démarrer la formation dans le UIManager (optionnel, selon tes besoins)
             if (uiManager != null)
             {
-                uiManager.StartTraining();
+                // uiManager.StartTraining(); // Commenté car on utilise notre nouveau HUD
             }
+        }
+
+        void ShowTrainingHUD()
+        {
+            // Chercher ou créer le TrainingHUD
+            var trainingHUD = TrainingHUD.Instance;
+            if (trainingHUD == null)
+            {
+                // Créer le HUD s'il n'existe pas
+                var hudGO = new GameObject("TrainingHUD");
+                trainingHUD = hudGO.AddComponent<TrainingHUD>();
+            }
+
+            // Détecter automatiquement les objets interactables
+            trainingHUD.AutoDetectInteractables();
+
+            // Afficher le HUD
+            trainingHUD.Show();
+
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Training HUD shown");
         }
 
         public void ShowLanguageSelection()
