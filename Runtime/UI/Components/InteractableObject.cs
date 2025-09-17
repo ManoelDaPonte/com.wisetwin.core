@@ -12,12 +12,25 @@ namespace WiseTwin
     public class InteractableObject : MonoBehaviour
     {
         [Header("Configuration")]
-        [SerializeField] private bool useMouseClick = true;
+        [SerializeField] private bool allowInteraction = true;
 
         [Header("Visual Feedback")]
         [SerializeField] private bool highlightOnHover = true;
+        [SerializeField] private HoverMode hoverMode = HoverMode.MultiplyColor;
         [SerializeField] private Color hoverColor = new Color(1.2f, 1.2f, 1.2f, 1f);
+        [SerializeField] private float emissionIntensity = 0.3f;
         [SerializeField] private bool showCursorChange = true;
+
+        public enum HoverMode
+        {
+            MultiplyColor,      // Multiplie la couleur actuelle
+            OverrideColor,      // Remplace la couleur
+            EmissionBoost,      // Augmente l'émission
+            MaterialSwap        // Change de matériau (nécessite un matériau d'hover)
+        }
+
+        [Header("Material Swap (if using MaterialSwap mode)")]
+        [SerializeField] private Material hoverMaterial;
 
         [Header("Content Type")]
         [SerializeField] private ContentType contentType = ContentType.Question;
@@ -29,7 +42,10 @@ namespace WiseTwin
         // Références
         private ObjectMetadataMapper metadataMapper;
         private Renderer objectRenderer;
+        private Material originalMaterial;
+        private Material instanceMaterial;
         private Color originalColor;
+        private Color originalEmissionColor;
         private bool isHovered = false;
         private bool isInteractionEnabled = true;
 
@@ -49,7 +65,31 @@ namespace WiseTwin
             objectRenderer = GetComponent<Renderer>();
             if (objectRenderer != null && objectRenderer.material != null)
             {
-                originalColor = objectRenderer.material.color;
+                // Stocker le matériau original
+                originalMaterial = objectRenderer.sharedMaterial;
+
+                // Créer une instance du matériau pour éviter de modifier l'asset
+                instanceMaterial = new Material(originalMaterial);
+                objectRenderer.material = instanceMaterial;
+
+                // Stocker les couleurs originales
+                if (instanceMaterial.HasProperty("_Color"))
+                {
+                    originalColor = instanceMaterial.GetColor("_Color");
+                }
+                else if (instanceMaterial.HasProperty("_BaseColor"))
+                {
+                    originalColor = instanceMaterial.GetColor("_BaseColor");
+                }
+                else
+                {
+                    originalColor = Color.white;
+                }
+
+                if (instanceMaterial.HasProperty("_EmissionColor"))
+                {
+                    originalEmissionColor = instanceMaterial.GetColor("_EmissionColor");
+                }
             }
 
             // S'assurer qu'il y a un collider
@@ -59,13 +99,6 @@ namespace WiseTwin
                 col = gameObject.AddComponent<BoxCollider>();
                 if (debugMode) Debug.Log($"[InteractableObject] Added BoxCollider to {gameObject.name}");
             }
-
-            // Le collider doit être en mode Trigger ou non selon la configuration
-            if (useMouseClick && !col.isTrigger)
-            {
-                // Pour OnMouseDown, le collider ne doit pas être trigger
-                col.isTrigger = false;
-            }
         }
 
         void Start()
@@ -74,6 +107,16 @@ namespace WiseTwin
             if (ContentDisplayManager.Instance == null && debugMode)
             {
                 Debug.LogWarning($"[InteractableObject] ContentDisplayManager not found in scene!");
+            }
+
+            // Vérifier si le système de raycast est présent
+            var raycastSystem = FindFirstObjectByType<InteractableObjectRaycast>();
+            if (raycastSystem == null)
+            {
+                // Créer automatiquement le système de raycast s'il n'existe pas
+                GameObject raycastGO = new GameObject("InteractableObjectRaycast");
+                raycastGO.AddComponent<InteractableObjectRaycast>();
+                if (debugMode) Debug.Log("[InteractableObject] Created InteractableObjectRaycast system");
             }
 
             // Précharger les données si possible
@@ -94,19 +137,16 @@ namespace WiseTwin
             }
         }
 
-        void OnMouseDown()
-        {
-            if (!useMouseClick || !isInteractionEnabled) return;
-
-            HandleInteraction();
-        }
 
         void OnMouseEnter()
         {
             if (!highlightOnHover || !isInteractionEnabled) return;
 
             // Ne pas activer l'hover si une UI est affichée
-            if (ContentDisplayManager.Instance != null && ContentDisplayManager.Instance.IsDisplaying) return;
+            if (ContentDisplayManager.Instance != null && ContentDisplayManager.Instance.IsDisplaying)
+            {
+                return;
+            }
 
             isHovered = true;
             ApplyHoverEffect();
@@ -128,18 +168,94 @@ namespace WiseTwin
 
         void ApplyHoverEffect()
         {
-            if (objectRenderer != null && objectRenderer.material != null)
+            if (objectRenderer == null || instanceMaterial == null) return;
+
+            switch (hoverMode)
             {
-                objectRenderer.material.color = originalColor * hoverColor.r;
+                case HoverMode.MultiplyColor:
+                    // Multiplier la couleur
+                    if (instanceMaterial.HasProperty("_Color"))
+                    {
+                        instanceMaterial.SetColor("_Color", originalColor * hoverColor);
+                    }
+                    if (instanceMaterial.HasProperty("_BaseColor"))
+                    {
+                        instanceMaterial.SetColor("_BaseColor", originalColor * hoverColor);
+                    }
+                    break;
+
+                case HoverMode.OverrideColor:
+                    // Remplacer la couleur
+                    if (instanceMaterial.HasProperty("_Color"))
+                    {
+                        instanceMaterial.SetColor("_Color", hoverColor);
+                    }
+                    if (instanceMaterial.HasProperty("_BaseColor"))
+                    {
+                        instanceMaterial.SetColor("_BaseColor", hoverColor);
+                    }
+                    break;
+
+                case HoverMode.EmissionBoost:
+                    // Augmenter l'émission
+                    if (instanceMaterial.HasProperty("_EmissionColor"))
+                    {
+                        instanceMaterial.EnableKeyword("_EMISSION");
+                        Color boostedEmission = originalEmissionColor + hoverColor * emissionIntensity;
+                        instanceMaterial.SetColor("_EmissionColor", boostedEmission);
+                    }
+                    break;
+
+                case HoverMode.MaterialSwap:
+                    // Changer de matériau
+                    if (hoverMaterial != null)
+                    {
+                        objectRenderer.material = hoverMaterial;
+                    }
+                    break;
             }
+
         }
 
         void RemoveHoverEffect()
         {
-            if (objectRenderer != null && objectRenderer.material != null)
+            if (objectRenderer == null) return;
+
+            switch (hoverMode)
             {
-                objectRenderer.material.color = originalColor;
+                case HoverMode.MultiplyColor:
+                case HoverMode.OverrideColor:
+                    // Restaurer les couleurs
+                    if (instanceMaterial != null)
+                    {
+                        if (instanceMaterial.HasProperty("_Color"))
+                        {
+                            instanceMaterial.SetColor("_Color", originalColor);
+                        }
+                        if (instanceMaterial.HasProperty("_BaseColor"))
+                        {
+                            instanceMaterial.SetColor("_BaseColor", originalColor);
+                        }
+                    }
+                    break;
+
+                case HoverMode.EmissionBoost:
+                    // Restaurer l'émission
+                    if (instanceMaterial != null && instanceMaterial.HasProperty("_EmissionColor"))
+                    {
+                        instanceMaterial.SetColor("_EmissionColor", originalEmissionColor);
+                    }
+                    break;
+
+                case HoverMode.MaterialSwap:
+                    // Restaurer le matériau original
+                    if (instanceMaterial != null)
+                    {
+                        objectRenderer.material = instanceMaterial;
+                    }
+                    break;
             }
+
         }
 
         public void HandleInteraction()
@@ -259,6 +375,12 @@ namespace WiseTwin
             if (isHovered)
             {
                 RemoveHoverEffect();
+            }
+
+            // Détruire l'instance du matériau pour éviter les fuites mémoire
+            if (instanceMaterial != null)
+            {
+                Destroy(instanceMaterial);
             }
         }
 
