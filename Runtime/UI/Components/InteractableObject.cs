@@ -1,10 +1,11 @@
 using UnityEngine;
 using System.Collections.Generic;
+using WiseTwin.UI;
 
 namespace WiseTwin
 {
     /// <summary>
-    /// Composant pour rendre un objet 3D interactif et déclencher l'affichage de questions
+    /// Composant pour rendre un objet 3D interactif et déclencher l'affichage de contenu
     /// Travaille en conjonction avec ObjectMetadataMapper pour récupérer l'ID
     /// </summary>
     [RequireComponent(typeof(Collider))]
@@ -19,7 +20,7 @@ namespace WiseTwin
         [SerializeField] private bool showCursorChange = true;
 
         [Header("Content Type")]
-        [SerializeField] private ContentInteractionType interactionType = ContentInteractionType.Question;
+        [SerializeField] private ContentType contentType = ContentType.Question;
         [SerializeField] private string specificContentKey = ""; // Laisser vide pour prendre le premier disponible
 
         [Header("Debug")]
@@ -27,7 +28,6 @@ namespace WiseTwin
 
         // Références
         private ObjectMetadataMapper metadataMapper;
-        private QuestionController questionController;
         private Renderer objectRenderer;
         private Color originalColor;
         private bool isHovered = false;
@@ -35,15 +35,6 @@ namespace WiseTwin
 
         // Cache des métadonnées
         private Dictionary<string, object> cachedObjectData;
-
-        public enum ContentInteractionType
-        {
-            Question,
-            Procedure,
-            Dialogue,
-            Media,
-            Custom
-        }
 
         void Awake()
         {
@@ -79,11 +70,10 @@ namespace WiseTwin
 
         void Start()
         {
-            // Trouver le QuestionController
-            questionController = FindFirstObjectByType<QuestionController>();
-            if (questionController == null && debugMode)
+            // Vérifier que ContentDisplayManager est disponible
+            if (ContentDisplayManager.Instance == null && debugMode)
             {
-                Debug.LogWarning($"[InteractableObject] QuestionController not found in scene!");
+                Debug.LogWarning($"[InteractableObject] ContentDisplayManager not found in scene!");
             }
 
             // Précharger les données si possible
@@ -114,6 +104,9 @@ namespace WiseTwin
         void OnMouseEnter()
         {
             if (!highlightOnHover || !isInteractionEnabled) return;
+
+            // Ne pas activer l'hover si une UI est affichée
+            if (ContentDisplayManager.Instance != null && ContentDisplayManager.Instance.IsDisplaying) return;
 
             isHovered = true;
             ApplyHoverEffect();
@@ -153,8 +146,11 @@ namespace WiseTwin
         {
             if (!isInteractionEnabled) return;
 
+            // Ne pas interagir si une UI est déjà affichée
+            if (ContentDisplayManager.Instance != null && ContentDisplayManager.Instance.IsDisplaying) return;
+
             string objectId = metadataMapper.MetadataId;
-            if (debugMode) Debug.Log($"[InteractableObject] Interaction with {objectId}");
+            if (debugMode) Debug.Log($"[InteractableObject] Interaction with {objectId} - Type: {contentType}");
 
             // Récupérer les données de l'objet
             if (cachedObjectData == null)
@@ -168,143 +164,70 @@ namespace WiseTwin
                 return;
             }
 
-            // Traiter selon le type d'interaction
-            switch (interactionType)
+            // Chercher le contenu selon le type
+            string contentKey = !string.IsNullOrEmpty(specificContentKey) ? specificContentKey : GetFirstContentKeyOfType(cachedObjectData);
+
+            if (!string.IsNullOrEmpty(contentKey) && cachedObjectData.ContainsKey(contentKey))
             {
-                case ContentInteractionType.Question:
-                    HandleQuestionInteraction(objectId, cachedObjectData);
-                    break;
-
-                case ContentInteractionType.Procedure:
-                    HandleProcedureInteraction(objectId, cachedObjectData);
-                    break;
-
-                case ContentInteractionType.Dialogue:
-                    HandleDialogueInteraction(objectId, cachedObjectData);
-                    break;
-
-                case ContentInteractionType.Media:
-                    HandleMediaInteraction(objectId, cachedObjectData);
-                    break;
-
-                case ContentInteractionType.Custom:
-                    HandleCustomInteraction(objectId, cachedObjectData);
-                    break;
-            }
-        }
-
-        void HandleQuestionInteraction(string objectId, Dictionary<string, object> objectData)
-        {
-            // Chercher une question dans les données
-            string questionKey = !string.IsNullOrEmpty(specificContentKey) ? specificContentKey : "question_1";
-
-            if (objectData.ContainsKey(questionKey))
-            {
-                var questionData = objectData[questionKey] as Dictionary<string, object>;
-
-                if (questionData != null)
+                var contentData = cachedObjectData[contentKey] as Dictionary<string, object>;
+                if (contentData != null && ContentDisplayManager.Instance != null)
                 {
-                    if (debugMode) Debug.Log($"[InteractableObject] Found question data for {objectId}.{questionKey}");
+                    // Désactiver temporairement l'hover sur cet objet
+                    if (isHovered)
+                    {
+                        RemoveHoverEffect();
+                        isHovered = false;
+                    }
 
-                    // Envoyer au QuestionController
-                    if (questionController != null)
-                    {
-                        questionController.ShowQuestion(objectId, questionKey, questionData);
-                    }
-                    else
-                    {
-                        // Fallback: essayer d'utiliser directement WiseTwinUIManager
-                        ShowQuestionFallback(questionData);
-                    }
+                    ContentDisplayManager.Instance.DisplayContent(objectId, contentType, contentData);
                 }
             }
             else
             {
-                if (debugMode) Debug.LogWarning($"[InteractableObject] No question '{questionKey}' found for {objectId}");
+                if (debugMode) Debug.LogWarning($"[InteractableObject] No content of type {contentType} found for {objectId}");
             }
         }
 
-        void ShowQuestionFallback(Dictionary<string, object> questionData)
+        /// <summary>
+        /// Trouve la première clé de contenu correspondant au type configuré
+        /// </summary>
+        string GetFirstContentKeyOfType(Dictionary<string, object> objectData)
         {
-            // Utiliser LocalizationManager pour obtenir la langue
-            string lang = LocalizationManager.Instance != null ? LocalizationManager.Instance.CurrentLanguage : "en";
-
-            // Extraire les données selon la langue
-            string questionText = ExtractLocalizedText(questionData, "text", lang);
-
-            if (!string.IsNullOrEmpty(questionText))
+            // Patterns de clés selon le type
+            string[] patterns = contentType switch
             {
-                // Essayer d'afficher via WiseTwinUIManager
-                if (WiseTwinUIManager.Instance != null)
+                ContentType.Question => new[] { "question", "quiz", "qcm" },
+                ContentType.Procedure => new[] { "procedure", "steps", "process" },
+                ContentType.Media => new[] { "media", "video", "image", "audio" },
+                ContentType.Dialogue => new[] { "dialogue", "conversation", "chat" },
+                ContentType.Instruction => new[] { "instruction", "info", "guide" },
+                _ => new[] { "content" }
+            };
+
+            // Chercher une clé qui correspond aux patterns
+            foreach (var key in objectData.Keys)
+            {
+                string lowerKey = key.ToLower();
+                foreach (var pattern in patterns)
                 {
-                    // Pour l'instant, afficher juste le texte
-                    // TODO: Adapter ShowQuestion pour accepter les données complètes
-                    WiseTwinUIManager.Instance.ShowNotification(questionText, NotificationType.Info);
+                    if (lowerKey.Contains(pattern))
+                    {
+                        return key;
+                    }
                 }
             }
-        }
 
-        string ExtractLocalizedText(Dictionary<string, object> data, string key, string language)
-        {
-            if (data.ContainsKey(key))
+            // Si aucun pattern ne correspond, retourner la première clé qui semble être du contenu
+            foreach (var key in objectData.Keys)
             {
-                var textData = data[key];
-
-                // Si c'est déjà une string, la retourner
-                if (textData is string simpleText)
+                var value = objectData[key];
+                if (value is Dictionary<string, object>)
                 {
-                    return simpleText;
-                }
-
-                // Si c'est un dictionnaire de langues
-                if (textData is Dictionary<string, object> localizedText)
-                {
-                    if (localizedText.ContainsKey(language))
-                    {
-                        return localizedText[language]?.ToString();
-                    }
-                    // Fallback to English
-                    if (localizedText.ContainsKey("en"))
-                    {
-                        return localizedText["en"]?.ToString();
-                    }
+                    return key;
                 }
             }
 
             return "";
-        }
-
-        void HandleProcedureInteraction(string objectId, Dictionary<string, object> objectData)
-        {
-            if (debugMode) Debug.Log($"[InteractableObject] Procedure interaction not yet implemented for {objectId}");
-            // TODO: Implémenter l'affichage des procédures
-        }
-
-        void HandleDialogueInteraction(string objectId, Dictionary<string, object> objectData)
-        {
-            if (debugMode) Debug.Log($"[InteractableObject] Dialogue interaction not yet implemented for {objectId}");
-            // TODO: Implémenter l'affichage des dialogues
-        }
-
-        void HandleMediaInteraction(string objectId, Dictionary<string, object> objectData)
-        {
-            if (debugMode) Debug.Log($"[InteractableObject] Media interaction not yet implemented for {objectId}");
-            // TODO: Implémenter l'affichage des médias
-        }
-
-        void HandleCustomInteraction(string objectId, Dictionary<string, object> objectData)
-        {
-            if (debugMode) Debug.Log($"[InteractableObject] Custom interaction for {objectId}");
-            // Les classes dérivées peuvent override cette méthode
-            OnCustomInteraction(objectId, objectData);
-        }
-
-        /// <summary>
-        /// Méthode virtuelle pour les interactions personnalisées
-        /// </summary>
-        protected virtual void OnCustomInteraction(string objectId, Dictionary<string, object> objectData)
-        {
-            // À override dans les classes dérivées
         }
 
         /// <summary>
@@ -337,6 +260,30 @@ namespace WiseTwin
             {
                 RemoveHoverEffect();
             }
+        }
+
+        void OnEnable()
+        {
+            // S'abonner aux événements du ContentDisplayManager
+            if (ContentDisplayManager.Instance != null)
+            {
+                ContentDisplayManager.Instance.OnContentClosed += HandleContentClosed;
+            }
+        }
+
+        void OnDisable()
+        {
+            // Se désabonner des événements
+            if (ContentDisplayManager.Instance != null)
+            {
+                ContentDisplayManager.Instance.OnContentClosed -= HandleContentClosed;
+            }
+        }
+
+        void HandleContentClosed(ContentType type, string objectId)
+        {
+            // Réactiver les interactions après fermeture d'une UI
+            isInteractionEnabled = true;
         }
 
         /// <summary>

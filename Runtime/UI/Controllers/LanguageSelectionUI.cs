@@ -240,6 +240,8 @@ namespace WiseTwin
             languageSelectionPanel.style.display = DisplayStyle.None;
             languageSelectionPanel.style.alignItems = Align.Center;
             languageSelectionPanel.style.justifyContent = Justify.Center;
+            // IMPORTANT : Bloquer les raycasts pour ne pas cliquer à travers
+            languageSelectionPanel.pickingMode = PickingMode.Position;
 
             // Container pour le contenu avec style carte moderne - plus compact sans titre
             var contentContainer = new VisualElement();
@@ -411,6 +413,8 @@ namespace WiseTwin
             disclaimerPanel.style.display = DisplayStyle.None;
             disclaimerPanel.style.alignItems = Align.Center;
             disclaimerPanel.style.justifyContent = Justify.Center;
+            // IMPORTANT : Bloquer les raycasts pour ne pas cliquer à travers
+            disclaimerPanel.pickingMode = PickingMode.Position;
 
             // Container pour le contenu
             var contentContainer = new VisualElement();
