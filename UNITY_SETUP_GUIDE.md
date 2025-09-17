@@ -97,9 +97,7 @@
    - Primary Color: (0.2, 0.4, 0.8)
    - Accent Color: (0.1, 0.8, 0.6)
 
-3. **Ajouter Component** → `QuestionController`
-   - Auto Show Next Question: ❌
-   - Delay Before Next: 2
+3. **Ajouter Component** → `ContentDisplayManager`
    - Debug Mode: ✅
 
 4. **Désactiver le GameObject** UI_Training (décocher la case en haut)
@@ -121,7 +119,7 @@
 3. **Ajouter Component** → `InteractableObject`
    - Use Mouse Click: ✅
    - Highlight On Hover: ✅
-   - Interaction Type: Question
+   - Content Type: Question
    - Debug Mode: ✅
 
 ### Sur `TrainingObject_02` (Sphere) :
@@ -233,7 +231,7 @@ public class MyTrainingController : MonoBehaviour
 
     private LanguageSelectionUI languageUI;
     private WiseTwinUIManager uiManager;
-    private QuestionController questionController;
+    private ContentDisplayManager contentDisplayManager;
     private WiseTwinManager wiseTwinManager;
 
     void Start()
@@ -241,7 +239,7 @@ public class MyTrainingController : MonoBehaviour
         // Récupérer les références
         languageUI = uiWelcome.GetComponent<LanguageSelectionUI>();
         uiManager = uiTraining.GetComponent<WiseTwinUIManager>();
-        questionController = uiTraining.GetComponent<QuestionController>();
+        contentDisplayManager = ContentDisplayManager.Instance;
         wiseTwinManager = WiseTwinManager.Instance;
 
         // S'abonner aux événements
@@ -350,20 +348,8 @@ public class MyTrainingController : MonoBehaviour
     {
         Debug.Log("📡 === SIMULATION ENVOI API ===");
 
-        // Récupérer les résultats
-        var results = questionController.GetSessionResults();
-        float score = questionController.GetSessionScore();
-
-        Debug.Log($"📊 Nombre de questions répondues: {results.Count}");
-        Debug.Log($"✅ Score final: {score:F0}%");
-
-        // Afficher chaque résultat
-        foreach (var result in results)
-        {
-            Debug.Log($"  Question: {result.questionId}");
-            Debug.Log($"  Répondu: {result.userAnswer} | Correct: {result.correctAnswer}");
-            Debug.Log($"  Temps: {result.timeSpent:F1}s | Correct: {result.isCorrect}");
-        }
+        // TODO: Récupérer les résultats depuis ContentDisplayManager
+        Debug.Log($"📊 Formation terminée");
 
         // Déclencher la notification de fin
         if (wiseTwinManager != null)
@@ -472,7 +458,7 @@ public class MyTrainingController : MonoBehaviour
 - [ ] PanelSettings créé et assigné
 - [ ] WiseTwinCore avec 4 composants
 - [ ] UI_Welcome avec LanguageSelectionUI
-- [ ] UI_Training avec UIManager + QuestionController
+- [ ] UI_Training avec UIManager + ContentDisplayManager
 - [ ] UI_Training désactivé au départ
 - [ ] Objets 3D avec ObjectMetadataMapper + InteractableObject
 - [ ] metadata.json dans StreamingAssets
