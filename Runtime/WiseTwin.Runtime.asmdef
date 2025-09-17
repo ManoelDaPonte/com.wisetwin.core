@@ -1,7 +1,10 @@
 {
     "name": "WiseTwin.Runtime",
-    "rootNamespace": "",
-    "references": [],
+    "rootNamespace": "WiseTwin",
+    "references": [
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -9,6 +12,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.nuget.newtonsoft-json",
+            "expression": "3.0.0",
+            "define": "NEWTONSOFT_JSON_AVAILABLE"
+        }
+    ],
     "noEngineReferences": false
 }
