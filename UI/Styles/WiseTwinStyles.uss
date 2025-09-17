@@ -1,0 +1,302 @@
+/* WiseTwin UI Toolkit Styles for Unity 6000+ */
+
+:root {
+    --primary-color: rgb(51, 102, 204);
+    --accent-color: rgb(26, 204, 153);
+    --success-color: rgb(26, 153, 77);
+    --error-color: rgb(204, 51, 51);
+    --warning-color: rgb(204, 153, 26);
+    --background-dark: rgba(0, 0, 0, 0.85);
+    --background-light: rgba(26, 26, 26, 0.95);
+    --text-primary: rgb(255, 255, 255);
+    --text-secondary: rgb(179, 179, 179);
+    --border-radius: 12px;
+    --transition-time: 0.3s;
+}
+
+/* Root Container */
+#root-container {
+    flex-grow: 1;
+    background-color: transparent;
+}
+
+/* HUD Styles */
+#hud-container {
+    transition-duration: var(--transition-time);
+    transition-property: opacity, translate;
+}
+
+#hud-container VisualElement {
+    -unity-font-definition: url('project://database/Assets/Fonts/YourFont.asset');
+}
+
+.hud-section {
+    background-color: var(--background-dark);
+    border-radius: var(--border-radius);
+    padding: 15px 20px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.hud-title {
+    font-size: 24px;
+    color: var(--text-primary);
+    -unity-font-style: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.hud-timer {
+    font-size: 20px;
+    color: var(--accent-color);
+    -unity-font-style: bold;
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+}
+
+/* Question Modal Styles */
+#question-modal {
+    transition-duration: var(--transition-time);
+    transition-property: opacity;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background-color: var(--background-light);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 600px;
+    min-width: 400px;
+    border-width: 2px;
+    border-color: var(--primary-color);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    animation-name: modal-enter;
+    animation-duration: 0.4s;
+    animation-timing-function: ease-out;
+}
+
+@keyframes modal-enter {
+    from {
+        scale: 0.8;
+        opacity: 0;
+    }
+    to {
+        scale: 1;
+        opacity: 1;
+    }
+}
+
+.question-text {
+    font-size: 22px;
+    color: var(--text-primary);
+    margin-bottom: 25px;
+    line-height: 1.4;
+    white-space: normal;
+}
+
+/* Option Buttons */
+.option-button {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    min-height: 45px;
+    font-size: 16px;
+    color: var(--text-primary);
+    border-width: 1px;
+    border-color: transparent;
+    transition-duration: var(--transition-time);
+    transition-property: background-color, border-color, translate;
+}
+
+.option-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary-color);
+    translate: 2px 0;
+}
+
+.option-button:active {
+    scale: 0.98;
+}
+
+.option-button.selected {
+    background-color: var(--primary-color);
+    border-color: var(--accent-color);
+    border-width: 2px;
+    font-weight: bold;
+}
+
+/* Submit Button */
+.submit-button {
+    background-color: var(--primary-color);
+    color: var(--text-primary);
+    border-radius: var(--border-radius);
+    padding: 12px 24px;
+    margin-top: 20px;
+    min-height: 50px;
+    font-size: 18px;
+    -unity-font-style: bold;
+    border-width: 0;
+    transition-duration: var(--transition-time);
+    transition-property: background-color, scale;
+}
+
+.submit-button:hover {
+    background-color: rgb(71, 122, 224);
+    scale: 1.02;
+}
+
+.submit-button:active {
+    scale: 0.98;
+}
+
+/* Notifications */
+.notification {
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    min-height: 40px;
+    animation-name: slide-in-right;
+    animation-duration: 0.3s;
+    animation-timing-function: ease-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes slide-in-right {
+    from {
+        translate: 100% 0;
+        opacity: 0;
+    }
+    to {
+        translate: 0 0;
+        opacity: 1;
+    }
+}
+
+.notification-info {
+    background-color: var(--primary-color);
+}
+
+.notification-success {
+    background-color: var(--success-color);
+}
+
+.notification-warning {
+    background-color: var(--warning-color);
+}
+
+.notification-error {
+    background-color: var(--error-color);
+}
+
+.notification Label {
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+/* Progress Panel */
+#progress-panel {
+    background-color: var(--background-dark);
+    border-radius: 15px;
+    padding: 15px 20px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.progress-label {
+    color: var(--text-primary);
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.progress-bar-container {
+    height: 20px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+    border-radius: 10px;
+    transition-duration: var(--transition-time);
+    transition-property: width;
+    transition-timing-function: ease-in-out;
+    box-shadow: 0 0 10px rgba(26, 204, 153, 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 90%;
+        padding: 20px;
+    }
+    
+    .question-text {
+        font-size: 18px;
+    }
+    
+    .option-button {
+        font-size: 14px;
+        padding: 10px 15px;
+    }
+}
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 5px var(--accent-color);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--accent-color), 0 0 30px var(--accent-color);
+    }
+}
+
+/* Utility Classes */
+.hidden {
+    display: none;
+}
+
+.fade-in {
+    animation-name: fade-in;
+    animation-duration: 0.3s;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-out {
+    animation-name: fade-out;
+    animation-duration: 0.3s;
+}
+
+@keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Glass Effect */
+.glass-effect {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}

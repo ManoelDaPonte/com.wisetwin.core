@@ -22,7 +22,7 @@ public class MetadataLoader : MonoBehaviour
     public float retryDelay = 2f;
     
     [Header("📋 Project Info")]
-    [SerializeField, Tooltip("Project name (auto-generated)")]
+    [Tooltip("Project name (auto-generated from Unity project)")]
     private string projectName;
     
     // Events simples
@@ -422,35 +422,4 @@ public class MetadataLoader : MonoBehaviour
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
-}
-
-// Classes d'exemple pour les scripts spécifiques aux builds
-[System.Serializable]
-public class QuestionContent
-{
-    public string text;
-    public string type;
-    public string[] options;
-    public int correctAnswer;
-    public string feedback;
-    public string incorrectFeedback;
-}
-
-[System.Serializable]
-public class MediaContent
-{
-    public string title;
-    public string description;
-    public string mediaUrl;
-    public string duration;
-    public string type; // video, audio, image
-}
-
-[System.Serializable]
-public class DialogueContent
-{
-    public string[] lines;
-    public string[] choices;
-    public string character;
-    public string emotion;
 }
