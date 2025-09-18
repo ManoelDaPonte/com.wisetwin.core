@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 #if UNITY_EDITOR
@@ -11,6 +13,8 @@ public class WiseTwinEditor : EditorWindow
 {
     // Settings stored as simple variables
     private bool useLocalMode = true;
+    private bool useAzureStorageDirect = false;
+    private string azureStorageUrl = "https://yourstorage.blob.core.windows.net/";
     private string azureApiUrl = "https://your-domain.com/api/unity/metadata";
     private string containerId = "";
     private string buildType = "wisetrainer";
@@ -421,16 +425,43 @@ public class WiseTwinEditor : EditorWindow
         }
         GUI.backgroundColor = Color.white;
 
+        // Bouton pour télécharger les métadonnées depuis l'API
         EditorGUILayout.Space(10);
-        
+        GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
+        if (GUILayout.Button("📥 Download Metadata from API", GUILayout.Height(30)))
+        {
+            DownloadMetadataFromAPI();
+        }
+        GUI.backgroundColor = Color.white;
+
+        EditorGUILayout.Space(10);
+
         // Azure Configuration (only show if not in local mode)
         if (!useLocalMode)
         {
             EditorGUILayout.LabelField("☁️ Azure Configuration", EditorStyles.boldLabel);
-            azureApiUrl = EditorGUILayout.TextField("API Base URL", azureApiUrl);
+
+            // Toggle pour choisir entre API et Azure Storage direct
+            useAzureStorageDirect = EditorGUILayout.Toggle("Use Azure Storage Direct", useAzureStorageDirect);
+
+            if (useAzureStorageDirect)
+            {
+                EditorGUILayout.HelpBox("☁️ Direct Azure Storage access (bypass API)", MessageType.Info);
+                azureStorageUrl = EditorGUILayout.TextField("Storage URL", azureStorageUrl);
+                if (GUILayout.Button("Example: https://yourstorage.blob.core.windows.net/", EditorStyles.miniLabel))
+                {
+                    azureStorageUrl = "https://yourstorage.blob.core.windows.net/";
+                }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("🌐 Using Next.js API endpoint", MessageType.Info);
+                azureApiUrl = EditorGUILayout.TextField("API Base URL", azureApiUrl);
+            }
+
             containerId = EditorGUILayout.TextField("Container ID", containerId);
             buildType = EditorGUILayout.TextField("Build Type", buildType);
-            
+
             EditorGUILayout.Space(10);
         }
         
@@ -764,6 +795,109 @@ public class WiseTwinEditor : EditorWindow
     }
     
     
+    async void DownloadMetadataFromAPI()
+    {
+        if (string.IsNullOrEmpty(azureApiUrl) || string.IsNullOrEmpty(containerId))
+        {
+            EditorUtility.DisplayDialog("Error",
+                "Please configure API URL and Container ID first!",
+                "OK");
+            return;
+        }
+
+        // Construire l'URL avec les paramètres
+        string projectName = Application.productName;
+        string url = $"{azureApiUrl}?buildName={UnityEngine.Networking.UnityWebRequest.EscapeURL(projectName)}" +
+                     $"&buildType={UnityEngine.Networking.UnityWebRequest.EscapeURL(buildType)}" +
+                     $"&containerId={UnityEngine.Networking.UnityWebRequest.EscapeURL(containerId)}";
+
+        EditorUtility.DisplayProgressBar("Downloading Metadata", "Connecting to API...", 0.1f);
+
+        try
+        {
+            using (var client = new System.Net.Http.HttpClient())
+            {
+                client.Timeout = System.TimeSpan.FromSeconds(30);
+
+                Debug.Log($"📥 Downloading from: {url}");
+
+                var response = await client.GetAsync(url);
+
+                EditorUtility.DisplayProgressBar("Downloading Metadata", "Receiving data...", 0.5f);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    string jsonContent = await response.Content.ReadAsStringAsync();
+
+                    // Parser la réponse API
+                    var apiResponse = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonContent);
+
+                    string metadataJson;
+
+                    // Si l'API retourne {success: true, data: {...}}
+                    if (apiResponse.ContainsKey("success") && apiResponse.ContainsKey("data"))
+                    {
+                        metadataJson = JsonConvert.SerializeObject(apiResponse["data"], Formatting.Indented);
+                    }
+                    else
+                    {
+                        // Sinon on prend la réponse directement
+                        metadataJson = jsonContent;
+                    }
+
+                    // Sauvegarder dans StreamingAssets
+                    string streamingAssetsPath = Path.Combine(Application.dataPath, "StreamingAssets");
+                    if (!Directory.Exists(streamingAssetsPath))
+                    {
+                        Directory.CreateDirectory(streamingAssetsPath);
+                    }
+
+                    string fileName = $"{projectName}-metadata.json";
+                    string filePath = Path.Combine(streamingAssetsPath, fileName);
+
+                    File.WriteAllText(filePath, metadataJson);
+
+                    EditorUtility.DisplayProgressBar("Downloading Metadata", "Saved to StreamingAssets!", 1f);
+
+                    AssetDatabase.Refresh();
+
+                    Debug.Log($"✅ Metadata downloaded and saved to: {filePath}");
+
+                    EditorUtility.ClearProgressBar();
+
+                    // Afficher le succès et proposer de passer en mode Local
+                    if (EditorUtility.DisplayDialog("Success",
+                        $"Metadata downloaded successfully!\n\nSaved to: StreamingAssets/{fileName}\n\n" +
+                        "Do you want to switch to Local Mode now?",
+                        "Yes, switch to Local", "No"))
+                    {
+                        useLocalMode = true;
+                        ApplySettingsToScene();
+                    }
+                }
+                else
+                {
+                    EditorUtility.ClearProgressBar();
+                    string error = $"API Error: {response.StatusCode} - {response.ReasonPhrase}";
+                    Debug.LogError($"❌ {error}");
+
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    Debug.LogError($"Response: {responseContent}");
+
+                    EditorUtility.DisplayDialog("Download Failed", error, "OK");
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            EditorUtility.ClearProgressBar();
+            Debug.LogError($"❌ Download failed: {e.Message}");
+            EditorUtility.DisplayDialog("Download Failed",
+                $"Failed to download metadata:\n{e.Message}",
+                "OK");
+        }
+    }
+
     void ApplySettingsToScene()
     {
         // Chercher le WiseTwinManager dans la scène
@@ -790,6 +924,8 @@ public class WiseTwinEditor : EditorWindow
         if (loader != null)
         {
             // Appliquer les paramètres API
+            loader.useAzureStorageDirect = useAzureStorageDirect;
+            loader.azureStorageUrl = azureStorageUrl;
             loader.apiBaseUrl = azureApiUrl;
             loader.containerId = containerId;
             loader.buildType = buildType;
@@ -797,10 +933,18 @@ public class WiseTwinEditor : EditorWindow
             loader.maxRetryAttempts = maxRetryAttempts;
 
             Debug.Log($"✅ MetadataLoader configured:");
-            Debug.Log($"   - API URL: {azureApiUrl}");
+            Debug.Log($"   - Mode: {(useLocalMode ? "Local" : "Production")}");
+            Debug.Log($"   - Azure Direct: {useAzureStorageDirect}");
+            if (useAzureStorageDirect)
+            {
+                Debug.Log($"   - Storage URL: {azureStorageUrl}");
+            }
+            else
+            {
+                Debug.Log($"   - API URL: {azureApiUrl}");
+            }
             Debug.Log($"   - Container ID: {containerId}");
             Debug.Log($"   - Build Type: {buildType}");
-            Debug.Log($"   - Mode: {(useLocalMode ? "Local" : "Production")}");
 
             EditorUtility.SetDirty(loader);
         }

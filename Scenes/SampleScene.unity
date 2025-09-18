@@ -1565,7 +1565,7 @@ PrefabInstance:
       objectReference: {fileID: 1944170555}
     - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: enableDebugLogs
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: useProductionMode

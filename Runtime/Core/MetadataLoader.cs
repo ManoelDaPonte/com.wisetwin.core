@@ -8,7 +8,11 @@ using UnityEngine.Networking;
 public class MetadataLoader : MonoBehaviour
 {
     [Header("🌐 Configuration (managed by WiseTwinManager)")]
-    [SerializeField, Tooltip("API URL for Azure metadata")]
+    [SerializeField, Tooltip("Use Azure Storage directly instead of API")]
+    public bool useAzureStorageDirect = false;
+    [SerializeField, Tooltip("Azure Storage URL (for direct access)")]
+    public string azureStorageUrl = "https://yourstorage.blob.core.windows.net/";
+    [SerializeField, Tooltip("API URL for Azure metadata (via Next.js)")]
     public string apiBaseUrl = "https://your-domain.com/api/unity/metadata";
     [SerializeField, Tooltip("Container ID for Azure")]
     public string containerId = "";
@@ -171,10 +175,97 @@ public class MetadataLoader : MonoBehaviour
     
     IEnumerator LoadFromAzure()
     {
-        DebugLog("🌐 Chargement depuis Azure...");
-        
+        if (useAzureStorageDirect)
+        {
+            yield return LoadFromAzureStorageDirect();
+        }
+        else
+        {
+            yield return LoadFromAzureAPI();
+        }
+    }
+
+    IEnumerator LoadFromAzureStorageDirect()
+    {
+        DebugLog("☁️ Chargement direct depuis Azure Storage...");
+
+        // Construction de l'URL Azure Storage
+        // Format: https://storage.blob.core.windows.net/container/buildType/projectName-metadata.json
+        string fileName = $"{projectName}-metadata.json";
+        string url = $"{azureStorageUrl.TrimEnd('/')}/{containerId}/{buildType}/{fileName}";
+
+        DebugLog($"📡 Azure Storage URL: {url}");
+
+        for (int attempt = 0; attempt < maxRetryAttempts; attempt++)
+        {
+            DebugLog($"🔄 Tentative {attempt + 1}/{maxRetryAttempts}");
+
+            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            {
+                request.timeout = (int)requestTimeout;
+
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    DebugLog($"✅ Réponse reçue ({request.downloadHandler.text.Length} caractères)");
+
+                    try
+                    {
+                        // Les données d'Azure Storage sont directement le JSON
+                        ProcessJSON(request.downloadHandler.text);
+                        DebugLog("✅ Métadonnées Azure Storage chargées avec succès");
+                        yield break;
+                    }
+                    catch (System.Exception e)
+                    {
+                        DebugLog($"❌ Erreur parsing JSON: {e.Message}");
+                    }
+                }
+                else
+                {
+                    DebugLog($"❌ Erreur: {request.error} (Code: {request.responseCode})");
+
+                    // Si erreur 404, essayer sans le buildType dans le chemin
+                    if (request.responseCode == 404 && attempt == 0)
+                    {
+                        string altUrl = $"{azureStorageUrl.TrimEnd('/')}/{containerId}/{fileName}";
+                        DebugLog($"🔄 Tentative avec URL alternative: {altUrl}");
+
+                        using (UnityWebRequest altRequest = UnityWebRequest.Get(altUrl))
+                        {
+                            altRequest.timeout = (int)requestTimeout;
+                            yield return altRequest.SendWebRequest();
+
+                            if (altRequest.result == UnityWebRequest.Result.Success)
+                            {
+                                ProcessJSON(altRequest.downloadHandler.text);
+                                DebugLog("✅ Métadonnées trouvées avec URL alternative");
+                                yield break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (attempt < maxRetryAttempts - 1)
+            {
+                DebugLog($"⏳ Attente de {retryDelay}s...");
+                yield return new WaitForSeconds(retryDelay);
+            }
+        }
+
+        string error = "❌ Impossible de charger depuis Azure Storage";
+        DebugLog(error);
+        OnLoadError?.Invoke(error);
+    }
+
+    IEnumerator LoadFromAzureAPI()
+    {
+        DebugLog("🌐 Chargement depuis l'API Next.js...");
+
         string url = BuildAPIUrl();
-        DebugLog($"📡 URL: {url}");
+        DebugLog($"📡 API URL: {url}");
         
         for (int attempt = 0; attempt < maxRetryAttempts; attempt++)
         {
