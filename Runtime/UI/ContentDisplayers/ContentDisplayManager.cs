@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 
 namespace WiseTwin.UI
 {
@@ -41,14 +42,15 @@ namespace WiseTwin.UI
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
                 InitializeDisplayers();
+                SetupUIDocument();
+
+                if (debugMode) Debug.Log("[ContentDisplayManager] Instance created and initialized");
             }
             else
             {
                 Destroy(gameObject);
                 return;
             }
-
-            SetupUIDocument();
         }
 
         void InitializeDisplayers()
@@ -74,22 +76,46 @@ namespace WiseTwin.UI
 
         void SetupUIDocument()
         {
+            // S'assurer d'avoir notre propre UIDocument
             uiDocument = GetComponent<UIDocument>();
             if (uiDocument == null)
             {
                 uiDocument = gameObject.AddComponent<UIDocument>();
+                Debug.Log("[ContentDisplayManager] Created UIDocument component");
+            }
+
+            // Vérifier qu'on ne partage pas le UIDocument avec un autre composant
+            var otherUIUsers = GetComponents<MonoBehaviour>()
+                .Where(c => c != this && c.GetType().Name.Contains("HUD"))
+                .ToArray();
+
+            if (otherUIUsers.Length > 0)
+            {
+                Debug.LogError($"[ContentDisplayManager] WARNING: Sharing GameObject with {otherUIUsers[0].GetType().Name}! " +
+                    "ContentDisplayManager should be on its own GameObject with its own UIDocument.");
             }
 
             // Assigner le PanelSettings s'il n'est pas déjà assigné
             if (uiDocument.panelSettings == null)
             {
+                Debug.LogWarning("[ContentDisplayManager] PanelSettings is null! UI won't display. Please assign WiseTwinPanelSettings to the UIDocument component.");
+
                 #if UNITY_EDITOR
                 var panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/WiseTwinPanelSettings.asset");
                 if (panelSettings != null)
                 {
                     uiDocument.panelSettings = panelSettings;
+                    Debug.Log("[ContentDisplayManager] Auto-assigned PanelSettings from Assets");
+                }
+                else
+                {
+                    Debug.LogError("[ContentDisplayManager] Could not find WiseTwinPanelSettings.asset! Please create it and assign it manually.");
                 }
                 #endif
+            }
+            else
+            {
+                Debug.Log($"[ContentDisplayManager] PanelSettings assigned: {uiDocument.panelSettings.name}");
             }
 
             root = uiDocument.rootVisualElement;
@@ -98,6 +124,8 @@ namespace WiseTwin.UI
                 Debug.LogError("[ContentDisplayManager] Root visual element is null!");
                 return;
             }
+
+            Debug.Log($"[ContentDisplayManager] Root element setup - Width: {root.resolvedStyle.width}, Height: {root.resolvedStyle.height}");
 
             // Configuration de base du root
             root.style.position = Position.Absolute;
@@ -131,8 +159,13 @@ namespace WiseTwin.UI
             // Bloquer les clics pendant l'affichage
             root.pickingMode = PickingMode.Position;
 
+            Debug.Log($"[ContentDisplayManager] Before display - Root child count: {root.childCount}");
+            Debug.Log($"[ContentDisplayManager] Root size: {root.resolvedStyle.width}x{root.resolvedStyle.height}");
+
             // Afficher le contenu
             currentDisplayer.Display(objectId, contentData, root);
+
+            Debug.Log($"[ContentDisplayManager] After display - Root child count: {root.childCount}");
 
             // S'abonner aux événements de l'afficheur
             currentDisplayer.OnClosed += HandleContentClosed;

@@ -27,8 +27,12 @@ namespace WiseTwin.UI
             hasAnswered = false;
             selectedAnswerIndex = -1;
 
+            Debug.Log($"[QuestionDisplayer] Starting display for {objectId}");
+            Debug.Log($"[QuestionDisplayer] Root element valid: {root != null}");
+
             // Obtenir la langue actuelle
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            Debug.Log($"[QuestionDisplayer] Using language: {lang}");
 
             // Extraire les données de la question
             string questionText = ExtractLocalizedText(contentData, "text", lang);
@@ -38,14 +42,21 @@ namespace WiseTwin.UI
             string incorrectFeedback = ExtractLocalizedText(contentData, "incorrectFeedback", lang);
             string questionType = ExtractString(contentData, "type");
 
+            Debug.Log($"[QuestionDisplayer] Question: {questionText}");
+            Debug.Log($"[QuestionDisplayer] Options count: {options?.Count ?? 0}");
+            Debug.Log($"[QuestionDisplayer] Type: {questionType}");
+
             // Créer l'UI
             CreateQuestionUI(questionText, options, questionType, feedback, incorrectFeedback);
         }
 
         void CreateQuestionUI(string questionText, List<string> options, string type, string feedback, string incorrectFeedback)
         {
+            Debug.Log($"[QuestionDisplayer] CreateQuestionUI called - Root is null: {rootElement == null}");
+
             // Clear root
             rootElement.Clear();
+            Debug.Log($"[QuestionDisplayer] Root cleared. Child count: {rootElement.childCount}");
 
             // Container modal
             modalContainer = new VisualElement();
@@ -56,6 +67,8 @@ namespace WiseTwin.UI
             modalContainer.style.alignItems = Align.Center;
             modalContainer.style.justifyContent = Justify.Center;
             modalContainer.pickingMode = PickingMode.Position;
+
+            Debug.Log($"[QuestionDisplayer] Modal container created with backgroundColor: {modalContainer.style.backgroundColor}");
 
             // Boîte de question
             var questionBox = new VisualElement();
@@ -159,6 +172,15 @@ namespace WiseTwin.UI
 
             modalContainer.Add(questionBox);
             rootElement.Add(modalContainer);
+
+            Debug.Log($"[QuestionDisplayer] UI Created - Modal added to root");
+            Debug.Log($"[QuestionDisplayer] Root child count after add: {rootElement.childCount}");
+            Debug.Log($"[QuestionDisplayer] Root visibility: {rootElement.visible}");
+            Debug.Log($"[QuestionDisplayer] Root display: {rootElement.style.display}");
+            Debug.Log($"[QuestionDisplayer] Modal visibility: {modalContainer.visible}");
+
+            // Forcer le rafraîchissement
+            rootElement.MarkDirtyRepaint();
         }
 
         Button CreateOptionButton(string text, int index, bool isTrueFalse)
@@ -286,12 +308,11 @@ namespace WiseTwin.UI
                 validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
                 validateButton.clicked -= null;
                 validateButton.clicked += () => {
-                    OnCompleted?.Invoke(currentObjectId, isCorrect);
                     Close();
                 };
             }
 
-            // Déclencher l'événement de complétion
+            // Déclencher l'événement de complétion UNE SEULE FOIS lors de la validation
             OnCompleted?.Invoke(currentObjectId, isCorrect);
         }
 
@@ -307,14 +328,30 @@ namespace WiseTwin.UI
             if (!data.ContainsKey(key)) return "";
 
             var textData = data[key];
+
+            // Si c'est directement une string
             if (textData is string simpleText) return simpleText;
 
+            // Si c'est un Dictionary
             if (textData is Dictionary<string, object> localizedText)
             {
                 if (localizedText.ContainsKey(language))
                     return localizedText[language]?.ToString() ?? "";
                 if (localizedText.ContainsKey("en"))
                     return localizedText["en"]?.ToString() ?? "";
+            }
+            // Si c'est un JObject de Newtonsoft
+            else if (textData != null && textData.GetType().FullName.Contains("JObject"))
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(textData);
+                var localizedJObject = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+                if (localizedJObject != null)
+                {
+                    if (localizedJObject.ContainsKey(language))
+                        return localizedJObject[language];
+                    if (localizedJObject.ContainsKey("en"))
+                        return localizedJObject["en"];
+                }
             }
 
             return "";
@@ -327,6 +364,7 @@ namespace WiseTwin.UI
 
             var listData = data[key];
 
+            // Si c'est directement une liste
             if (listData is List<object> simpleList)
             {
                 foreach (var item in simpleList)
@@ -334,17 +372,46 @@ namespace WiseTwin.UI
                     result.Add(item?.ToString() ?? "");
                 }
             }
+            // Si c'est un JArray de Newtonsoft
+            else if (listData != null && listData.GetType().FullName.Contains("JArray"))
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(listData);
+                var array = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json);
+                if (array != null) result.AddRange(array);
+            }
+            // Si c'est un dictionnaire de langues
             else if (listData is Dictionary<string, object> localizedLists)
             {
-                if (localizedLists.ContainsKey(language) && localizedLists[language] is List<object> langList)
+                if (localizedLists.ContainsKey(language))
                 {
-                    foreach (var item in langList)
+                    var langData = localizedLists[language];
+                    if (langData is List<object> langList)
                     {
-                        result.Add(item?.ToString() ?? "");
+                        foreach (var item in langList)
+                        {
+                            result.Add(item?.ToString() ?? "");
+                        }
+                    }
+                    else if (langData != null && langData.GetType().FullName.Contains("JArray"))
+                    {
+                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(langData);
+                        var array = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json);
+                        if (array != null) result.AddRange(array);
                     }
                 }
             }
+            // Si c'est un JObject contenant les langues
+            else if (listData != null && listData.GetType().FullName.Contains("JObject"))
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(listData);
+                var localizedJObjectLists = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(json);
+                if (localizedJObjectLists != null && localizedJObjectLists.ContainsKey(language))
+                {
+                    result.AddRange(localizedJObjectLists[language]);
+                }
+            }
 
+            Debug.Log($"[QuestionDisplayer] ExtractLocalizedList for '{key}' in '{language}': found {result.Count} items");
             return result;
         }
 

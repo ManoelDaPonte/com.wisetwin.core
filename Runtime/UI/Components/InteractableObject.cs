@@ -11,8 +11,6 @@ namespace WiseTwin
     [RequireComponent(typeof(Collider))]
     public class InteractableObject : MonoBehaviour
     {
-        [Header("Configuration")]
-        [SerializeField] private bool allowInteraction = true;
 
         [Header("Visual Feedback")]
         [SerializeField] private bool highlightOnHover = true;
@@ -283,24 +281,72 @@ namespace WiseTwin
             // Chercher le contenu selon le type
             string contentKey = !string.IsNullOrEmpty(specificContentKey) ? specificContentKey : GetFirstContentKeyOfType(cachedObjectData);
 
+            if (debugMode) Debug.Log($"[InteractableObject] Looking for key: {contentKey} in object data with keys: {string.Join(", ", cachedObjectData.Keys)}");
+
             if (!string.IsNullOrEmpty(contentKey) && cachedObjectData.ContainsKey(contentKey))
             {
-                var contentData = cachedObjectData[contentKey] as Dictionary<string, object>;
-                if (contentData != null && ContentDisplayManager.Instance != null)
+                // Debug pour voir le type exact
+                var rawContent = cachedObjectData[contentKey];
+                if (debugMode)
                 {
-                    // Désactiver temporairement l'hover sur cet objet
-                    if (isHovered)
+                    Debug.Log($"[InteractableObject] Raw content type for '{contentKey}': {rawContent?.GetType()?.FullName ?? "null"}");
+                    if (rawContent != null)
                     {
-                        RemoveHoverEffect();
-                        isHovered = false;
+                        string jsonDebug = Newtonsoft.Json.JsonConvert.SerializeObject(rawContent, Newtonsoft.Json.Formatting.Indented);
+                        Debug.Log($"[InteractableObject] Content data: {jsonDebug}");
                     }
+                }
 
-                    ContentDisplayManager.Instance.DisplayContent(objectId, contentType, contentData);
+                // Essayer de convertir en Dictionary
+                Dictionary<string, object> contentData = null;
+
+                // Si c'est déjà un Dictionary
+                if (rawContent is Dictionary<string, object> dict)
+                {
+                    contentData = dict;
+                }
+                // Si c'est un JObject de Newtonsoft
+                else if (rawContent != null)
+                {
+                    try
+                    {
+                        // Convertir le JObject en Dictionary
+                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(rawContent);
+                        contentData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                    }
+                    catch (System.Exception e)
+                    {
+                        if (debugMode) Debug.LogError($"[InteractableObject] Failed to convert content: {e.Message}");
+                    }
+                }
+
+                if (contentData != null)
+                {
+                    if (ContentDisplayManager.Instance != null)
+                    {
+                        // Désactiver temporairement l'hover sur cet objet
+                        if (isHovered)
+                        {
+                            RemoveHoverEffect();
+                            isHovered = false;
+                        }
+
+                        if (debugMode) Debug.Log($"[InteractableObject] Displaying content for {objectId} with type {contentType}");
+                        ContentDisplayManager.Instance.DisplayContent(objectId, contentType, contentData);
+                    }
+                    else
+                    {
+                        Debug.LogError("[InteractableObject] ContentDisplayManager.Instance is null! Add ContentDisplayManager to your scene.");
+                    }
+                }
+                else
+                {
+                    if (debugMode) Debug.LogWarning($"[InteractableObject] Content data for key '{contentKey}' is not a Dictionary");
                 }
             }
             else
             {
-                if (debugMode) Debug.LogWarning($"[InteractableObject] No content of type {contentType} found for {objectId}");
+                if (debugMode) Debug.LogWarning($"[InteractableObject] No content of type {contentType} found for {objectId}. Keys available: {string.Join(", ", cachedObjectData.Keys)}");
             }
         }
 
@@ -337,7 +383,9 @@ namespace WiseTwin
             foreach (var key in objectData.Keys)
             {
                 var value = objectData[key];
-                if (value is Dictionary<string, object>)
+                // Vérifier si c'est un Dictionary ou un JObject (Newtonsoft)
+                if (value is Dictionary<string, object> ||
+                    (value != null && value.GetType().FullName.Contains("JObject")))
                 {
                     return key;
                 }

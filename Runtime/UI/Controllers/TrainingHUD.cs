@@ -235,6 +235,13 @@ namespace WiseTwin
 
         public void IncrementProgress()
         {
+            // Ne pas incrémenter si on a déjà atteint le maximum
+            if (currentProgress >= totalObjects)
+            {
+                Debug.LogWarning($"[TrainingHUD] Progress already at maximum ({currentProgress}/{totalObjects})");
+                return;
+            }
+
             currentProgress++;
             UpdateProgressDisplay();
         }
@@ -249,6 +256,8 @@ namespace WiseTwin
             if (progressFill != null && totalObjects > 0)
             {
                 float percentage = (float)currentProgress / totalObjects * 100f;
+                // S'assurer que le pourcentage ne dépasse pas 100%
+                percentage = Mathf.Clamp(percentage, 0f, 100f);
                 progressFill.style.width = Length.Percent(percentage);
 
                 // Changer la couleur quand c'est terminé

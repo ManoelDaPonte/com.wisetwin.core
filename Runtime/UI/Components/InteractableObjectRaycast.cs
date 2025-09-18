@@ -46,10 +46,21 @@ namespace WiseTwin
         {
             if (mouse == null) return;
 
-            // Ne pas faire de raycast si une UI est affichée
+            // Ne pas faire de raycast si une UI est affichée (ContentDisplay OU LanguageSelection)
             if (ContentDisplayManager.Instance != null && ContentDisplayManager.Instance.IsDisplaying)
             {
                 // Si on avait un objet en hover, le désactiver
+                if (currentHoveredObject != null)
+                {
+                    ExitHover();
+                }
+                return;
+            }
+
+            // Vérifier aussi si LanguageSelectionUI est actif
+            var languageUI = FindFirstObjectByType<LanguageSelectionUI>();
+            if (languageUI != null && languageUI.IsDisplaying)
+            {
                 if (currentHoveredObject != null)
                 {
                     ExitHover();

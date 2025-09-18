@@ -42,6 +42,7 @@ namespace WiseTwin
 
         // État
         private string selectedLanguage = "";
+        public bool IsDisplaying { get; private set; } = false;
         private bool isInitialized = false;
 
         // Events
@@ -760,6 +761,7 @@ namespace WiseTwin
             {
                 if (debugMode) Debug.Log("[LanguageSelectionUI] Showing language selection panel");
                 languageSelectionPanel.style.display = DisplayStyle.Flex;
+                IsDisplaying = true;
                 // Désactiver temporairement le fade pour tester
                 languageSelectionPanel.style.opacity = 1;
                 //StartCoroutine(FadeIn(languageSelectionPanel));
@@ -826,6 +828,9 @@ namespace WiseTwin
                 root.style.display = DisplayStyle.None;
                 if (debugMode) Debug.Log("[LanguageSelectionUI] Root element hidden");
             }
+
+            // IMPORTANT : Marquer comme non affiché pour permettre les clics 3D
+            IsDisplaying = false;
 
             // Or alternatively, clear the root entirely
             // root?.Clear();
