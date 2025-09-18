@@ -244,6 +244,12 @@ namespace WiseTwin
 
             currentProgress++;
             UpdateProgressDisplay();
+
+            // Vérifier si on a terminé tous les modules
+            if (currentProgress >= totalObjects && totalObjects > 0)
+            {
+                OnTrainingCompleted();
+            }
         }
 
         void UpdateProgressDisplay()
@@ -332,6 +338,52 @@ namespace WiseTwin
         public void TestIncrement()
         {
             IncrementProgress();
+        }
+
+        void OnTrainingCompleted()
+        {
+            if (debugMode) Debug.Log($"[TrainingHUD] Training completed! {currentProgress}/{totalObjects} modules done");
+
+            // Calculer le temps total
+            float totalTime = Time.time - startTime;
+
+            // Chercher ou créer l'UI de complétion
+            var completionUI = FindObjectOfType<UI.TrainingCompletionUI>();
+            if (completionUI == null)
+            {
+                // Créer l'UI de complétion s'il n'existe pas
+                GameObject completionGO = new GameObject("TrainingCompletionUI");
+                completionUI = completionGO.AddComponent<UI.TrainingCompletionUI>();
+                completionGO.AddComponent<UIDocument>();
+            }
+
+            // Afficher l'écran de complétion
+            completionUI.ShowCompletionScreen(totalTime, currentProgress);
+
+            // Animation de célébration sur la barre de progression
+            if (progressFill != null)
+            {
+                progressFill.style.backgroundColor = new Color(0.2f, 0.9f, 0.4f, 1f);
+
+                // Pulse animation
+                StartCoroutine(PulseProgressBar());
+            }
+        }
+
+        System.Collections.IEnumerator PulseProgressBar()
+        {
+            if (progressFill == null) yield break;
+
+            Color successColor = new Color(0.2f, 0.9f, 0.4f, 1f);
+            Color pulseColor = new Color(0.3f, 1f, 0.5f, 1f);
+
+            for (int i = 0; i < 3; i++)
+            {
+                progressFill.style.backgroundColor = pulseColor;
+                yield return new WaitForSeconds(0.3f);
+                progressFill.style.backgroundColor = successColor;
+                yield return new WaitForSeconds(0.3f);
+            }
         }
     }
 }
