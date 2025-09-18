@@ -85,7 +85,7 @@ namespace WiseTwin.UI
             if (uiDocument == null)
             {
                 uiDocument = gameObject.AddComponent<UIDocument>();
-                Debug.Log("[ContentDisplayManager] Created UIDocument component");
+                if (debugMode) Debug.Log("[ContentDisplayManager] Created UIDocument component");
             }
 
             // Vérifier qu'on ne partage pas le UIDocument avec un autre composant
@@ -109,7 +109,7 @@ namespace WiseTwin.UI
                 if (panelSettings != null)
                 {
                     uiDocument.panelSettings = panelSettings;
-                    Debug.Log("[ContentDisplayManager] Auto-assigned PanelSettings from Assets");
+                    if (debugMode) Debug.Log("[ContentDisplayManager] Auto-assigned PanelSettings from Assets");
                 }
                 else
                 {
@@ -119,7 +119,7 @@ namespace WiseTwin.UI
             }
             else
             {
-                Debug.Log($"[ContentDisplayManager] PanelSettings assigned: {uiDocument.panelSettings.name}");
+                if (debugMode) Debug.Log($"[ContentDisplayManager] PanelSettings assigned: {uiDocument.panelSettings.name}");
             }
 
             root = uiDocument.rootVisualElement;
@@ -129,7 +129,7 @@ namespace WiseTwin.UI
                 return;
             }
 
-            Debug.Log($"[ContentDisplayManager] Root element setup - Width: {root.resolvedStyle.width}, Height: {root.resolvedStyle.height}");
+            if (debugMode) Debug.Log($"[ContentDisplayManager] Root element setup - Width: {root.resolvedStyle.width}, Height: {root.resolvedStyle.height}");
 
             // Configuration de base du root
             root.style.position = Position.Absolute;
@@ -163,13 +163,16 @@ namespace WiseTwin.UI
             // Bloquer les clics pendant l'affichage
             root.pickingMode = PickingMode.Position;
 
-            Debug.Log($"[ContentDisplayManager] Before display - Root child count: {root.childCount}");
-            Debug.Log($"[ContentDisplayManager] Root size: {root.resolvedStyle.width}x{root.resolvedStyle.height}");
+            if (debugMode)
+            {
+                Debug.Log($"[ContentDisplayManager] Before display - Root child count: {root.childCount}");
+                Debug.Log($"[ContentDisplayManager] Root size: {root.resolvedStyle.width}x{root.resolvedStyle.height}");
+            }
 
             // Afficher le contenu
             currentDisplayer.Display(objectId, contentData, root);
 
-            Debug.Log($"[ContentDisplayManager] After display - Root child count: {root.childCount}");
+            if (debugMode) Debug.Log($"[ContentDisplayManager] After display - Root child count: {root.childCount}");
 
             // S'abonner aux événements de l'afficheur
             currentDisplayer.OnClosed += HandleContentClosed;

@@ -527,12 +527,49 @@ namespace WiseTwin.UI
 
         public void Close()
         {
-            // Nettoyer les surbrillances
-            foreach (var obj in sequenceObjects)
+            // Désactiver le monitoring des clics
+            isMonitoringClicks = false;
+
+            // Nettoyer le GameObject actuellement surligné
+            if (currentHighlightedObject != null)
             {
-                RemoveHighlight(obj);
-                EnableObjectInteraction(obj, true);
+                RemoveHighlight(currentHighlightedObject);
+
+                // Retirer le composant de clic temporaire
+                var clickHandler = currentHighlightedObject.GetComponent<ProcedureStepClickHandler>();
+                if (clickHandler != null)
+                {
+                    Destroy(clickHandler);
+                }
+
+                currentHighlightedObject = null;
             }
+
+            // Nettoyer toutes les surbrillances et réactiver les interactions
+            if (sequenceObjects != null)
+            {
+                foreach (var obj in sequenceObjects)
+                {
+                    if (obj != null)
+                    {
+                        RemoveHighlight(obj);
+                        EnableObjectInteraction(obj, true);
+
+                        // S'assurer qu'aucun handler ne reste
+                        var handler = obj.GetComponent<ProcedureStepClickHandler>();
+                        if (handler != null)
+                        {
+                            Destroy(handler);
+                        }
+                    }
+                }
+            }
+
+            // Réinitialiser l'état
+            currentStepIndex = 0;
+            steps = null;
+            sequenceObjects = null;
+            originalMaterials?.Clear();
 
             rootElement?.Clear();
             OnClosed?.Invoke(currentObjectId);
