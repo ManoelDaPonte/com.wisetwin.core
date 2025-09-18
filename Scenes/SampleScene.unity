@@ -1206,6 +1206,7 @@ GameObject:
   - component: {fileID: 1964762688}
   - component: {fileID: 1964762687}
   - component: {fileID: 1964762690}
+  - component: {fileID: 1964762691}
   m_Layer: 0
   m_Name: Red Cube
   m_TagString: Untagged
@@ -1325,6 +1326,22 @@ MonoBehaviour:
   useDragDropSequence: 0
   procedureSequence: []
   debugMode: 0
+--- !u!114 &1964762691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1964762685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d430767f192c43de86546986b8b8f38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  metadataId: 
+  autoDetectId: 0
+  showNameLabel: 1
+  labelColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1966944349
 GameObject:
   m_ObjectHideFlags: 0
