@@ -93,6 +93,17 @@ public class MetadataLoader : MonoBehaviour
     
     void Start()
     {
+        // Debug pour vérifier la configuration
+        bool isProduction = !GetUseLocalMode();
+        DebugLog($"🚀 MetadataLoader Start - Production Mode: {isProduction}");
+        if (isProduction)
+        {
+            DebugLog($"📡 API URL: {apiBaseUrl}");
+            DebugLog($"📦 Container ID: {containerId}");
+            DebugLog($"🏗️ Build Type: {buildType}");
+            DebugLog($"📋 Build Name: {projectName}");
+        }
+
         LoadMetadata();
     }
     

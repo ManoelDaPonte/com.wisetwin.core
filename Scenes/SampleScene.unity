@@ -1193,6 +1193,28 @@ MonoBehaviour:
   useDragDropSequence: 0
   procedureSequence: []
   debugMode: 0
+--- !u!114 &1944170554 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 798460448257152867, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+  m_PrefabInstance: {fileID: 4479523053237671175}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 167402a5ed19d4bc7b426b52c6454a2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1944170555 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5717370407079796314, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+  m_PrefabInstance: {fileID: 4479523053237671175}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f284b566a0ebd490f846968564296b9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1964762685
 GameObject:
   m_ObjectHideFlags: 0
@@ -1538,9 +1560,21 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      propertyPath: metadataLoader
+      value: 
+      objectReference: {fileID: 1944170555}
+    - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      propertyPath: enableDebugLogs
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: useProductionMode
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      propertyPath: completionNotifier
+      value: 
+      objectReference: {fileID: 1944170554}
     - target: {fileID: 798460448257152867, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: m_Enabled
       value: 1
@@ -1552,6 +1586,10 @@ PrefabInstance:
     - target: {fileID: 5717370407079796314, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: containerId
       value: org-super-admin-wisetwin-cmdy8hzs
+      objectReference: {fileID: 0}
+    - target: {fileID: 5717370407079796314, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      propertyPath: enableDebugLogs
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7123580581372257338, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: m_LocalPosition.x

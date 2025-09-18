@@ -406,11 +406,21 @@ public class WiseTwinEditor : EditorWindow
         }
         
         EditorGUILayout.HelpBox(
-            useLocalMode ? 
-            "🏠 Local Mode: Will load metadata from StreamingAssets folder" : 
-            "☁️ Production Mode: Will load metadata from Azure API", 
+            useLocalMode ?
+            "🏠 Local Mode: Will load metadata from StreamingAssets folder" :
+            "☁️ Production Mode: Will load metadata from Azure API",
             MessageType.Info);
-        
+
+        EditorGUILayout.Space(10);
+
+        // Bouton pour appliquer les settings aux GameObjects de la scène
+        GUI.backgroundColor = new Color(0.2f, 0.8f, 0.5f);
+        if (GUILayout.Button("🔧 Apply Settings to Scene Objects", GUILayout.Height(30)))
+        {
+            ApplySettingsToScene();
+        }
+        GUI.backgroundColor = Color.white;
+
         EditorGUILayout.Space(10);
         
         // Azure Configuration (only show if not in local mode)
@@ -754,6 +764,61 @@ public class WiseTwinEditor : EditorWindow
     }
     
     
+    void ApplySettingsToScene()
+    {
+        // Chercher le WiseTwinManager dans la scène
+        WiseTwin.WiseTwinManager manager = FindFirstObjectByType<WiseTwin.WiseTwinManager>();
+        if (manager != null)
+        {
+            // Appliquer le mode Production/Local
+            SerializedObject managerSO = new SerializedObject(manager);
+            SerializedProperty prodModeProp = managerSO.FindProperty("useProductionMode");
+            if (prodModeProp != null)
+            {
+                prodModeProp.boolValue = !useLocalMode;  // Inverser car useLocalMode est l'opposé de useProductionMode
+                managerSO.ApplyModifiedProperties();
+                Debug.Log($"✅ WiseTwinManager: Production Mode = {!useLocalMode}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("❌ WiseTwinManager not found in scene!");
+        }
+
+        // Chercher le MetadataLoader dans la scène
+        MetadataLoader loader = FindFirstObjectByType<MetadataLoader>();
+        if (loader != null)
+        {
+            // Appliquer les paramètres API
+            loader.apiBaseUrl = azureApiUrl;
+            loader.containerId = containerId;
+            loader.buildType = buildType;
+            loader.requestTimeout = requestTimeout;
+            loader.maxRetryAttempts = maxRetryAttempts;
+
+            Debug.Log($"✅ MetadataLoader configured:");
+            Debug.Log($"   - API URL: {azureApiUrl}");
+            Debug.Log($"   - Container ID: {containerId}");
+            Debug.Log($"   - Build Type: {buildType}");
+            Debug.Log($"   - Mode: {(useLocalMode ? "Local" : "Production")}");
+
+            EditorUtility.SetDirty(loader);
+        }
+        else
+        {
+            Debug.LogWarning("❌ MetadataLoader not found in scene!");
+        }
+
+        // Sauvegarder les changements
+        SaveSettings();
+
+        EditorUtility.DisplayDialog("Success",
+            $"Settings applied to scene!\n\nMode: {(useLocalMode ? "Local" : "Production")}\n" +
+            $"API: {azureApiUrl}\n" +
+            $"Container: {containerId}",
+            "OK");
+    }
+
     void OnDisable()
     {
         SaveSettings();
