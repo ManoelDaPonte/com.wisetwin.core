@@ -34,6 +34,12 @@ namespace WiseTwin
         [SerializeField] private ContentType contentType = ContentType.Question;
         [SerializeField] private string specificContentKey = ""; // Laisser vide pour prendre le premier disponible
 
+        [Header("Procedure Settings (Only for Procedure type)")]
+        [SerializeField] private bool useDragDropSequence = false;
+        [SerializeField] private List<GameObject> procedureSequence = new List<GameObject>();
+        [SerializeField] private string procedureTitle = "Maintenance Procedure";
+        [SerializeField] private string procedureDescription = "Follow the steps to complete the procedure";
+
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
 
@@ -278,6 +284,31 @@ namespace WiseTwin
                 return;
             }
 
+            // Pour les procédures avec drag & drop, créer les données dynamiquement
+            if (contentType == ContentType.Procedure && useDragDropSequence && procedureSequence.Count > 0)
+            {
+                if (ContentDisplayManager.Instance != null)
+                {
+                    // Désactiver temporairement l'hover sur cet objet
+                    if (isHovered)
+                    {
+                        RemoveHoverEffect();
+                        isHovered = false;
+                    }
+
+                    // Créer les données de procédure dynamiquement
+                    var procedureData = CreateDynamicProcedureData();
+
+                    if (debugMode) Debug.Log($"[InteractableObject] Displaying drag & drop procedure with {procedureSequence.Count} steps");
+                    ContentDisplayManager.Instance.DisplayContent(objectId, contentType, procedureData);
+                }
+                else
+                {
+                    Debug.LogError("[InteractableObject] ContentDisplayManager.Instance is null! Add ContentDisplayManager to your scene.");
+                }
+                return;
+            }
+
             // Pour les questions, on doit passer TOUTES les données de l'objet pour supporter les questions multiples
             if (contentType == ContentType.Question)
             {
@@ -391,6 +422,84 @@ namespace WiseTwin
                     if (debugMode) Debug.LogWarning($"[InteractableObject] No content of type {contentType} found for {objectId}. Keys available: {string.Join(", ", cachedObjectData.Keys)}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Crée les données de procédure dynamiquement à partir des GameObjects drag & drop
+        /// </summary>
+        Dictionary<string, object> CreateDynamicProcedureData()
+        {
+            var procedureData = new Dictionary<string, object>();
+
+            // Obtenir la langue actuelle
+            string currentLang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            bool isFrench = currentLang == "fr";
+
+            // Titre et description
+            procedureData["title"] = new Dictionary<string, object>
+            {
+                ["en"] = procedureTitle,
+                ["fr"] = procedureTitle
+            };
+
+            procedureData["description"] = new Dictionary<string, object>
+            {
+                ["en"] = procedureDescription,
+                ["fr"] = procedureDescription
+            };
+
+            // Créer les étapes à partir des GameObjects
+            for (int i = 0; i < procedureSequence.Count; i++)
+            {
+                var stepObj = procedureSequence[i];
+                if (stepObj == null) continue;
+
+                string stepKey = $"step_{i + 1}";
+
+                // Essayer de récupérer l'ID metadata de l'objet, sinon utiliser son nom
+                string objectId = "";
+                var mapper = stepObj.GetComponent<ObjectMetadataMapper>();
+                if (mapper != null)
+                {
+                    objectId = mapper.MetadataId;
+                }
+                else
+                {
+                    // Créer un ID basé sur le nom de l'objet
+                    objectId = stepObj.name.ToLower().Replace(" ", "_");
+                }
+
+                // Créer les instructions pour cette étape
+                procedureData[stepKey] = new Dictionary<string, object>
+                {
+                    ["objectId"] = objectId,
+                    ["instruction"] = new Dictionary<string, object>
+                    {
+                        ["en"] = $"Step {i + 1}: Click on {stepObj.name}",
+                        ["fr"] = $"Étape {i + 1}: Cliquez sur {stepObj.name}"
+                    },
+                    ["validation"] = new Dictionary<string, object>
+                    {
+                        ["en"] = $"Verify that {stepObj.name} is highlighted in yellow",
+                        ["fr"] = $"Vérifiez que {stepObj.name} est surligné en jaune"
+                    },
+                    ["hint"] = new Dictionary<string, object>
+                    {
+                        ["en"] = $"Look for the object named '{stepObj.name}'",
+                        ["fr"] = $"Cherchez l'objet nommé '{stepObj.name}'"
+                    }
+                };
+
+                // S'assurer que l'objet a un ObjectMetadataMapper pour être trouvé
+                if (mapper == null)
+                {
+                    mapper = stepObj.AddComponent<ObjectMetadataMapper>();
+                    mapper.MetadataId = objectId;
+                    if (debugMode) Debug.Log($"[InteractableObject] Added ObjectMetadataMapper to {stepObj.name} with ID: {objectId}");
+                }
+            }
+
+            return procedureData;
         }
 
         /// <summary>

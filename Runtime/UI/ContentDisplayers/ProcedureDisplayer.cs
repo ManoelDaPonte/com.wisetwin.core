@@ -2,22 +2,58 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 
 namespace WiseTwin.UI
 {
     /// <summary>
-    /// Afficheur spécialisé pour les procédures (étapes à suivre)
+    /// Afficheur spécialisé pour les procédures séquentielles
+    /// Guide l'utilisateur à travers une séquence d'objets 3D à interagir dans le bon ordre
     /// </summary>
     public class ProcedureDisplayer : MonoBehaviour, IContentDisplayer
     {
         public event Action<string> OnClosed;
         public event Action<string, bool> OnCompleted;
 
+        [Header("Visual Settings")]
+        [SerializeField] private Color highlightColor = new Color(1f, 0.9f, 0.3f, 1f); // Jaune
+        [SerializeField] private float highlightIntensity = 2f;
+        [SerializeField] private bool pulseHighlight = true;
+        [SerializeField] private float pulseSpeed = 2f;
+
         private string currentObjectId;
         private VisualElement rootElement;
+        private VisualElement modalContainer;
+
+        // Données de la procédure
+        private string procedureTitle;
+        private string procedureDescription;
+        private List<ProcedureStep> steps;
         private int currentStepIndex = 0;
-        private List<Dictionary<string, object>> steps;
-        private bool[] stepCompleted;
+
+        // GameObjects de la séquence
+        private List<GameObject> sequenceObjects;
+        private Dictionary<GameObject, Material> originalMaterials;
+        private GameObject currentHighlightedObject;
+
+        // UI Elements
+        private Label titleLabel;
+        private Label descriptionLabel;
+        private Label stepLabel;
+        private Label progressLabel;
+        private VisualElement progressBar;
+        private VisualElement progressFill;
+        private bool isMonitoringClicks = false;
+
+        public class ProcedureStep
+        {
+            public string objectId;
+            public string instruction;
+            public string validation;
+            public string hint;
+            public GameObject targetObject;
+            public bool completed = false;
+        }
 
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
         {
@@ -29,88 +65,100 @@ namespace WiseTwin.UI
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
 
             // Extraire les données de la procédure
-            string title = ExtractLocalizedText(contentData, "title", lang);
-            steps = ExtractSteps(contentData, "steps");
-            stepCompleted = new bool[steps.Count];
+            procedureTitle = ExtractLocalizedText(contentData, "title", lang);
+            procedureDescription = ExtractLocalizedText(contentData, "description", lang);
+
+            // Extraire les étapes
+            steps = ExtractProcedureSteps(contentData, lang);
+
+            if (steps == null || steps.Count == 0)
+            {
+                Debug.LogError($"[ProcedureDisplayer] No steps found for procedure {objectId}");
+                return;
+            }
+
+            // Initialiser les matériaux originaux
+            originalMaterials = new Dictionary<GameObject, Material>();
+            sequenceObjects = new List<GameObject>();
+
+            // Trouver les GameObjects pour chaque étape
+            foreach (var step in steps)
+            {
+                if (!string.IsNullOrEmpty(step.objectId))
+                {
+                    // Chercher l'objet par son metadata ID
+                    var allMappers = FindObjectsByType<ObjectMetadataMapper>(FindObjectsSortMode.None);
+                    foreach (var mapper in allMappers)
+                    {
+                        if (mapper.MetadataId == step.objectId)
+                        {
+                            step.targetObject = mapper.gameObject;
+                            sequenceObjects.Add(mapper.gameObject);
+
+                            // Stocker le matériau original
+                            var renderer = mapper.GetComponent<Renderer>();
+                            if (renderer != null)
+                            {
+                                originalMaterials[mapper.gameObject] = renderer.material;
+                            }
+
+                            Debug.Log($"[ProcedureDisplayer] Found object for step: {step.objectId} -> {mapper.gameObject.name}");
+                            break;
+                        }
+                    }
+
+                    if (step.targetObject == null)
+                    {
+                        Debug.LogWarning($"[ProcedureDisplayer] Could not find GameObject with metadata ID: {step.objectId}");
+                    }
+                }
+            }
 
             // Créer l'UI
-            CreateProcedureUI(title);
+            CreateProcedureUI();
+
+            // Commencer la première étape
+            StartCurrentStep();
         }
 
-        void CreateProcedureUI(string title)
+        void CreateProcedureUI()
         {
             // Clear root
             rootElement.Clear();
 
-            // Container modal
-            var modalContainer = new VisualElement();
+            // Container modal semi-transparent
+            modalContainer = new VisualElement();
             modalContainer.style.position = Position.Absolute;
             modalContainer.style.width = Length.Percent(100);
             modalContainer.style.height = Length.Percent(100);
-            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.85f);
-            modalContainer.style.alignItems = Align.Center;
+            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.3f); // Plus transparent pour mieux voir la scène
+            modalContainer.style.alignItems = Align.FlexEnd; // Aligner à droite
             modalContainer.style.justifyContent = Justify.Center;
             modalContainer.pickingMode = PickingMode.Position;
 
-            // Boîte de procédure
-            var procedureBox = new VisualElement();
-            procedureBox.style.width = 800;
-            procedureBox.style.maxWidth = Length.Percent(90);
-            procedureBox.style.height = 600;
-            procedureBox.style.maxHeight = Length.Percent(85);
-            procedureBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
-            procedureBox.style.borderTopLeftRadius = 25;
-            procedureBox.style.borderTopRightRadius = 25;
-            procedureBox.style.borderBottomLeftRadius = 25;
-            procedureBox.style.borderBottomRightRadius = 25;
-            procedureBox.style.flexDirection = FlexDirection.Column;
+            // Panneau d'instructions vertical à droite
+            var instructionPanel = new VisualElement();
+            instructionPanel.style.width = 400;
+            instructionPanel.style.height = Length.Percent(90);
+            instructionPanel.style.maxHeight = 800;
+            instructionPanel.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
+            instructionPanel.style.marginRight = 20;
+            instructionPanel.style.borderTopLeftRadius = 20;
+            instructionPanel.style.borderTopRightRadius = 20;
+            instructionPanel.style.borderBottomLeftRadius = 20;
+            instructionPanel.style.borderBottomRightRadius = 20;
+            instructionPanel.style.borderLeftWidth = 3;
+            instructionPanel.style.borderLeftColor = new Color(0.1f, 0.8f, 0.6f, 1f);
+            instructionPanel.style.flexDirection = FlexDirection.Column;
 
-            // Header
-            var header = CreateHeader(title);
-            procedureBox.Add(header);
-
-            // Progress bar
-            var progressBar = CreateProgressBar();
-            procedureBox.Add(progressBar);
-
-            // Content area
-            var contentArea = new ScrollView();
-            contentArea.name = "content-area";
-            contentArea.style.flexGrow = 1;
-            contentArea.style.paddingTop = 20;
-            contentArea.style.paddingBottom = 20;
-            contentArea.style.paddingLeft = 40;
-            contentArea.style.paddingRight = 40;
-            procedureBox.Add(contentArea);
-
-            // Footer avec boutons
-            var footer = CreateFooter();
-            procedureBox.Add(footer);
-
-            modalContainer.Add(procedureBox);
-            rootElement.Add(modalContainer);
-
-            // Afficher la première étape
-            DisplayStep(currentStepIndex);
-        }
-
-        VisualElement CreateHeader(string title)
-        {
-            var header = new VisualElement();
-            header.style.paddingTop = 30;
-            header.style.paddingBottom = 20;
-            header.style.paddingLeft = 40;
-            header.style.paddingRight = 40;
-            header.style.borderBottomWidth = 1;
-            header.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-
-            // Titre
-            var titleLabel = new Label(title);
-            titleLabel.style.fontSize = 28;
-            titleLabel.style.color = Color.white;
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            header.Add(titleLabel);
+            // Header avec titre et bouton fermer
+            var headerSection = new VisualElement();
+            headerSection.style.paddingTop = 20;
+            headerSection.style.paddingBottom = 15;
+            headerSection.style.paddingLeft = 25;
+            headerSection.style.paddingRight = 25;
+            headerSection.style.borderBottomWidth = 1;
+            headerSection.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
 
             // Bouton fermer (X)
             var closeButton = new Button(() => Close());
@@ -118,53 +166,66 @@ namespace WiseTwin.UI
             closeButton.style.position = Position.Absolute;
             closeButton.style.top = 15;
             closeButton.style.right = 15;
-            closeButton.style.width = 35;
-            closeButton.style.height = 35;
-            closeButton.style.fontSize = 24;
+            closeButton.style.width = 30;
+            closeButton.style.height = 30;
+            closeButton.style.fontSize = 20;
             closeButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
             closeButton.style.color = Color.white;
-            closeButton.style.borderTopLeftRadius = 17;
-            closeButton.style.borderTopRightRadius = 17;
-            closeButton.style.borderBottomLeftRadius = 17;
-            closeButton.style.borderBottomRightRadius = 17;
-            header.Add(closeButton);
+            closeButton.style.borderTopLeftRadius = 15;
+            closeButton.style.borderTopRightRadius = 15;
+            closeButton.style.borderBottomLeftRadius = 15;
+            closeButton.style.borderBottomRightRadius = 15;
+            headerSection.Add(closeButton);
 
-            return header;
-        }
+            // Titre de la procédure
+            titleLabel = new Label(procedureTitle);
+            titleLabel.style.fontSize = 24;
+            titleLabel.style.color = new Color(0.1f, 0.8f, 0.6f, 1f);
+            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            titleLabel.style.marginBottom = 5;
+            titleLabel.style.whiteSpace = WhiteSpace.Normal;
+            headerSection.Add(titleLabel);
 
-        VisualElement CreateProgressBar()
-        {
-            var progressContainer = new VisualElement();
-            progressContainer.name = "progress-container";
-            progressContainer.style.paddingTop = 15;
-            progressContainer.style.paddingBottom = 15;
-            progressContainer.style.paddingLeft = 40;
-            progressContainer.style.paddingRight = 40;
-            progressContainer.style.borderBottomWidth = 1;
-            progressContainer.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            // Description
+            if (!string.IsNullOrEmpty(procedureDescription))
+            {
+                descriptionLabel = new Label(procedureDescription);
+                descriptionLabel.style.fontSize = 14;
+                descriptionLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
+                descriptionLabel.style.whiteSpace = WhiteSpace.Normal;
+                headerSection.Add(descriptionLabel);
+            }
 
-            // Label d'étape
-            var stepLabel = new Label();
-            stepLabel.name = "step-label";
-            stepLabel.style.fontSize = 16;
-            stepLabel.style.color = new Color(0.8f, 0.8f, 0.8f);
-            stepLabel.style.marginBottom = 10;
-            stepLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            progressContainer.Add(stepLabel);
+            instructionPanel.Add(headerSection);
 
-            // Barre de progression
-            var progressBar = new VisualElement();
+            // Section de progression
+            var progressSection = new VisualElement();
+            progressSection.style.paddingTop = 15;
+            progressSection.style.paddingBottom = 15;
+            progressSection.style.paddingLeft = 25;
+            progressSection.style.paddingRight = 25;
+            progressSection.style.borderBottomWidth = 1;
+            progressSection.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+
+            progressLabel = new Label($"Étape 1 / {steps.Count}");
+            progressLabel.style.fontSize = 16;
+            progressLabel.style.color = Color.white;
+            progressLabel.style.marginBottom = 10;
+            progressLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            progressSection.Add(progressLabel);
+
+            progressBar = new VisualElement();
             progressBar.style.height = 8;
-            progressBar.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 0.5f);
+            progressBar.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f);
             progressBar.style.borderTopLeftRadius = 4;
             progressBar.style.borderTopRightRadius = 4;
             progressBar.style.borderBottomLeftRadius = 4;
             progressBar.style.borderBottomRightRadius = 4;
 
-            var progressFill = new VisualElement();
-            progressFill.name = "progress-fill";
-            progressFill.style.height = Length.Percent(100);
+            progressFill = new VisualElement();
+            progressFill.style.position = Position.Absolute;
             progressFill.style.width = Length.Percent(0);
+            progressFill.style.height = 8;
             progressFill.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
             progressFill.style.borderTopLeftRadius = 4;
             progressFill.style.borderTopRightRadius = 4;
@@ -172,244 +233,353 @@ namespace WiseTwin.UI
             progressFill.style.borderBottomRightRadius = 4;
             progressBar.Add(progressFill);
 
-            progressContainer.Add(progressBar);
-            return progressContainer;
+            progressSection.Add(progressBar);
+            instructionPanel.Add(progressSection);
+
+            // Section principale avec ScrollView pour l'instruction
+            var mainSection = new ScrollView();
+            mainSection.style.flexGrow = 1;
+            mainSection.style.paddingTop = 20;
+            mainSection.style.paddingBottom = 20;
+            mainSection.style.paddingLeft = 25;
+            mainSection.style.paddingRight = 25;
+
+            // Instruction de l'étape actuelle
+            stepLabel = new Label();
+            stepLabel.style.fontSize = 18;
+            stepLabel.style.color = Color.white;
+            stepLabel.style.whiteSpace = WhiteSpace.Normal;
+            mainSection.Add(stepLabel);
+
+            instructionPanel.Add(mainSection);
+
+            // Section des boutons en bas
+            var buttonSection = new VisualElement();
+            buttonSection.style.paddingTop = 20;
+            buttonSection.style.paddingBottom = 20;
+            buttonSection.style.paddingLeft = 25;
+            buttonSection.style.paddingRight = 25;
+            buttonSection.style.borderTopWidth = 1;
+            buttonSection.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+
+            // Info text uniquement
+            var infoLabel = new Label();
+            infoLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                ? "Cliquez sur l'objet surligné pour valider l'étape"
+                : "Click on the highlighted object to validate the step";
+            infoLabel.style.fontSize = 14;
+            infoLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
+            infoLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            infoLabel.style.whiteSpace = WhiteSpace.Normal;
+            buttonSection.Add(infoLabel);
+
+            instructionPanel.Add(buttonSection);
+            modalContainer.Add(instructionPanel);
+
+            rootElement.Add(modalContainer);
         }
 
-        VisualElement CreateFooter()
+        void StartCurrentStep()
         {
-            var footer = new VisualElement();
-            footer.style.paddingTop = 20;
-            footer.style.paddingBottom = 30;
-            footer.style.paddingLeft = 40;
-            footer.style.paddingRight = 40;
-            footer.style.borderTopWidth = 1;
-            footer.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-            footer.style.flexDirection = FlexDirection.Row;
-            footer.style.justifyContent = Justify.SpaceBetween;
-
-            // Bouton Précédent
-            var prevButton = new Button(() => PreviousStep());
-            prevButton.name = "prev-button";
-            prevButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "◀ Précédent" : "◀ Previous";
-            prevButton.style.width = 150;
-            prevButton.style.height = 45;
-            prevButton.style.fontSize = 16;
-            prevButton.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            prevButton.style.color = Color.white;
-            prevButton.style.borderTopLeftRadius = 10;
-            prevButton.style.borderTopRightRadius = 10;
-            prevButton.style.borderBottomLeftRadius = 10;
-            prevButton.style.borderBottomRightRadius = 10;
-            footer.Add(prevButton);
-
-            // Checkbox de validation
-            var validationContainer = new VisualElement();
-            validationContainer.style.flexDirection = FlexDirection.Row;
-            validationContainer.style.alignItems = Align.Center;
-
-            var checkbox = new Toggle();
-            checkbox.name = "step-checkbox";
-            checkbox.style.marginRight = 10;
-            checkbox.RegisterValueChangedCallback(evt => {
-                stepCompleted[currentStepIndex] = evt.newValue;
-                UpdateNextButtonState();
-            });
-            validationContainer.Add(checkbox);
-
-            var checkLabel = new Label();
-            checkLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Étape complétée" : "Step completed";
-            checkLabel.style.fontSize = 16;
-            checkLabel.style.color = Color.white;
-            validationContainer.Add(checkLabel);
-
-            footer.Add(validationContainer);
-
-            // Bouton Suivant
-            var nextButton = new Button(() => NextStep());
-            nextButton.name = "next-button";
-            nextButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Suivant ▶" : "Next ▶";
-            nextButton.style.width = 150;
-            nextButton.style.height = 45;
-            nextButton.style.fontSize = 16;
-            nextButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-            nextButton.style.color = Color.white;
-            nextButton.style.borderTopLeftRadius = 10;
-            nextButton.style.borderTopRightRadius = 10;
-            nextButton.style.borderBottomLeftRadius = 10;
-            nextButton.style.borderBottomRightRadius = 10;
-            footer.Add(nextButton);
-
-            return footer;
-        }
-
-        void DisplayStep(int index)
-        {
-            if (index < 0 || index >= steps.Count) return;
-
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-            var step = steps[index];
-
-            // Mettre à jour le contenu
-            var contentArea = rootElement.Q<ScrollView>("content-area");
-            if (contentArea != null)
+            if (currentStepIndex >= steps.Count)
             {
-                contentArea.Clear();
+                CompleteProcedure();
+                return;
+            }
 
-                // Titre de l'étape
-                string stepTitle = ExtractLocalizedText(step, "title", lang);
-                var titleLabel = new Label(stepTitle);
-                titleLabel.style.fontSize = 22;
-                titleLabel.style.color = new Color(0.1f, 0.8f, 0.6f, 1f);
-                titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-                titleLabel.style.marginBottom = 20;
-                contentArea.Add(titleLabel);
+            var currentStep = steps[currentStepIndex];
+            isMonitoringClicks = true;
 
-                // Description de l'étape
-                string description = ExtractLocalizedText(step, "description", lang);
-                var descLabel = new Label(description);
-                descLabel.style.fontSize = 18;
-                descLabel.style.color = Color.white;
-                descLabel.style.whiteSpace = WhiteSpace.Normal;
-                descLabel.style.marginBottom = 20;
-                contentArea.Add(descLabel);
+            // Mettre à jour l'UI
+            progressLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                ? $"Étape {currentStepIndex + 1} / {steps.Count}"
+                : $"Step {currentStepIndex + 1} / {steps.Count}";
 
-                // Point de validation
-                string validation = ExtractLocalizedText(step, "validation", lang);
-                if (!string.IsNullOrEmpty(validation))
+            stepLabel.text = currentStep.instruction;
+
+            // Ajouter le hint si présent
+            if (!string.IsNullOrEmpty(currentStep.hint))
+            {
+                stepLabel.text += $"\n\n💡 {currentStep.hint}";
+            }
+
+            // Mettre à jour la barre de progression
+            float progress = (float)currentStepIndex / steps.Count * 100f;
+            progressFill.style.width = Length.Percent(progress);
+
+            // Retirer la surbrillance de l'objet précédent
+            if (currentHighlightedObject != null)
+            {
+                RemoveHighlight(currentHighlightedObject);
+
+                // Retirer le composant de clic temporaire
+                var oldClickHandler = currentHighlightedObject.GetComponent<ProcedureStepClickHandler>();
+                if (oldClickHandler != null)
                 {
-                    var validationBox = new VisualElement();
-                    validationBox.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.8f);
-                    validationBox.style.paddingTop = 15;
-                    validationBox.style.paddingBottom = 15;
-                    validationBox.style.paddingLeft = 20;
-                    validationBox.style.paddingRight = 20;
-                    validationBox.style.borderTopLeftRadius = 10;
-                    validationBox.style.borderTopRightRadius = 10;
-                    validationBox.style.borderBottomLeftRadius = 10;
-                    validationBox.style.borderBottomRightRadius = 10;
-                    validationBox.style.borderLeftWidth = 3;
-                    validationBox.style.borderLeftColor = new Color(0.8f, 0.6f, 0.1f, 1f);
-
-                    var validationLabel = new Label("⚠️ " + validation);
-                    validationLabel.style.fontSize = 16;
-                    validationLabel.style.color = new Color(1f, 0.9f, 0.6f);
-                    validationLabel.style.whiteSpace = WhiteSpace.Normal;
-                    validationBox.Add(validationLabel);
-
-                    contentArea.Add(validationBox);
+                    Destroy(oldClickHandler);
                 }
             }
 
-            // Mettre à jour la progression
-            UpdateProgress();
-
-            // Mettre à jour la checkbox
-            var checkbox = rootElement.Q<Toggle>("step-checkbox");
-            if (checkbox != null)
+            // Ajouter la surbrillance au nouvel objet
+            if (currentStep.targetObject != null)
             {
-                checkbox.value = stepCompleted[index];
-            }
+                HighlightObject(currentStep.targetObject);
+                currentHighlightedObject = currentStep.targetObject;
 
-            // Mettre à jour les boutons
-            UpdateNavigationButtons();
-        }
-
-        void UpdateProgress()
-        {
-            // Label d'étape
-            var stepLabel = rootElement.Q<Label>("step-label");
-            if (stepLabel != null)
-            {
-                string text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"Étape {currentStepIndex + 1} sur {steps.Count}"
-                    : $"Step {currentStepIndex + 1} of {steps.Count}";
-                stepLabel.text = text;
-            }
-
-            // Barre de progression
-            var progressFill = rootElement.Q<VisualElement>("progress-fill");
-            if (progressFill != null)
-            {
-                float progress = (float)(currentStepIndex + 1) / steps.Count * 100f;
-                progressFill.style.width = Length.Percent(progress);
-            }
-        }
-
-        void UpdateNavigationButtons()
-        {
-            // Bouton précédent
-            var prevButton = rootElement.Q<Button>("prev-button");
-            if (prevButton != null)
-            {
-                prevButton.SetEnabled(currentStepIndex > 0);
-                prevButton.style.opacity = currentStepIndex > 0 ? 1f : 0.5f;
-            }
-
-            // Bouton suivant
-            var nextButton = rootElement.Q<Button>("next-button");
-            if (nextButton != null)
-            {
-                bool isLastStep = currentStepIndex >= steps.Count - 1;
-                nextButton.text = isLastStep
-                    ? (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Terminer ✓" : "Complete ✓")
-                    : (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Suivant ▶" : "Next ▶");
-
-                UpdateNextButtonState();
-            }
-        }
-
-        void UpdateNextButtonState()
-        {
-            var nextButton = rootElement.Q<Button>("next-button");
-            if (nextButton != null)
-            {
-                bool canProceed = stepCompleted[currentStepIndex];
-                nextButton.SetEnabled(canProceed);
-                nextButton.style.opacity = canProceed ? 1f : 0.5f;
-            }
-        }
-
-        void PreviousStep()
-        {
-            if (currentStepIndex > 0)
-            {
-                currentStepIndex--;
-                DisplayStep(currentStepIndex);
-            }
-        }
-
-        void NextStep()
-        {
-            if (!stepCompleted[currentStepIndex]) return;
-
-            if (currentStepIndex < steps.Count - 1)
-            {
-                currentStepIndex++;
-                DisplayStep(currentStepIndex);
-            }
-            else
-            {
-                // Procédure terminée
-                bool allCompleted = true;
-                foreach (bool completed in stepCompleted)
+                // Ajouter un composant temporaire pour gérer le clic
+                var clickHandler = currentStep.targetObject.GetComponent<ProcedureStepClickHandler>();
+                if (clickHandler == null)
                 {
-                    if (!completed)
+                    clickHandler = currentStep.targetObject.AddComponent<ProcedureStepClickHandler>();
+                }
+                clickHandler.Initialize(this, currentStepIndex);
+
+                // Désactiver les interactions normales sur les autres objets
+                foreach (var obj in sequenceObjects)
+                {
+                    if (obj != currentStep.targetObject)
                     {
-                        allCompleted = false;
+                        EnableObjectInteraction(obj, false);
+                    }
+                }
+            }
+        }
+
+        void HighlightObject(GameObject obj)
+        {
+            if (obj == null) return;
+
+            var renderer = obj.GetComponent<Renderer>();
+            if (renderer == null) return;
+
+            // Créer un nouveau matériau avec émission
+            Material highlightMaterial = new Material(renderer.material);
+
+            // Activer l'émission
+            highlightMaterial.EnableKeyword("_EMISSION");
+            highlightMaterial.SetColor("_EmissionColor", highlightColor * highlightIntensity);
+
+            // Changer la couleur principale pour un effet jaune
+            if (highlightMaterial.HasProperty("_Color"))
+            {
+                highlightMaterial.SetColor("_Color", highlightColor);
+            }
+            else if (highlightMaterial.HasProperty("_BaseColor"))
+            {
+                highlightMaterial.SetColor("_BaseColor", highlightColor);
+            }
+
+            renderer.material = highlightMaterial;
+
+            // Ajouter un composant pour l'animation de pulsation si activé
+            if (pulseHighlight && obj.GetComponent<PulseEffect>() == null)
+            {
+                var pulse = obj.AddComponent<PulseEffect>();
+                pulse.Initialize(highlightColor, highlightIntensity, pulseSpeed);
+            }
+        }
+
+        void RemoveHighlight(GameObject obj)
+        {
+            if (obj == null) return;
+
+            var renderer = obj.GetComponent<Renderer>();
+            if (renderer == null) return;
+
+            // Restaurer le matériau original
+            if (originalMaterials.ContainsKey(obj))
+            {
+                renderer.material = originalMaterials[obj];
+            }
+
+            // Retirer l'effet de pulsation
+            var pulse = obj.GetComponent<PulseEffect>();
+            if (pulse != null)
+            {
+                Destroy(pulse);
+            }
+        }
+
+        void EnableObjectInteraction(GameObject obj, bool enabled)
+        {
+            var interactable = obj.GetComponent<InteractableObject>();
+            if (interactable != null)
+            {
+                interactable.SetInteractionEnabled(enabled);
+            }
+        }
+
+        public void ValidateCurrentStep()
+        {
+            if (currentStepIndex >= steps.Count) return;
+
+            var currentStep = steps[currentStepIndex];
+            currentStep.completed = true;
+            isMonitoringClicks = false;
+
+            // Attendre un peu avant de passer à l'étape suivante
+            StartCoroutine(NextStepAfterDelay(0.5f));
+        }
+
+        System.Collections.IEnumerator NextStepAfterDelay(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+
+            currentStepIndex++;
+            StartCurrentStep();
+        }
+
+        public void ResetProcedure()
+        {
+            Debug.Log("[ProcedureDisplayer] Resetting procedure - clicked outside sequence");
+
+            // Retirer les surbrillances actuelles
+            if (currentHighlightedObject != null)
+            {
+                RemoveHighlight(currentHighlightedObject);
+
+                // Retirer le composant de clic temporaire
+                var clickHandler = currentHighlightedObject.GetComponent<ProcedureStepClickHandler>();
+                if (clickHandler != null)
+                {
+                    Destroy(clickHandler);
+                }
+            }
+
+            // Réinitialiser l'index
+            currentStepIndex = 0;
+            isMonitoringClicks = false;
+
+            // Réactiver toutes les interactions
+            foreach (var obj in sequenceObjects)
+            {
+                EnableObjectInteraction(obj, true);
+            }
+
+            // Redémarrer la première étape
+            StartCurrentStep();
+        }
+
+        void Update()
+        {
+            // Détecter les clics en dehors de la séquence
+            if (isMonitoringClicks && UnityEngine.InputSystem.Mouse.current != null)
+            {
+                if (UnityEngine.InputSystem.Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    CheckOutsideClick();
+                }
+            }
+        }
+
+        void CheckOutsideClick()
+        {
+            Camera mainCamera = Camera.main;
+            if (mainCamera == null) return;
+
+            Vector2 mousePos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
+            Ray ray = mainCamera.ScreenPointToRay(new Vector3(mousePos.x, mousePos.y, 0));
+
+            RaycastHit hit;
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+            {
+                GameObject clickedObject = hit.transform.gameObject;
+
+                // Vérifier si l'objet cliqué est dans la séquence
+                bool isInSequence = false;
+                foreach (var obj in sequenceObjects)
+                {
+                    if (clickedObject == obj || clickedObject.transform.IsChildOf(obj.transform))
+                    {
+                        isInSequence = true;
                         break;
                     }
                 }
 
-                OnCompleted?.Invoke(currentObjectId, allCompleted);
-                Close();
+                // Si on a cliqué en dehors de la séquence et que ce n'est pas l'UI
+                if (!isInSequence && hit.collider != null && currentStepIndex < steps.Count)
+                {
+                    // Vérifier que ce n'est pas l'objet actuellement surligné
+                    if (clickedObject != currentHighlightedObject)
+                    {
+                        ResetProcedure();
+                    }
+                }
             }
         }
 
+        void CompleteProcedure()
+        {
+            // Retirer toutes les surbrillances
+            foreach (var obj in sequenceObjects)
+            {
+                RemoveHighlight(obj);
+                EnableObjectInteraction(obj, true);
+            }
+
+            // Envoyer l'événement de complétion AVANT de fermer pour que ContentDisplayManager puisse le gérer
+            OnCompleted?.Invoke(currentObjectId, true);
+
+            // Fermer après avoir envoyé l'événement
+            Close();
+        }
+
+
         public void Close()
         {
+            // Nettoyer les surbrillances
+            foreach (var obj in sequenceObjects)
+            {
+                RemoveHighlight(obj);
+                EnableObjectInteraction(obj, true);
+            }
+
             rootElement?.Clear();
             OnClosed?.Invoke(currentObjectId);
+        }
+
+        List<ProcedureStep> ExtractProcedureSteps(Dictionary<string, object> data, string language)
+        {
+            var procedureSteps = new List<ProcedureStep>();
+
+            // Chercher les étapes (step_1, step_2, etc.)
+            var stepKeys = data.Keys.Where(k => k.StartsWith("step_")).OrderBy(k => k).ToList();
+
+            foreach (var stepKey in stepKeys)
+            {
+                if (data[stepKey] is Dictionary<string, object> stepData ||
+                    (data[stepKey] != null && TryConvertToDict(data[stepKey], out stepData)))
+                {
+                    var step = new ProcedureStep
+                    {
+                        objectId = ExtractString(stepData, "objectId"),
+                        instruction = ExtractLocalizedText(stepData, "instruction", language),
+                        validation = ExtractLocalizedText(stepData, "validation", language),
+                        hint = ExtractLocalizedText(stepData, "hint", language)
+                    };
+
+                    procedureSteps.Add(step);
+                }
+            }
+
+            return procedureSteps;
+        }
+
+        bool TryConvertToDict(object obj, out Dictionary<string, object> dict)
+        {
+            dict = null;
+            if (obj == null) return false;
+
+            try
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
+                dict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                return dict != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         // Méthodes utilitaires
@@ -418,6 +588,7 @@ namespace WiseTwin.UI
             if (!data.ContainsKey(key)) return "";
 
             var textData = data[key];
+
             if (textData is string simpleText) return simpleText;
 
             if (textData is Dictionary<string, object> localizedText)
@@ -427,44 +598,64 @@ namespace WiseTwin.UI
                 if (localizedText.ContainsKey("en"))
                     return localizedText["en"]?.ToString() ?? "";
             }
+            else if (textData != null && textData.GetType().FullName.Contains("JObject"))
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(textData);
+                var localizedJObject = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+                if (localizedJObject != null)
+                {
+                    if (localizedJObject.ContainsKey(language))
+                        return localizedJObject[language];
+                    if (localizedJObject.ContainsKey("en"))
+                        return localizedJObject["en"];
+                }
+            }
 
             return "";
         }
 
-        List<Dictionary<string, object>> ExtractSteps(Dictionary<string, object> data, string key)
+        string ExtractString(Dictionary<string, object> data, string key)
         {
-            var result = new List<Dictionary<string, object>>();
+            return data.ContainsKey(key) ? data[key]?.ToString() ?? "" : "";
+        }
+    }
 
-            if (data.ContainsKey(key) && data[key] is List<object> stepsList)
+    /// <summary>
+    /// Effet de pulsation pour les objets mis en surbrillance
+    /// </summary>
+    public class PulseEffect : MonoBehaviour
+    {
+        private Renderer objectRenderer;
+        private Color baseColor;
+        private float intensity;
+        private float speed;
+        private float time;
+
+        public void Initialize(Color color, float emissionIntensity, float pulseSpeed)
+        {
+            objectRenderer = GetComponent<Renderer>();
+            baseColor = color;
+            intensity = emissionIntensity;
+            speed = pulseSpeed;
+        }
+
+        void Update()
+        {
+            if (objectRenderer == null) return;
+
+            time += Time.deltaTime * speed;
+            float pulse = (Mathf.Sin(time) + 1f) / 2f; // Valeur entre 0 et 1
+            float currentIntensity = Mathf.Lerp(intensity * 0.5f, intensity, pulse);
+
+            if (objectRenderer.material.HasProperty("_EmissionColor"))
             {
-                foreach (var step in stepsList)
-                {
-                    if (step is Dictionary<string, object> stepDict)
-                    {
-                        result.Add(stepDict);
-                    }
-                }
+                objectRenderer.material.SetColor("_EmissionColor", baseColor * currentIntensity);
             }
+        }
 
-            // Si pas d'étapes, créer une étape par défaut
-            if (result.Count == 0)
-            {
-                result.Add(new Dictionary<string, object>
-                {
-                    ["title"] = new Dictionary<string, object>
-                    {
-                        ["en"] = "Step 1",
-                        ["fr"] = "Étape 1"
-                    },
-                    ["description"] = new Dictionary<string, object>
-                    {
-                        ["en"] = "No procedure steps defined.",
-                        ["fr"] = "Aucune étape de procédure définie."
-                    }
-                });
-            }
-
-            return result;
+        void OnDestroy()
+        {
+            // Nettoyer si nécessaire
         }
     }
 }
