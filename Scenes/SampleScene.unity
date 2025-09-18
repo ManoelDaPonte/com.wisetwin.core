@@ -1537,9 +1537,21 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      propertyPath: useProductionMode
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 798460448257152867, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: m_Enabled
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5717370407079796314, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      propertyPath: apiBaseUrl
+      value: https://app.wisetwin.eu/api/unity/metadata
+      objectReference: {fileID: 0}
+    - target: {fileID: 5717370407079796314, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      propertyPath: containerId
+      value: org-super-admin-wisetwin-cmdy8hzs
       objectReference: {fileID: 0}
     - target: {fileID: 7123580581372257338, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: m_LocalPosition.x
