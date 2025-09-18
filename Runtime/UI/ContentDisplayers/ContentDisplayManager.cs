@@ -66,6 +66,10 @@ namespace WiseTwin.UI
             procedureDisplayer.transform.SetParent(transform);
             contentDisplayers[ContentType.Procedure] = procedureDisplayer;
 
+            var textDisplayer = new GameObject("TextDisplayer").AddComponent<TextDisplayer>();
+            textDisplayer.transform.SetParent(transform);
+            contentDisplayers[ContentType.Text] = textDisplayer;
+
             // TODO: Ajouter d'autres types d'afficheurs
             // contentDisplayers[ContentType.Media] = new MediaDisplayer();
             // contentDisplayers[ContentType.Dialogue] = new DialogueDisplayer();

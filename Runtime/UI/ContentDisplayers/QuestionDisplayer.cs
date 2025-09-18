@@ -2,11 +2,13 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 
 namespace WiseTwin.UI
 {
     /// <summary>
     /// Afficheur spécialisé pour les questions (QCM, Vrai/Faux, etc.)
+    /// Supporte les questions multiples séquentielles
     /// </summary>
     public class QuestionDisplayer : MonoBehaviour, IContentDisplayer
     {
@@ -20,19 +22,81 @@ namespace WiseTwin.UI
         private int correctAnswerIndex;
         private bool hasAnswered = false;
 
+        // Pour gérer les questions séquentielles
+        private List<string> questionKeys;
+        private int currentQuestionIndex = 0;
+        private Dictionary<string, object> allObjectData;
+
+        // Références UI pour mise à jour
+        private Label questionLabel;
+        private Label progressLabel;
+        private VisualElement optionsContainer;
+        private Button validateButton;
+        private VisualElement feedbackContainer;
+        private Label feedbackLabel;
+        private string currentFeedback;
+        private string currentIncorrectFeedback;
+
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
         {
             currentObjectId = objectId;
             rootElement = root;
+
+            // Si contentData contient déjà les données de question directement
+            if (contentData.ContainsKey("text"))
+            {
+                // Question unique passée directement
+                questionKeys = null;
+                allObjectData = null;
+                DisplaySingleQuestion(contentData);
+            }
+            else
+            {
+                // Potentiellement plusieurs questions
+                allObjectData = contentData;
+                questionKeys = new List<string>();
+
+                // Chercher toutes les clés de questions (question_1, question_2, etc.)
+                foreach (var key in contentData.Keys)
+                {
+                    if (key.StartsWith("question_"))
+                    {
+                        questionKeys.Add(key);
+                    }
+                }
+
+                // Trier les questions par ordre numérique
+                questionKeys.Sort((a, b) =>
+                {
+                    int numA = int.Parse(a.Replace("question_", ""));
+                    int numB = int.Parse(b.Replace("question_", ""));
+                    return numA.CompareTo(numB);
+                });
+
+                Debug.Log($"[QuestionDisplayer] Found {questionKeys.Count} questions for {objectId}");
+
+                if (questionKeys.Count > 0)
+                {
+                    currentQuestionIndex = 0;
+                    CreateQuestionUI();
+                    DisplayCurrentQuestion();
+                }
+                else
+                {
+                    Debug.LogError($"[QuestionDisplayer] No questions found for {objectId}");
+                }
+            }
+        }
+
+        private void DisplaySingleQuestion(Dictionary<string, object> contentData)
+        {
             hasAnswered = false;
             selectedAnswerIndex = -1;
 
-            Debug.Log($"[QuestionDisplayer] Starting display for {objectId}");
-            Debug.Log($"[QuestionDisplayer] Root element valid: {root != null}");
+            Debug.Log($"[QuestionDisplayer] Displaying single question for {currentObjectId}");
 
             // Obtenir la langue actuelle
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-            Debug.Log($"[QuestionDisplayer] Using language: {lang}");
 
             // Extraire les données de la question
             string questionText = ExtractLocalizedText(contentData, "text", lang);
@@ -44,19 +108,15 @@ namespace WiseTwin.UI
 
             Debug.Log($"[QuestionDisplayer] Question: {questionText}");
             Debug.Log($"[QuestionDisplayer] Options count: {options?.Count ?? 0}");
-            Debug.Log($"[QuestionDisplayer] Type: {questionType}");
 
-            // Créer l'UI
-            CreateQuestionUI(questionText, options, questionType, feedback, incorrectFeedback);
+            // Créer l'UI pour question unique
+            CreateSingleQuestionUI(questionText, options, questionType, feedback, incorrectFeedback);
         }
 
-        void CreateQuestionUI(string questionText, List<string> options, string type, string feedback, string incorrectFeedback)
+        private void CreateQuestionUI()
         {
-            Debug.Log($"[QuestionDisplayer] CreateQuestionUI called - Root is null: {rootElement == null}");
-
             // Clear root
             rootElement.Clear();
-            Debug.Log($"[QuestionDisplayer] Root cleared. Child count: {rootElement.childCount}");
 
             // Container modal
             modalContainer = new VisualElement();
@@ -67,8 +127,6 @@ namespace WiseTwin.UI
             modalContainer.style.alignItems = Align.Center;
             modalContainer.style.justifyContent = Justify.Center;
             modalContainer.pickingMode = PickingMode.Position;
-
-            Debug.Log($"[QuestionDisplayer] Modal container created with backgroundColor: {modalContainer.style.backgroundColor}");
 
             // Boîte de question
             var questionBox = new VisualElement();
@@ -100,14 +158,18 @@ namespace WiseTwin.UI
             closeButton.style.borderTopRightRadius = 17;
             closeButton.style.borderBottomLeftRadius = 17;
             closeButton.style.borderBottomRightRadius = 17;
-            closeButton.style.borderTopWidth = 0;
-            closeButton.style.borderBottomWidth = 0;
-            closeButton.style.borderLeftWidth = 0;
-            closeButton.style.borderRightWidth = 0;
             questionBox.Add(closeButton);
 
+            // Indicateur de progression si plusieurs questions
+            progressLabel = new Label();
+            progressLabel.style.fontSize = 16;
+            progressLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
+            progressLabel.style.marginBottom = 10;
+            progressLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            questionBox.Add(progressLabel);
+
             // Texte de la question
-            var questionLabel = new Label(questionText);
+            questionLabel = new Label();
             questionLabel.style.fontSize = 24;
             questionLabel.style.color = Color.white;
             questionLabel.style.marginBottom = 35;
@@ -116,21 +178,12 @@ namespace WiseTwin.UI
             questionBox.Add(questionLabel);
 
             // Container des options
-            var optionsContainer = new VisualElement();
+            optionsContainer = new VisualElement();
             optionsContainer.style.marginBottom = 30;
-
-            // Créer les boutons d'options
-            for (int i = 0; i < options.Count; i++)
-            {
-                int index = i;
-                var optionButton = CreateOptionButton(options[i], index, type == "true-false");
-                optionsContainer.Add(optionButton);
-            }
-
             questionBox.Add(optionsContainer);
 
             // Zone de feedback (cachée au début)
-            var feedbackContainer = new VisualElement();
+            feedbackContainer = new VisualElement();
             feedbackContainer.name = "feedback-container";
             feedbackContainer.style.display = DisplayStyle.None;
             feedbackContainer.style.marginTop = 20;
@@ -143,7 +196,210 @@ namespace WiseTwin.UI
             feedbackContainer.style.borderBottomLeftRadius = 10;
             feedbackContainer.style.borderBottomRightRadius = 10;
 
-            var feedbackLabel = new Label();
+            feedbackLabel = new Label();
+            feedbackLabel.name = "feedback-text";
+            feedbackLabel.style.fontSize = 18;
+            feedbackLabel.style.color = Color.white;
+            feedbackLabel.style.whiteSpace = WhiteSpace.Normal;
+            feedbackLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            feedbackContainer.Add(feedbackLabel);
+            questionBox.Add(feedbackContainer);
+
+            // Bouton Valider
+            validateButton = new Button(() => ValidateAnswer());
+            validateButton.name = "validate-button";
+            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
+            validateButton.style.height = 50;
+            validateButton.style.fontSize = 18;
+            validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
+            validateButton.style.color = Color.white;
+            validateButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            validateButton.style.borderTopLeftRadius = 10;
+            validateButton.style.borderTopRightRadius = 10;
+            validateButton.style.borderBottomLeftRadius = 10;
+            validateButton.style.borderBottomRightRadius = 10;
+            validateButton.style.marginTop = 20;
+            questionBox.Add(validateButton);
+
+            modalContainer.Add(questionBox);
+            rootElement.Add(modalContainer);
+        }
+
+        private void DisplayCurrentQuestion()
+        {
+            if (currentQuestionIndex >= questionKeys.Count)
+            {
+                // Toutes les questions ont été répondues
+                OnCompleted?.Invoke(currentObjectId, true);
+                Close();
+                return;
+            }
+
+            hasAnswered = false;
+            selectedAnswerIndex = -1;
+
+            string currentKey = questionKeys[currentQuestionIndex];
+            Debug.Log($"[QuestionDisplayer] Displaying question {currentQuestionIndex + 1}/{questionKeys.Count}: {currentKey}");
+
+            // Mise à jour de l'indicateur de progression
+            if (questionKeys.Count > 1)
+            {
+                progressLabel.text = $"Question {currentQuestionIndex + 1} / {questionKeys.Count}";
+                progressLabel.style.display = DisplayStyle.Flex;
+            }
+            else
+            {
+                progressLabel.style.display = DisplayStyle.None;
+            }
+
+            if (allObjectData.ContainsKey(currentKey))
+            {
+                var questionData = allObjectData[currentKey];
+
+                // Convertir en Dictionary si nécessaire
+                Dictionary<string, object> questionDict = null;
+                if (questionData is Dictionary<string, object> dict)
+                {
+                    questionDict = dict;
+                }
+                else if (questionData != null)
+                {
+                    try
+                    {
+                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(questionData);
+                        questionDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogError($"[QuestionDisplayer] Failed to convert question data: {e.Message}");
+                    }
+                }
+
+                if (questionDict != null)
+                {
+                    // Obtenir la langue actuelle
+                    string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+
+                    // Extraire les données de la question
+                    string questionText = ExtractLocalizedText(questionDict, "text", lang);
+                    var options = ExtractLocalizedList(questionDict, "options", lang);
+                    correctAnswerIndex = ExtractInt(questionDict, "correctAnswer");
+                    currentFeedback = ExtractLocalizedText(questionDict, "feedback", lang);
+                    currentIncorrectFeedback = ExtractLocalizedText(questionDict, "incorrectFeedback", lang);
+
+                    // Mettre à jour l'UI
+                    questionLabel.text = questionText;
+
+                    // Clear options container et recréer les options
+                    optionsContainer.Clear();
+                    for (int i = 0; i < options.Count; i++)
+                    {
+                        int index = i;
+                        var optionButton = CreateOptionButton(options[i], index);
+                        optionsContainer.Add(optionButton);
+                    }
+
+                    // Réinitialiser le feedback
+                    feedbackContainer.style.display = DisplayStyle.None;
+
+                    // Réinitialiser le bouton valider
+                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
+                    validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
+                    validateButton.clicked -= NextQuestion;
+                    validateButton.clicked -= ValidateAnswer;
+                    validateButton.clicked += ValidateAnswer;
+                }
+            }
+        }
+
+        private void CreateSingleQuestionUI(string questionText, List<string> options, string type, string feedback, string incorrectFeedback)
+        {
+            currentFeedback = feedback;
+            currentIncorrectFeedback = incorrectFeedback;
+
+            // Clear root
+            rootElement.Clear();
+
+            // Container modal
+            modalContainer = new VisualElement();
+            modalContainer.style.position = Position.Absolute;
+            modalContainer.style.width = Length.Percent(100);
+            modalContainer.style.height = Length.Percent(100);
+            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.85f);
+            modalContainer.style.alignItems = Align.Center;
+            modalContainer.style.justifyContent = Justify.Center;
+            modalContainer.pickingMode = PickingMode.Position;
+
+            // Boîte de question
+            var questionBox = new VisualElement();
+            questionBox.style.width = 700;
+            questionBox.style.maxWidth = Length.Percent(90);
+            questionBox.style.maxHeight = Length.Percent(80);
+            questionBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
+            questionBox.style.borderTopLeftRadius = 25;
+            questionBox.style.borderTopRightRadius = 25;
+            questionBox.style.borderBottomLeftRadius = 25;
+            questionBox.style.borderBottomRightRadius = 25;
+            questionBox.style.paddingTop = 40;
+            questionBox.style.paddingBottom = 40;
+            questionBox.style.paddingLeft = 40;
+            questionBox.style.paddingRight = 40;
+
+            // Bouton fermer (X)
+            var closeButton = new Button(() => Close());
+            closeButton.text = "✕";
+            closeButton.style.position = Position.Absolute;
+            closeButton.style.top = 15;
+            closeButton.style.right = 15;
+            closeButton.style.width = 35;
+            closeButton.style.height = 35;
+            closeButton.style.fontSize = 24;
+            closeButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
+            closeButton.style.color = Color.white;
+            closeButton.style.borderTopLeftRadius = 17;
+            closeButton.style.borderTopRightRadius = 17;
+            closeButton.style.borderBottomLeftRadius = 17;
+            closeButton.style.borderBottomRightRadius = 17;
+            questionBox.Add(closeButton);
+
+            // Texte de la question
+            questionLabel = new Label(questionText);
+            questionLabel.style.fontSize = 24;
+            questionLabel.style.color = Color.white;
+            questionLabel.style.marginBottom = 35;
+            questionLabel.style.whiteSpace = WhiteSpace.Normal;
+            questionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            questionBox.Add(questionLabel);
+
+            // Container des options
+            optionsContainer = new VisualElement();
+            optionsContainer.style.marginBottom = 30;
+
+            // Créer les boutons d'options
+            for (int i = 0; i < options.Count; i++)
+            {
+                int index = i;
+                var optionButton = CreateOptionButton(options[i], index);
+                optionsContainer.Add(optionButton);
+            }
+
+            questionBox.Add(optionsContainer);
+
+            // Zone de feedback (cachée au début)
+            feedbackContainer = new VisualElement();
+            feedbackContainer.name = "feedback-container";
+            feedbackContainer.style.display = DisplayStyle.None;
+            feedbackContainer.style.marginTop = 20;
+            feedbackContainer.style.paddingTop = 20;
+            feedbackContainer.style.paddingBottom = 20;
+            feedbackContainer.style.paddingLeft = 20;
+            feedbackContainer.style.paddingRight = 20;
+            feedbackContainer.style.borderTopLeftRadius = 10;
+            feedbackContainer.style.borderTopRightRadius = 10;
+            feedbackContainer.style.borderBottomLeftRadius = 10;
+            feedbackContainer.style.borderBottomRightRadius = 10;
+
+            feedbackLabel = new Label();
             feedbackLabel.name = "feedback-text";
             feedbackLabel.style.fontSize = 18;
             feedbackLabel.style.color = Color.white;
@@ -154,7 +410,7 @@ namespace WiseTwin.UI
             questionBox.Add(feedbackContainer);
 
             // Bouton Valider
-            var validateButton = new Button(() => ValidateAnswer(feedback, incorrectFeedback));
+            validateButton = new Button(() => ValidateAnswer());
             validateButton.name = "validate-button";
             validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
             validateButton.style.height = 50;
@@ -172,18 +428,9 @@ namespace WiseTwin.UI
 
             modalContainer.Add(questionBox);
             rootElement.Add(modalContainer);
-
-            Debug.Log($"[QuestionDisplayer] UI Created - Modal added to root");
-            Debug.Log($"[QuestionDisplayer] Root child count after add: {rootElement.childCount}");
-            Debug.Log($"[QuestionDisplayer] Root visibility: {rootElement.visible}");
-            Debug.Log($"[QuestionDisplayer] Root display: {rootElement.style.display}");
-            Debug.Log($"[QuestionDisplayer] Modal visibility: {modalContainer.visible}");
-
-            // Forcer le rafraîchissement
-            rootElement.MarkDirtyRepaint();
         }
 
-        Button CreateOptionButton(string text, int index, bool isTrueFalse)
+        Button CreateOptionButton(string text, int index)
         {
             var button = new Button(() => SelectOption(index));
             button.name = $"option-{index}";
@@ -232,22 +479,19 @@ namespace WiseTwin.UI
             selectedAnswerIndex = index;
 
             // Désélectionner tous les boutons
-            var allOptions = rootElement.Query<Button>(className: null).Build();
+            var allOptions = optionsContainer.Query<Button>().Build();
             foreach (var option in allOptions)
             {
-                if (option.name.StartsWith("option-"))
-                {
-                    option.RemoveFromClassList("selected");
-                    option.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
-                    option.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                    option.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                    option.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                    option.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                }
+                option.RemoveFromClassList("selected");
+                option.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
+                option.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                option.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                option.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                option.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
             }
 
             // Sélectionner le bouton cliqué
-            var selectedButton = rootElement.Q<Button>($"option-{index}");
+            var selectedButton = optionsContainer.Q<Button>($"option-{index}");
             if (selectedButton != null)
             {
                 selectedButton.AddToClassList("selected");
@@ -259,61 +503,82 @@ namespace WiseTwin.UI
             }
         }
 
-        void ValidateAnswer(string correctFeedback, string incorrectFeedback)
+        void ValidateAnswer()
         {
             if (hasAnswered || selectedAnswerIndex < 0) return;
 
-            hasAnswered = true;
             bool isCorrect = selectedAnswerIndex == correctAnswerIndex;
 
             // Afficher le feedback
-            var feedbackContainer = rootElement.Q<VisualElement>("feedback-container");
-            var feedbackText = rootElement.Q<Label>("feedback-text");
+            feedbackContainer.style.display = DisplayStyle.Flex;
+            feedbackLabel.text = isCorrect ? currentFeedback : currentIncorrectFeedback;
 
-            if (feedbackContainer != null && feedbackText != null)
+            if (isCorrect)
             {
-                feedbackContainer.style.display = DisplayStyle.Flex;
-                feedbackText.text = isCorrect ? correctFeedback : incorrectFeedback;
+                hasAnswered = true;
+                feedbackContainer.style.backgroundColor = new Color(0.1f, 0.6f, 0.3f, 0.3f);
+                feedbackContainer.style.borderTopWidth = 2;
+                feedbackContainer.style.borderBottomWidth = 2;
+                feedbackContainer.style.borderLeftWidth = 2;
+                feedbackContainer.style.borderRightWidth = 2;
+                feedbackContainer.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                feedbackContainer.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                feedbackContainer.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                feedbackContainer.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
 
-                if (isCorrect)
+                // Si on a plusieurs questions, passer à la suivante
+                if (questionKeys != null && questionKeys.Count > 1)
                 {
-                    feedbackContainer.style.backgroundColor = new Color(0.1f, 0.6f, 0.3f, 0.3f);
-                    feedbackContainer.style.borderTopWidth = 2;
-                    feedbackContainer.style.borderBottomWidth = 2;
-                    feedbackContainer.style.borderLeftWidth = 2;
-                    feedbackContainer.style.borderRightWidth = 2;
-                    feedbackContainer.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    feedbackContainer.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    feedbackContainer.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    feedbackContainer.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    // Afficher un bouton "Question suivante" au lieu de valider
+                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1
+                        ? (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Question suivante" : "Next Question")
+                        : (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Terminer" : "Finish");
+                    validateButton.clicked -= ValidateAnswer;
+                    validateButton.clicked += NextQuestion;
                 }
                 else
                 {
-                    feedbackContainer.style.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.3f);
-                    feedbackContainer.style.borderTopWidth = 2;
-                    feedbackContainer.style.borderBottomWidth = 2;
-                    feedbackContainer.style.borderLeftWidth = 2;
-                    feedbackContainer.style.borderRightWidth = 2;
-                    feedbackContainer.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    feedbackContainer.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    // Question unique - changer le bouton en "Continuer"
+                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+                    validateButton.clicked -= ValidateAnswer;
+                    validateButton.clicked += () => {
+                        OnCompleted?.Invoke(currentObjectId, true);
+                        Close();
+                    };
                 }
             }
-
-            // Changer le bouton en "Continuer"
-            var validateButton = rootElement.Q<Button>("validate-button");
-            if (validateButton != null)
+            else
             {
-                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
-                validateButton.clicked -= null;
-                validateButton.clicked += () => {
-                    Close();
-                };
-            }
+                feedbackContainer.style.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.3f);
+                feedbackContainer.style.borderTopWidth = 2;
+                feedbackContainer.style.borderBottomWidth = 2;
+                feedbackContainer.style.borderLeftWidth = 2;
+                feedbackContainer.style.borderRightWidth = 2;
+                feedbackContainer.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                feedbackContainer.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
 
-            // Déclencher l'événement de complétion UNE SEULE FOIS lors de la validation
-            OnCompleted?.Invoke(currentObjectId, isCorrect);
+                // Permettre de réessayer - changer le texte du bouton
+                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Réessayer" : "Try Again";
+                validateButton.style.backgroundColor = new Color(0.8f, 0.4f, 0.1f, 1f);
+            }
+        }
+
+        void NextQuestion()
+        {
+            currentQuestionIndex++;
+            if (currentQuestionIndex >= questionKeys.Count)
+            {
+                // Toutes les questions terminées
+                OnCompleted?.Invoke(currentObjectId, true);
+                Close();
+            }
+            else
+            {
+                // Afficher la question suivante
+                DisplayCurrentQuestion();
+            }
         }
 
         public void Close()

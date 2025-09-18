@@ -9,13 +9,9 @@ namespace WiseTwin
     /// </summary>
     public enum ContentType
     {
-        Question,
-        Procedure,
-        Media,
-        Dialogue,
-        Instruction,
-        Assessment,
-        Custom
+        Question,    // Questions QCM, Vrai/Faux, etc.
+        Procedure,   // Procédures séquentielles
+        Text         // Affichage de texte informatif
     }
 
     /// <summary>

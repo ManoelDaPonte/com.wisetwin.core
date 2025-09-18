@@ -278,49 +278,21 @@ namespace WiseTwin
                 return;
             }
 
-            // Chercher le contenu selon le type
-            string contentKey = !string.IsNullOrEmpty(specificContentKey) ? specificContentKey : GetFirstContentKeyOfType(cachedObjectData);
-
-            if (debugMode) Debug.Log($"[InteractableObject] Looking for key: {contentKey} in object data with keys: {string.Join(", ", cachedObjectData.Keys)}");
-
-            if (!string.IsNullOrEmpty(contentKey) && cachedObjectData.ContainsKey(contentKey))
+            // Pour les questions, on doit passer TOUTES les données de l'objet pour supporter les questions multiples
+            if (contentType == ContentType.Question)
             {
-                // Debug pour voir le type exact
-                var rawContent = cachedObjectData[contentKey];
-                if (debugMode)
+                // Vérifier qu'il y a au moins une question
+                bool hasQuestions = false;
+                foreach (var key in cachedObjectData.Keys)
                 {
-                    Debug.Log($"[InteractableObject] Raw content type for '{contentKey}': {rawContent?.GetType()?.FullName ?? "null"}");
-                    if (rawContent != null)
+                    if (key.StartsWith("question"))
                     {
-                        string jsonDebug = Newtonsoft.Json.JsonConvert.SerializeObject(rawContent, Newtonsoft.Json.Formatting.Indented);
-                        Debug.Log($"[InteractableObject] Content data: {jsonDebug}");
+                        hasQuestions = true;
+                        break;
                     }
                 }
 
-                // Essayer de convertir en Dictionary
-                Dictionary<string, object> contentData = null;
-
-                // Si c'est déjà un Dictionary
-                if (rawContent is Dictionary<string, object> dict)
-                {
-                    contentData = dict;
-                }
-                // Si c'est un JObject de Newtonsoft
-                else if (rawContent != null)
-                {
-                    try
-                    {
-                        // Convertir le JObject en Dictionary
-                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(rawContent);
-                        contentData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
-                    }
-                    catch (System.Exception e)
-                    {
-                        if (debugMode) Debug.LogError($"[InteractableObject] Failed to convert content: {e.Message}");
-                    }
-                }
-
-                if (contentData != null)
+                if (hasQuestions)
                 {
                     if (ContentDisplayManager.Instance != null)
                     {
@@ -331,8 +303,10 @@ namespace WiseTwin
                             isHovered = false;
                         }
 
-                        if (debugMode) Debug.Log($"[InteractableObject] Displaying content for {objectId} with type {contentType}");
-                        ContentDisplayManager.Instance.DisplayContent(objectId, contentType, contentData);
+                        if (debugMode) Debug.Log($"[InteractableObject] Displaying questions for {objectId}");
+
+                        // Passer toutes les données de l'objet pour que QuestionDisplayer puisse trouver toutes les questions
+                        ContentDisplayManager.Instance.DisplayContent(objectId, contentType, cachedObjectData);
                     }
                     else
                     {
@@ -341,12 +315,81 @@ namespace WiseTwin
                 }
                 else
                 {
-                    if (debugMode) Debug.LogWarning($"[InteractableObject] Content data for key '{contentKey}' is not a Dictionary");
+                    if (debugMode) Debug.LogWarning($"[InteractableObject] No questions found for {objectId}. Keys available: {string.Join(", ", cachedObjectData.Keys)}");
                 }
             }
             else
             {
-                if (debugMode) Debug.LogWarning($"[InteractableObject] No content of type {contentType} found for {objectId}. Keys available: {string.Join(", ", cachedObjectData.Keys)}");
+                // Pour les autres types de contenu, on continue avec l'ancienne logique
+                string contentKey = !string.IsNullOrEmpty(specificContentKey) ? specificContentKey : GetFirstContentKeyOfType(cachedObjectData);
+
+                if (debugMode) Debug.Log($"[InteractableObject] Looking for key: {contentKey} in object data with keys: {string.Join(", ", cachedObjectData.Keys)}");
+
+                if (!string.IsNullOrEmpty(contentKey) && cachedObjectData.ContainsKey(contentKey))
+                {
+                    // Debug pour voir le type exact
+                    var rawContent = cachedObjectData[contentKey];
+                    if (debugMode)
+                    {
+                        Debug.Log($"[InteractableObject] Raw content type for '{contentKey}': {rawContent?.GetType()?.FullName ?? "null"}");
+                        if (rawContent != null)
+                        {
+                            string jsonDebug = Newtonsoft.Json.JsonConvert.SerializeObject(rawContent, Newtonsoft.Json.Formatting.Indented);
+                            Debug.Log($"[InteractableObject] Content data: {jsonDebug}");
+                        }
+                    }
+
+                    // Essayer de convertir en Dictionary
+                    Dictionary<string, object> contentData = null;
+
+                    // Si c'est déjà un Dictionary
+                    if (rawContent is Dictionary<string, object> dict)
+                    {
+                        contentData = dict;
+                    }
+                    // Si c'est un JObject de Newtonsoft
+                    else if (rawContent != null)
+                    {
+                        try
+                        {
+                            // Convertir le JObject en Dictionary
+                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(rawContent);
+                            contentData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                        }
+                        catch (System.Exception e)
+                        {
+                            if (debugMode) Debug.LogError($"[InteractableObject] Failed to convert content: {e.Message}");
+                        }
+                    }
+
+                    if (contentData != null)
+                    {
+                        if (ContentDisplayManager.Instance != null)
+                        {
+                            // Désactiver temporairement l'hover sur cet objet
+                            if (isHovered)
+                            {
+                                RemoveHoverEffect();
+                                isHovered = false;
+                            }
+
+                            if (debugMode) Debug.Log($"[InteractableObject] Displaying content for {objectId} with type {contentType}");
+                            ContentDisplayManager.Instance.DisplayContent(objectId, contentType, contentData);
+                        }
+                        else
+                        {
+                            Debug.LogError("[InteractableObject] ContentDisplayManager.Instance is null! Add ContentDisplayManager to your scene.");
+                        }
+                    }
+                    else
+                    {
+                        if (debugMode) Debug.LogWarning($"[InteractableObject] Content data for key '{contentKey}' is not a Dictionary");
+                    }
+                }
+                else
+                {
+                    if (debugMode) Debug.LogWarning($"[InteractableObject] No content of type {contentType} found for {objectId}. Keys available: {string.Join(", ", cachedObjectData.Keys)}");
+                }
             }
         }
 
@@ -360,9 +403,7 @@ namespace WiseTwin
             {
                 ContentType.Question => new[] { "question", "quiz", "qcm" },
                 ContentType.Procedure => new[] { "procedure", "steps", "process" },
-                ContentType.Media => new[] { "media", "video", "image", "audio" },
-                ContentType.Dialogue => new[] { "dialogue", "conversation", "chat" },
-                ContentType.Instruction => new[] { "instruction", "info", "guide" },
+                ContentType.Text => new[] { "text", "info", "content" },
                 _ => new[] { "content" }
             };
 
