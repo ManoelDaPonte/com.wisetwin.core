@@ -11,7 +11,6 @@ namespace WiseTwin.UI
     public class TrainingCompletionUI : MonoBehaviour
     {
         [Header("Visual Settings")]
-        [SerializeField] private bool showConfetti = true;
         [SerializeField] private float displayDuration = 5f; // Durée avant fermeture automatique
 
         private UIDocument uiDocument;
@@ -269,7 +268,7 @@ namespace WiseTwin.UI
         void NotifyTrainingCompletion()
         {
             // Utiliser le TrainingCompletionNotifier
-            var completionNotifier = FindObjectOfType<TrainingCompletionNotifier>();
+            var completionNotifier = FindFirstObjectByType<TrainingCompletionNotifier>();
             if (completionNotifier != null)
             {
                 completionNotifier.FormationCompleted(Application.productName);

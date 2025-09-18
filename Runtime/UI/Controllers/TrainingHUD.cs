@@ -348,7 +348,7 @@ namespace WiseTwin
             float totalTime = Time.time - startTime;
 
             // Chercher ou créer l'UI de complétion
-            var completionUI = FindObjectOfType<UI.TrainingCompletionUI>();
+            var completionUI = FindFirstObjectByType<UI.TrainingCompletionUI>();
             if (completionUI == null)
             {
                 // Créer l'UI de complétion s'il n'existe pas
