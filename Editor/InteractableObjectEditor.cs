@@ -14,8 +14,6 @@ namespace WiseTwin.EditorExtensions
         SerializedProperty contentType;
         SerializedProperty useDragDropSequence;
         SerializedProperty procedureSequence;
-        SerializedProperty procedureTitle;
-        SerializedProperty procedureDescription;
         SerializedProperty specificContentKey;
         SerializedProperty debugMode;
 
@@ -33,8 +31,6 @@ namespace WiseTwin.EditorExtensions
             contentType = serializedObject.FindProperty("contentType");
             useDragDropSequence = serializedObject.FindProperty("useDragDropSequence");
             procedureSequence = serializedObject.FindProperty("procedureSequence");
-            procedureTitle = serializedObject.FindProperty("procedureTitle");
-            procedureDescription = serializedObject.FindProperty("procedureDescription");
             specificContentKey = serializedObject.FindProperty("specificContentKey");
             debugMode = serializedObject.FindProperty("debugMode");
 
@@ -132,11 +128,9 @@ namespace WiseTwin.EditorExtensions
             {
                 EditorGUI.indentLevel++;
 
-                // Titre et description de la procédure
-                EditorGUILayout.PropertyField(procedureTitle,
-                    new GUIContent("Procedure Title", "Title shown in the procedure UI"));
-                EditorGUILayout.PropertyField(procedureDescription,
-                    new GUIContent("Procedure Description", "Description shown in the procedure UI"));
+                // Clé de la procédure dans les métadatas
+                EditorGUILayout.PropertyField(specificContentKey,
+                    new GUIContent("Procedure Key", "Key in metadata for procedure texts (e.g., 'procedure_maintenance')"));
 
                 EditorGUILayout.Space(5);
 
@@ -148,7 +142,7 @@ namespace WiseTwin.EditorExtensions
                 if (procedureSequence.arraySize == 0)
                 {
                     EditorGUILayout.HelpBox("Add GameObjects to define the procedure sequence. " +
-                        "Objects will be highlighted in order during the procedure.", MessageType.Info);
+                        "Text instructions will come from metadata.", MessageType.Info);
                 }
                 else
                 {
@@ -164,6 +158,9 @@ namespace WiseTwin.EditorExtensions
                         }
                     }
                     EditorGUILayout.EndVertical();
+
+                    EditorGUILayout.HelpBox("Instructions for each step will be loaded from metadata (step_1, step_2, etc.)",
+                        MessageType.Info);
                 }
 
                 EditorGUI.indentLevel--;
@@ -175,8 +172,8 @@ namespace WiseTwin.EditorExtensions
                     new GUIContent("Procedure Key (Optional)",
                     "Leave empty to use first procedure found in metadata"));
 
-                EditorGUILayout.HelpBox("Procedure will be loaded from metadata file. " +
-                    "Enable 'Use Drag & Drop Sequence' to manually define steps.", MessageType.Info);
+                EditorGUILayout.HelpBox("Procedure will be loaded from metadata file (objects and texts). " +
+                    "Enable 'Use Drag & Drop Sequence' to define objects manually.", MessageType.Info);
             }
         }
 

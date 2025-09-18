@@ -37,8 +37,6 @@ namespace WiseTwin
         [Header("Procedure Settings (Only for Procedure type)")]
         [SerializeField] private bool useDragDropSequence = false;
         [SerializeField] private List<GameObject> procedureSequence = new List<GameObject>();
-        [SerializeField] private string procedureTitle = "Maintenance Procedure";
-        [SerializeField] private string procedureDescription = "Follow the steps to complete the procedure";
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
@@ -425,77 +423,195 @@ namespace WiseTwin
         }
 
         /// <summary>
-        /// Crée les données de procédure dynamiquement à partir des GameObjects drag & drop
+        /// Crée les données de procédure en combinant les métadatas et les GameObjects drag & drop
         /// </summary>
         Dictionary<string, object> CreateDynamicProcedureData()
         {
             var procedureData = new Dictionary<string, object>();
 
-            // Obtenir la langue actuelle
-            string currentLang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-            bool isFrench = currentLang == "fr";
+            // Chercher la procédure dans les métadatas
+            Dictionary<string, object> metadataProcedure = null;
 
-            // Titre et description
-            procedureData["title"] = new Dictionary<string, object>
+            // Si une clé spécifique est définie, l'utiliser
+            if (!string.IsNullOrEmpty(specificContentKey) && cachedObjectData.ContainsKey(specificContentKey))
             {
-                ["en"] = procedureTitle,
-                ["fr"] = procedureTitle
-            };
-
-            procedureData["description"] = new Dictionary<string, object>
-            {
-                ["en"] = procedureDescription,
-                ["fr"] = procedureDescription
-            };
-
-            // Créer les étapes à partir des GameObjects
-            for (int i = 0; i < procedureSequence.Count; i++)
-            {
-                var stepObj = procedureSequence[i];
-                if (stepObj == null) continue;
-
-                string stepKey = $"step_{i + 1}";
-
-                // Essayer de récupérer l'ID metadata de l'objet, sinon utiliser son nom
-                string objectId = "";
-                var mapper = stepObj.GetComponent<ObjectMetadataMapper>();
-                if (mapper != null)
+                var rawData = cachedObjectData[specificContentKey];
+                if (rawData is Dictionary<string, object> dict)
                 {
-                    objectId = mapper.MetadataId;
+                    metadataProcedure = dict;
                 }
-                else
+                else if (rawData != null)
                 {
-                    // Créer un ID basé sur le nom de l'objet
-                    objectId = stepObj.name.ToLower().Replace(" ", "_");
+                    // Convertir si c'est un JObject
+                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(rawData);
+                    metadataProcedure = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
                 }
-
-                // Créer les instructions pour cette étape
-                procedureData[stepKey] = new Dictionary<string, object>
+            }
+            // Sinon chercher la première procédure
+            else
+            {
+                foreach (var key in cachedObjectData.Keys)
                 {
-                    ["objectId"] = objectId,
-                    ["instruction"] = new Dictionary<string, object>
+                    if (key.ToLower().Contains("procedure"))
                     {
-                        ["en"] = $"Step {i + 1}: Click on {stepObj.name}",
-                        ["fr"] = $"Étape {i + 1}: Cliquez sur {stepObj.name}"
-                    },
-                    ["validation"] = new Dictionary<string, object>
-                    {
-                        ["en"] = $"Verify that {stepObj.name} is highlighted in yellow",
-                        ["fr"] = $"Vérifiez que {stepObj.name} est surligné en jaune"
-                    },
-                    ["hint"] = new Dictionary<string, object>
-                    {
-                        ["en"] = $"Look for the object named '{stepObj.name}'",
-                        ["fr"] = $"Cherchez l'objet nommé '{stepObj.name}'"
+                        var rawData = cachedObjectData[key];
+                        if (rawData is Dictionary<string, object> dict)
+                        {
+                            metadataProcedure = dict;
+                            break;
+                        }
+                        else if (rawData != null)
+                        {
+                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(rawData);
+                            metadataProcedure = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                            break;
+                        }
                     }
+                }
+            }
+
+            // Si on a trouvé des métadatas de procédure, les utiliser pour titre et description
+            if (metadataProcedure != null)
+            {
+                // Copier le titre et la description depuis les métadatas
+                if (metadataProcedure.ContainsKey("title"))
+                    procedureData["title"] = metadataProcedure["title"];
+                else
+                    procedureData["title"] = new Dictionary<string, object> { ["en"] = "Procedure", ["fr"] = "Procédure" };
+
+                if (metadataProcedure.ContainsKey("description"))
+                    procedureData["description"] = metadataProcedure["description"];
+                else
+                    procedureData["description"] = new Dictionary<string, object> { ["en"] = "Follow the steps", ["fr"] = "Suivez les étapes" };
+
+                // Créer les étapes en combinant métadatas et GameObjects
+                for (int i = 0; i < procedureSequence.Count; i++)
+                {
+                    var stepObj = procedureSequence[i];
+                    if (stepObj == null) continue;
+
+                    string stepKey = $"step_{i + 1}";
+
+                    // Récupérer l'ID metadata de l'objet
+                    string objectId = "";
+                    var mapper = stepObj.GetComponent<ObjectMetadataMapper>();
+                    if (mapper != null)
+                    {
+                        objectId = mapper.MetadataId;
+                    }
+                    else
+                    {
+                        objectId = stepObj.name.ToLower().Replace(" ", "_");
+                    }
+
+                    // Vérifier si on a des données pour cette étape dans les métadatas
+                    if (metadataProcedure.ContainsKey(stepKey))
+                    {
+                        // Utiliser les données des métadatas mais remplacer l'objectId par celui du GameObject
+                        var stepData = metadataProcedure[stepKey];
+                        if (stepData is Dictionary<string, object> stepDict)
+                        {
+                            var modifiedStep = new Dictionary<string, object>(stepDict);
+                            modifiedStep["objectId"] = objectId;
+                            procedureData[stepKey] = modifiedStep;
+                        }
+                        else if (stepData != null)
+                        {
+                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(stepData);
+                            var convertedStepDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                            convertedStepDict["objectId"] = objectId;
+                            procedureData[stepKey] = convertedStepDict;
+                        }
+                    }
+                    else
+                    {
+                        // Si pas de métadatas pour cette étape, créer des données par défaut
+                        procedureData[stepKey] = new Dictionary<string, object>
+                        {
+                            ["objectId"] = objectId,
+                            ["instruction"] = new Dictionary<string, object>
+                            {
+                                ["en"] = $"Step {i + 1}: Interact with the highlighted object",
+                                ["fr"] = $"Étape {i + 1}: Interagissez avec l'objet surligné"
+                            },
+                            ["validation"] = new Dictionary<string, object>
+                            {
+                                ["en"] = "Object interaction validated",
+                                ["fr"] = "Interaction avec l'objet validée"
+                            },
+                            ["hint"] = new Dictionary<string, object>
+                            {
+                                ["en"] = "Click on the yellow highlighted object",
+                                ["fr"] = "Cliquez sur l'objet surligné en jaune"
+                            }
+                        };
+                    }
+
+                    // S'assurer que l'objet a un ObjectMetadataMapper
+                    if (mapper == null)
+                    {
+                        mapper = stepObj.AddComponent<ObjectMetadataMapper>();
+                        mapper.MetadataId = objectId;
+                        if (debugMode) Debug.Log($"[InteractableObject] Added ObjectMetadataMapper to {stepObj.name} with ID: {objectId}");
+                    }
+                }
+            }
+            else
+            {
+                // Si pas de métadatas, utiliser les valeurs par défaut
+                if (debugMode) Debug.LogWarning("[InteractableObject] No procedure metadata found, using default values");
+
+                procedureData["title"] = new Dictionary<string, object>
+                {
+                    ["en"] = "Procedure",
+                    ["fr"] = "Procédure"
                 };
 
-                // S'assurer que l'objet a un ObjectMetadataMapper pour être trouvé
-                if (mapper == null)
+                procedureData["description"] = new Dictionary<string, object>
                 {
-                    mapper = stepObj.AddComponent<ObjectMetadataMapper>();
-                    mapper.MetadataId = objectId;
-                    if (debugMode) Debug.Log($"[InteractableObject] Added ObjectMetadataMapper to {stepObj.name} with ID: {objectId}");
+                    ["en"] = "Follow the steps in order",
+                    ["fr"] = "Suivez les étapes dans l'ordre"
+                };
+
+                // Créer les étapes par défaut
+                for (int i = 0; i < procedureSequence.Count; i++)
+                {
+                    var stepObj = procedureSequence[i];
+                    if (stepObj == null) continue;
+
+                    string stepKey = $"step_{i + 1}";
+                    string objectId = "";
+                    var mapper = stepObj.GetComponent<ObjectMetadataMapper>();
+                    if (mapper != null)
+                    {
+                        objectId = mapper.MetadataId;
+                    }
+                    else
+                    {
+                        objectId = stepObj.name.ToLower().Replace(" ", "_");
+                        mapper = stepObj.AddComponent<ObjectMetadataMapper>();
+                        mapper.MetadataId = objectId;
+                    }
+
+                    procedureData[stepKey] = new Dictionary<string, object>
+                    {
+                        ["objectId"] = objectId,
+                        ["instruction"] = new Dictionary<string, object>
+                        {
+                            ["en"] = $"Step {i + 1}: Click on {stepObj.name}",
+                            ["fr"] = $"Étape {i + 1}: Cliquez sur {stepObj.name}"
+                        },
+                        ["validation"] = new Dictionary<string, object>
+                        {
+                            ["en"] = "Step completed",
+                            ["fr"] = "Étape terminée"
+                        },
+                        ["hint"] = new Dictionary<string, object>
+                        {
+                            ["en"] = "Look for the highlighted object",
+                            ["fr"] = "Cherchez l'objet surligné"
+                        }
+                    };
                 }
             }
 
