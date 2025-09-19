@@ -30,6 +30,9 @@ namespace WiseTwin.UI
         // Singleton
         public static ContentDisplayManager Instance { get; private set; }
 
+        // Public properties
+        public bool DebugMode => debugMode;
+
         // Events
         public event Action<ContentType, string> OnContentDisplayed;
         public event Action<ContentType, string> OnContentClosed;
@@ -268,10 +271,10 @@ namespace WiseTwin.UI
         {
             OnContentCompleted?.Invoke(objectId, success);
 
-            // Mettre à jour la progression dans le HUD
+            // Mettre à jour la progression dans le HUD (avec anti-triche)
             if (success && TrainingHUD.Instance != null)
             {
-                TrainingHUD.Instance.IncrementProgress();
+                TrainingHUD.Instance.IncrementProgressForObject(objectId);
             }
         }
 

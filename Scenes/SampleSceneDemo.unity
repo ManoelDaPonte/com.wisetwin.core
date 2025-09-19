@@ -458,7 +458,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 212797dc666544ded894ed15fe72710b, type: 2}
+  - {fileID: 2100000, guid: f62373e3e8ba54963a948a13df40a81f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -898,7 +898,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 076ffbabe072848faa8b46386530bbe8, type: 2}
+  - {fileID: 2100000, guid: bc193985f3ece47fe802fbeeb50e3401, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1140,7 +1140,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 33f0d1ede2ae04855b417f7571ebcfa3, type: 2}
+  - {fileID: 2100000, guid: 2eb86d77eedab4629acafbc4f1f9fabc, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1295,7 +1295,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 95dd99e3142624474beb57c100fd2aec, type: 2}
+  - {fileID: 2100000, guid: aff097e8e4ed444ed8629eb9e99134f4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1569,7 +1569,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: useProductionMode
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: completionNotifier
@@ -1589,7 +1589,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5717370407079796314, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: enableDebugLogs
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7123580581372257338, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: m_LocalPosition.x

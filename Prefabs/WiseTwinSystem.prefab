@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PanelSettings: {fileID: 11400000, guid: 1c81c9b4f0abf47e2bcb12e81821d0c9, type: 2}
+  m_PanelSettings: {fileID: 11400000, guid: 842dde6b862e04712bec0bea77820389, type: 2}
   m_ParentUI: {fileID: 0}
   sourceAsset: {fileID: 0}
   m_SortingOrder: 0
@@ -115,7 +115,7 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PanelSettings: {fileID: 11400000, guid: 1c81c9b4f0abf47e2bcb12e81821d0c9, type: 2}
+  m_PanelSettings: {fileID: 11400000, guid: 842dde6b862e04712bec0bea77820389, type: 2}
   m_ParentUI: {fileID: 0}
   sourceAsset: {fileID: 0}
   m_SortingOrder: 0
@@ -180,7 +180,7 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PanelSettings: {fileID: 11400000, guid: 1c81c9b4f0abf47e2bcb12e81821d0c9, type: 2}
+  m_PanelSettings: {fileID: 11400000, guid: 842dde6b862e04712bec0bea77820389, type: 2}
   m_ParentUI: {fileID: 0}
   sourceAsset: {fileID: 0}
   m_SortingOrder: 0
@@ -296,6 +296,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f284b566a0ebd490f846968564296b9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  useAzureStorageDirect: 0
+  azureStorageUrl: https://yourstorage.blob.core.windows.net/
   apiBaseUrl: https://your-domain.com/api/unity/metadata
   containerId: 
   buildType: wisetrainer

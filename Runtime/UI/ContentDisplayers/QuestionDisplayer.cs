@@ -19,8 +19,11 @@ namespace WiseTwin.UI
         private VisualElement rootElement;
         private VisualElement modalContainer;
         private int selectedAnswerIndex = -1;
-        private int correctAnswerIndex;
+        private List<int> selectedAnswerIndexes = new List<int>(); // Pour les réponses multiples
+        private int correctAnswerIndex; // Pour réponse unique
+        private List<int> correctAnswerIndexes = new List<int>(); // Pour réponses multiples
         private bool hasAnswered = false;
+        private bool isMultipleChoice = false; // Détermine si c'est un QCM multiple ou unique
 
         // Pour gérer les questions séquentielles
         private List<string> questionKeys;
@@ -73,7 +76,10 @@ namespace WiseTwin.UI
                     return numA.CompareTo(numB);
                 });
 
-                Debug.Log($"[QuestionDisplayer] Found {questionKeys.Count} questions for {objectId}");
+                if (ContentDisplayManager.Instance?.DebugMode ?? false)
+                {
+                    Debug.Log($"[QuestionDisplayer] Found {questionKeys.Count} questions for {objectId}");
+                }
 
                 if (questionKeys.Count > 0)
                 {
@@ -83,7 +89,10 @@ namespace WiseTwin.UI
                 }
                 else
                 {
-                    Debug.LogError($"[QuestionDisplayer] No questions found for {objectId}");
+                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
+                    {
+                        Debug.LogError($"[QuestionDisplayer] No questions found for {objectId}");
+                    }
                 }
             }
         }
@@ -93,7 +102,10 @@ namespace WiseTwin.UI
             hasAnswered = false;
             selectedAnswerIndex = -1;
 
-            Debug.Log($"[QuestionDisplayer] Displaying single question for {currentObjectId}");
+            if (ContentDisplayManager.Instance?.DebugMode ?? false)
+            {
+                Debug.Log($"[QuestionDisplayer] Displaying single question for {currentObjectId}");
+            }
 
             // Obtenir la langue actuelle
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
@@ -101,13 +113,75 @@ namespace WiseTwin.UI
             // Extraire les données de la question
             string questionText = ExtractLocalizedText(contentData, "text", lang);
             var options = ExtractLocalizedList(contentData, "options", lang);
-            correctAnswerIndex = ExtractInt(contentData, "correctAnswer");
+
+            // Vérifier le mode de sélection (single ou multiple)
+            string selectionMode = contentData.ContainsKey("selectionMode")
+                ? ExtractString(contentData, "selectionMode")
+                : "single";
+            isMultipleChoice = (selectionMode == "multiple");
+
+            // Gérer les réponses correctes selon le mode
+            if (isMultipleChoice)
+            {
+                // Pour les réponses multiples, on peut avoir un tableau ou une string avec des virgules
+                correctAnswerIndexes.Clear();
+                if (contentData.ContainsKey("correctAnswers"))
+                {
+                    var correctAnswers = contentData["correctAnswers"];
+                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
+                    {
+                        Debug.Log($"[QuestionDisplayer] correctAnswers type: {correctAnswers?.GetType()?.Name ?? "null"}");
+                    }
+
+                    if (correctAnswers is Newtonsoft.Json.Linq.JArray jarray)
+                    {
+                        correctAnswerIndexes = jarray.Select(x => (int)x).ToList();
+                    }
+                    else if (correctAnswers is List<object> list)
+                    {
+                        correctAnswerIndexes = list.Select(x => Convert.ToInt32(x)).ToList();
+                    }
+                    else if (correctAnswers is string str)
+                    {
+                        correctAnswerIndexes = str.Split(',').Select(x => int.Parse(x.Trim())).ToList();
+                    }
+                    else if (correctAnswers is int[] intArray)
+                    {
+                        correctAnswerIndexes = intArray.ToList();
+                    }
+                    else if (correctAnswers is long[] longArray)
+                    {
+                        correctAnswerIndexes = longArray.Select(x => (int)x).ToList();
+                    }
+
+                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
+                    {
+                        Debug.Log($"[QuestionDisplayer] Loaded correct answers for multiple choice: {string.Join(", ", correctAnswerIndexes)}");
+                    }
+                }
+                else
+                {
+                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
+                    {
+                        Debug.LogWarning("[QuestionDisplayer] No correctAnswers field found for multiple choice question!");
+                    }
+                }
+            }
+            else
+            {
+                // Pour réponse unique
+                correctAnswerIndex = ExtractInt(contentData, "correctAnswer");
+            }
+
             string feedback = ExtractLocalizedText(contentData, "feedback", lang);
             string incorrectFeedback = ExtractLocalizedText(contentData, "incorrectFeedback", lang);
             string questionType = ExtractString(contentData, "type");
 
-            Debug.Log($"[QuestionDisplayer] Question: {questionText}");
-            Debug.Log($"[QuestionDisplayer] Options count: {options?.Count ?? 0}");
+            if (ContentDisplayManager.Instance?.DebugMode ?? false)
+            {
+                Debug.Log($"[QuestionDisplayer] Question: {questionText}");
+                Debug.Log($"[QuestionDisplayer] Options count: {options?.Count ?? 0}");
+            }
 
             // Créer l'UI pour question unique
             CreateSingleQuestionUI(questionText, options, questionType, feedback, incorrectFeedback);
@@ -239,7 +313,10 @@ namespace WiseTwin.UI
             selectedAnswerIndex = -1;
 
             string currentKey = questionKeys[currentQuestionIndex];
-            Debug.Log($"[QuestionDisplayer] Displaying question {currentQuestionIndex + 1}/{questionKeys.Count}: {currentKey}");
+            if (ContentDisplayManager.Instance?.DebugMode ?? false)
+            {
+                Debug.Log($"[QuestionDisplayer] Displaying question {currentQuestionIndex + 1}/{questionKeys.Count}: {currentKey}");
+            }
 
             // Mise à jour de l'indicateur de progression
             if (questionKeys.Count > 1)
@@ -271,7 +348,10 @@ namespace WiseTwin.UI
                     }
                     catch (System.Exception e)
                     {
-                        Debug.LogError($"[QuestionDisplayer] Failed to convert question data: {e.Message}");
+                        if (ContentDisplayManager.Instance?.DebugMode ?? false)
+                        {
+                            Debug.LogError($"[QuestionDisplayer] Failed to convert question data: {e.Message}");
+                        }
                     }
                 }
 
@@ -283,7 +363,48 @@ namespace WiseTwin.UI
                     // Extraire les données de la question
                     string questionText = ExtractLocalizedText(questionDict, "text", lang);
                     var options = ExtractLocalizedList(questionDict, "options", lang);
-                    correctAnswerIndex = ExtractInt(questionDict, "correctAnswer");
+
+                    // Vérifier le mode de sélection pour chaque question
+                    string selectionMode = questionDict.ContainsKey("selectionMode")
+                        ? ExtractString(questionDict, "selectionMode")
+                        : "single";
+                    isMultipleChoice = (selectionMode == "multiple");
+
+                    // Gérer les réponses correctes selon le mode
+                    if (isMultipleChoice)
+                    {
+                        correctAnswerIndexes.Clear();
+                        if (questionDict.ContainsKey("correctAnswers"))
+                        {
+                            var correctAnswers = questionDict["correctAnswers"];
+
+                            if (correctAnswers is Newtonsoft.Json.Linq.JArray jarray)
+                            {
+                                correctAnswerIndexes = jarray.Select(x => (int)x).ToList();
+                            }
+                            else if (correctAnswers is List<object> list)
+                            {
+                                correctAnswerIndexes = list.Select(x => Convert.ToInt32(x)).ToList();
+                            }
+                            else if (correctAnswers is string str)
+                            {
+                                correctAnswerIndexes = str.Split(',').Select(x => int.Parse(x.Trim())).ToList();
+                            }
+                            else if (correctAnswers is int[] intArray)
+                            {
+                                correctAnswerIndexes = intArray.ToList();
+                            }
+                            else if (correctAnswers is long[] longArray)
+                            {
+                                correctAnswerIndexes = longArray.Select(x => (int)x).ToList();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        correctAnswerIndex = ExtractInt(questionDict, "correctAnswer");
+                    }
+
                     currentFeedback = ExtractLocalizedText(questionDict, "feedback", lang);
                     currentIncorrectFeedback = ExtractLocalizedText(questionDict, "incorrectFeedback", lang);
 
@@ -298,6 +419,10 @@ namespace WiseTwin.UI
                         var optionButton = CreateOptionButton(options[i], index);
                         optionsContainer.Add(optionButton);
                     }
+
+                    // Réinitialiser les sélections
+                    selectedAnswerIndex = -1;
+                    selectedAnswerIndexes.Clear();
 
                     // Réinitialiser le feedback
                     feedbackContainer.style.display = DisplayStyle.None;
@@ -430,84 +555,201 @@ namespace WiseTwin.UI
             rootElement.Add(modalContainer);
         }
 
-        Button CreateOptionButton(string text, int index)
+        VisualElement CreateOptionButton(string text, int index)
         {
-            var button = new Button(() => SelectOption(index));
-            button.name = $"option-{index}";
-            button.text = text;
-            button.style.marginBottom = 12;
-            button.style.height = 50;
-            button.style.fontSize = 18;
-            button.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
-            button.style.color = Color.white;
-            button.style.borderTopLeftRadius = 10;
-            button.style.borderTopRightRadius = 10;
-            button.style.borderBottomLeftRadius = 10;
-            button.style.borderBottomRightRadius = 10;
-            button.style.borderTopWidth = 2;
-            button.style.borderBottomWidth = 2;
-            button.style.borderLeftWidth = 2;
-            button.style.borderRightWidth = 2;
-            button.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            button.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            button.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            button.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            button.style.unityTextAlign = TextAnchor.MiddleCenter;
+            // Container pour l'option (contiendra le checkbox/radio + texte)
+            var optionContainer = new VisualElement();
+            optionContainer.style.flexDirection = FlexDirection.Row;
+            optionContainer.style.alignItems = Align.Center;
+            optionContainer.style.marginBottom = 12;
+            optionContainer.style.paddingTop = 12;
+            optionContainer.style.paddingBottom = 12;
+            optionContainer.style.paddingLeft = 15;
+            optionContainer.style.paddingRight = 15;
+            optionContainer.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
+            optionContainer.style.borderTopLeftRadius = 10;
+            optionContainer.style.borderTopRightRadius = 10;
+            optionContainer.style.borderBottomLeftRadius = 10;
+            optionContainer.style.borderBottomRightRadius = 10;
+            optionContainer.style.borderTopWidth = 2;
+            optionContainer.style.borderBottomWidth = 2;
+            optionContainer.style.borderLeftWidth = 2;
+            optionContainer.style.borderRightWidth = 2;
+            optionContainer.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+            optionContainer.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+            optionContainer.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+            optionContainer.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+            optionContainer.style.cursor = StyleKeyword.Auto;
+            optionContainer.pickingMode = PickingMode.Position;
+            optionContainer.name = $"option-{index}";
+
+            // Indicateur visuel (cercle pour radio, carré pour checkbox)
+            var indicator = new VisualElement();
+            indicator.name = "indicator";
+            indicator.style.width = 24;
+            indicator.style.height = 24;
+            indicator.style.marginRight = 12;
+            indicator.style.borderTopWidth = 2;
+            indicator.style.borderBottomWidth = 2;
+            indicator.style.borderLeftWidth = 2;
+            indicator.style.borderRightWidth = 2;
+            indicator.style.borderTopColor = Color.white;
+            indicator.style.borderBottomColor = Color.white;
+            indicator.style.borderLeftColor = Color.white;
+            indicator.style.borderRightColor = Color.white;
+            indicator.style.backgroundColor = Color.clear;
+
+            if (isMultipleChoice)
+            {
+                // Checkbox (carré)
+                indicator.style.borderTopLeftRadius = 4;
+                indicator.style.borderTopRightRadius = 4;
+                indicator.style.borderBottomLeftRadius = 4;
+                indicator.style.borderBottomRightRadius = 4;
+            }
+            else
+            {
+                // Radio button (cercle)
+                indicator.style.borderTopLeftRadius = 12;
+                indicator.style.borderTopRightRadius = 12;
+                indicator.style.borderBottomLeftRadius = 12;
+                indicator.style.borderBottomRightRadius = 12;
+            }
+
+            // Texte de l'option
+            var label = new Label(text);
+            label.style.fontSize = 18;
+            label.style.color = Color.white;
+            label.style.flexGrow = 1;
+            label.style.whiteSpace = WhiteSpace.Normal;
+
+            optionContainer.Add(indicator);
+            optionContainer.Add(label);
+
+            // Event click
+            optionContainer.RegisterCallback<ClickEvent>((evt) => {
+                if (!hasAnswered)
+                {
+                    SelectOption(index);
+                }
+            });
 
             // Hover effect
-            button.RegisterCallback<MouseEnterEvent>((evt) => {
-                if (!hasAnswered && !button.ClassListContains("selected"))
+            optionContainer.RegisterCallback<MouseEnterEvent>((evt) => {
+                if (!hasAnswered)
                 {
-                    button.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
+                    optionContainer.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
+                    optionContainer.style.cursor = StyleKeyword.Auto;
                 }
             });
 
-            button.RegisterCallback<MouseLeaveEvent>((evt) => {
-                if (!hasAnswered && !button.ClassListContains("selected"))
+            optionContainer.RegisterCallback<MouseLeaveEvent>((evt) => {
+                if (!hasAnswered && !optionContainer.ClassListContains("selected"))
                 {
-                    button.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
+                    optionContainer.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
                 }
             });
 
-            return button;
+            return optionContainer;
         }
 
         void SelectOption(int index)
         {
             if (hasAnswered) return;
 
-            selectedAnswerIndex = index;
-
-            // Désélectionner tous les boutons
-            var allOptions = optionsContainer.Query<Button>().Build();
-            foreach (var option in allOptions)
+            if (isMultipleChoice)
             {
-                option.RemoveFromClassList("selected");
-                option.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
-                option.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                option.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                option.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                option.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                // Mode checkbox - peut sélectionner/désélectionner plusieurs options
+                if (selectedAnswerIndexes.Contains(index))
+                {
+                    selectedAnswerIndexes.Remove(index);
+                }
+                else
+                {
+                    selectedAnswerIndexes.Add(index);
+                }
+            }
+            else
+            {
+                // Mode radio - une seule sélection
+                selectedAnswerIndex = index;
+                selectedAnswerIndexes.Clear();
+                selectedAnswerIndexes.Add(index);
             }
 
-            // Sélectionner le bouton cliqué
-            var selectedButton = optionsContainer.Q<Button>($"option-{index}");
-            if (selectedButton != null)
+            // Mettre à jour l'UI
+            UpdateOptionsUI();
+        }
+
+        void UpdateOptionsUI()
+        {
+            var allOptions = optionsContainer.Query<VisualElement>().Build().ToList();
+
+            for (int i = 0; i < allOptions.Count; i++)
             {
-                selectedButton.AddToClassList("selected");
-                selectedButton.style.backgroundColor = new Color(0.2f, 0.4f, 0.8f, 0.8f);
-                selectedButton.style.borderTopColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-                selectedButton.style.borderBottomColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-                selectedButton.style.borderLeftColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-                selectedButton.style.borderRightColor = new Color(0.1f, 0.8f, 0.6f, 1f);
+                var option = optionsContainer.Q<VisualElement>($"option-{i}");
+                if (option != null)
+                {
+                    var indicator = option.Q<VisualElement>("indicator");
+                    bool isSelected = isMultipleChoice ? selectedAnswerIndexes.Contains(i) : selectedAnswerIndex == i;
+
+                    if (isSelected)
+                    {
+                        option.AddToClassList("selected");
+                        option.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
+                        option.style.borderTopColor = new Color(0.2f, 0.6f, 1f, 1f);
+                        option.style.borderBottomColor = new Color(0.2f, 0.6f, 1f, 1f);
+                        option.style.borderLeftColor = new Color(0.2f, 0.6f, 1f, 1f);
+                        option.style.borderRightColor = new Color(0.2f, 0.6f, 1f, 1f);
+
+                        // Remplir l'indicateur
+                        indicator.style.backgroundColor = new Color(0.2f, 0.6f, 1f, 1f);
+                    }
+                    else
+                    {
+                        option.RemoveFromClassList("selected");
+                        option.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
+                        option.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                        option.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                        option.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                        option.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+
+                        // Vider l'indicateur
+                        indicator.style.backgroundColor = Color.clear;
+                    }
+                }
             }
         }
 
         void ValidateAnswer()
         {
-            if (hasAnswered || selectedAnswerIndex < 0) return;
+            if (hasAnswered) return;
 
-            bool isCorrect = selectedAnswerIndex == correctAnswerIndex;
+            bool isCorrect = false;
+
+            if (isMultipleChoice)
+            {
+                // Pour les réponses multiples, vérifier si les sélections correspondent exactement
+                if (selectedAnswerIndexes.Count == 0) return;
+
+                selectedAnswerIndexes.Sort();
+                correctAnswerIndexes.Sort();
+
+                if (ContentDisplayManager.Instance?.DebugMode ?? false)
+                {
+                    Debug.Log($"[QuestionDisplayer] Selected answers: {string.Join(", ", selectedAnswerIndexes)}");
+                    Debug.Log($"[QuestionDisplayer] Correct answers: {string.Join(", ", correctAnswerIndexes)}");
+                }
+
+                isCorrect = selectedAnswerIndexes.Count == correctAnswerIndexes.Count &&
+                           selectedAnswerIndexes.SequenceEqual(correctAnswerIndexes);
+            }
+            else
+            {
+                // Pour réponse unique
+                if (selectedAnswerIndex < 0) return;
+                isCorrect = selectedAnswerIndex == correctAnswerIndex;
+            }
 
             // Afficher le feedback
             feedbackContainer.style.display = DisplayStyle.Flex;
@@ -676,7 +918,10 @@ namespace WiseTwin.UI
                 }
             }
 
-            Debug.Log($"[QuestionDisplayer] ExtractLocalizedList for '{key}' in '{language}': found {result.Count} items");
+            if (ContentDisplayManager.Instance?.DebugMode ?? false)
+            {
+                Debug.Log($"[QuestionDisplayer] ExtractLocalizedList for '{key}' in '{language}': found {result.Count} items");
+            }
             return result;
         }
 

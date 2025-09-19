@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections;
+using System.Collections.Generic;
 
 namespace WiseTwin
 {
@@ -35,6 +36,7 @@ namespace WiseTwin
         private int currentProgress = 0;
         private int totalObjects = 0;
         private bool isVisible = false;
+        private HashSet<string> completedObjects = new HashSet<string>(); // Pour éviter la triche
 
         // Singleton
         public static TrainingHUD Instance { get; private set; }
@@ -235,6 +237,23 @@ namespace WiseTwin
 
         public void IncrementProgress()
         {
+            // Méthode legacy sans ID d'objet (pour compatibilité)
+            IncrementProgressForObject(null);
+        }
+
+        public void IncrementProgressForObject(string objectId)
+        {
+            // Si on a un ID d'objet, vérifier qu'il n'a pas déjà été complété
+            if (!string.IsNullOrEmpty(objectId))
+            {
+                if (completedObjects.Contains(objectId))
+                {
+                    Debug.LogWarning($"[TrainingHUD] Object {objectId} already completed - ignoring to prevent cheating");
+                    return;
+                }
+                completedObjects.Add(objectId);
+            }
+
             // Ne pas incrémenter si on a déjà atteint le maximum
             if (currentProgress >= totalObjects)
             {
@@ -244,6 +263,11 @@ namespace WiseTwin
 
             currentProgress++;
             UpdateProgressDisplay();
+
+            if (debugMode)
+            {
+                Debug.Log($"[TrainingHUD] Progress: {currentProgress}/{totalObjects} (Object: {objectId ?? "unknown"})");
+            }
 
             // Vérifier si on a terminé tous les modules
             if (currentProgress >= totalObjects && totalObjects > 0)

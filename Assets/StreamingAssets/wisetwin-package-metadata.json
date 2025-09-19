@@ -1,0 +1,222 @@
+{
+  "id": "wisetwin-package",
+  "title": "Training Testeuh",
+  "description": "Training description",
+  "version": "1.0.0",
+  "category": "Général",
+  "duration": "30 minutes",
+  "difficulty": "Facile",
+  "tags": [
+    "training",
+    "interactive"
+  ],
+  "imageUrl": "https://res.cloudinary.com/dhojbmhmr/image/upload/v1741172878/wisetwin_logo_ehmnre.png",
+  "modules": [],
+  "objectives": [],
+  "prerequisites": [],
+  "createdAt": "2025-09-07T10:25:28.108Z",
+  "updatedAt": "2025-09-07T10:25:28.108Z",
+  "unity": {
+    "red_cube": {
+      "question_1": {
+        "text": {
+          "en": "What color is this cube?",
+          "fr": "De quelle couleur est ce cube ?"
+        },
+        "type": "multiple-choice",
+        "options": {
+          "en": [
+            "Red",
+            "Blue",
+            "Green"
+          ],
+          "fr": [
+            "Rouge",
+            "Bleu",
+            "Vert"
+          ]
+        },
+        "correctAnswer": 0,
+        "feedback": {
+          "en": "Correct! It's red.",
+          "fr": "Correct ! C'est rouge."
+        },
+        "incorrectFeedback": {
+          "en": "Look closer at the color!",
+          "fr": "Regardez mieux la couleur !"
+        }
+      },
+      "question_2": {
+        "text": {
+          "en": "How many faces does a cube have?",
+          "fr": "Combien de faces a un cube ?"
+        },
+        "type": "multiple-choice",
+        "options": {
+          "en": [
+            "4 faces",
+            "6 faces",
+            "8 faces"
+          ],
+          "fr": [
+            "4 faces",
+            "6 faces",
+            "8 faces"
+          ]
+        },
+        "correctAnswer": 1,
+        "feedback": {
+          "en": "Perfect! A cube has 6 faces.",
+          "fr": "Parfait ! Un cube a 6 faces."
+        },
+        "incorrectFeedback": {
+          "en": "Think about all sides of the cube!",
+          "fr": "Pensez à tous les côtés du cube !"
+        }
+      },
+      "question_3": {
+        "text": {
+          "en": "What type of geometric shape is each face of a cube?",
+          "fr": "Quel type de forme géométrique est chaque face d'un cube ?"
+        },
+        "type": "multiple-choice",
+        "options": {
+          "en": [
+            "Triangle",
+            "Square",
+            "Circle"
+          ],
+          "fr": [
+            "Triangle",
+            "Carré",
+            "Cercle"
+          ]
+        },
+        "correctAnswer": 1,
+        "feedback": {
+          "en": "Excellent! Each face of a cube is a square.",
+          "fr": "Excellent ! Chaque face d'un cube est un carré."
+        },
+        "incorrectFeedback": {
+          "en": "Look at the shape of each face!",
+          "fr": "Regardez la forme de chaque face !"
+        }
+      }
+    },
+    "blue_sphere": {
+      "question_1": {
+        "text": {
+          "en": "What shape is this object?",
+          "fr": "Quelle est la forme de cet objet ?"
+        },
+        "type": "multiple-choice",
+        "options": {
+          "en": [
+            "Cube",
+            "Sphere",
+            "Cylinder"
+          ],
+          "fr": [
+            "Cube",
+            "Sphère",
+            "Cylindre"
+          ]
+        },
+        "correctAnswer": 1,
+        "feedback": {
+          "en": "Exactly! It's a sphere.",
+          "fr": "Exactement ! C'est une sphère."
+        },
+        "incorrectFeedback": {
+          "en": "Look carefully at the shape!",
+          "fr": "Regardez attentivement la forme !"
+        }
+      }
+    },
+    "green_cylinder": {
+      "text_content": {
+        "title": {
+          "en": "About Cylinders",
+          "fr": "À propos des cylindres"
+        },
+        "subtitle": {
+          "en": "Geometric Properties",
+          "fr": "Propriétés géométriques"
+        },
+        "content": {
+          "en": "# Understanding Cylinders\n\nA cylinder is a three-dimensional geometric shape with two parallel circular bases connected by a curved surface.\n\n## Key Properties\n\n- Two circular bases of equal size\n- Height perpendicular to the bases\n- Curved lateral surface\n- Volume = πr²h\n- Surface area = 2πr² + 2πrh\n\n## Real-world Applications\n\n> Cylinders are found everywhere in our daily life!\n\n- Cans and containers\n- Pipes and tubes\n- Engine pistons\n- Columns in architecture\n\n! Remember: The green cylinder in this scene demonstrates perfect cylindrical geometry.\n\n### Mathematical Note\n\nThe cylinder is one of the most studied shapes in geometry due to its practical applications and mathematical properties.",
+          "fr": "# Comprendre les Cylindres\n\nUn cylindre est une forme géométrique tridimensionnelle avec deux bases circulaires parallèles connectées par une surface courbe.\n\n## Propriétés Clés\n\n- Deux bases circulaires de taille égale\n- Hauteur perpendiculaire aux bases\n- Surface latérale courbe\n- Volume = πr²h\n- Surface = 2πr² + 2πrh\n\n## Applications Réelles\n\n> Les cylindres sont partout dans notre vie quotidienne !\n\n- Canettes et contenants\n- Tuyaux et tubes\n- Pistons de moteur\n- Colonnes en architecture\n\n! Rappel : Le cylindre vert dans cette scène démontre une géométrie cylindrique parfaite.\n\n### Note Mathématique\n\nLe cylindre est l'une des formes les plus étudiées en géométrie en raison de ses applications pratiques et de ses propriétés mathématiques."
+        },
+        "showContinueButton": true
+      }
+    },
+    "yellow_capsule": {
+      "procedure_startup": {
+        "title": {
+          "en": "🚀 Quantum Reactor Startup Sequence",
+          "fr": "🚀 Séquence de démarrage du réacteur quantique"
+        },
+        "description": {
+          "en": "Initialize the quantum reactor core systems in the correct order to prevent temporal anomalies",
+          "fr": "Initialisez les systèmes du cœur du réacteur quantique dans le bon ordre pour éviter les anomalies temporelles"
+        },
+        "step_1": {
+          "instruction": {
+            "en": "⚡ POWER CORE INITIALIZATION\n\nLocate the RED CUBE energy core module. This is the primary power source that must be activated first. Click to channel quantum energy into the system.",
+            "fr": "⚡ INITIALISATION DU CŒUR D'ÉNERGIE\n\nLocalisez le module de cœur d'énergie CUBE ROUGE. C'est la source d'alimentation principale qui doit être activée en premier. Cliquez pour canaliser l'énergie quantique dans le système."
+          },
+          "validation": {
+            "en": "✅ Power core online - Quantum field stable at 47.3 TeV",
+            "fr": "✅ Cœur d'énergie en ligne - Champ quantique stable à 47,3 TeV"
+          },
+          "hint": {
+            "en": "💡 The red cube pulses with energy - it's the heart of the reactor",
+            "fr": "💡 Le cube rouge pulse d'énergie - c'est le cœur du réacteur"
+          }
+        },
+        "step_2": {
+          "instruction": {
+            "en": "🔮 TEMPORAL STABILIZER ACTIVATION\n\nEngage the BLUE SPHERE temporal stabilizer. This spherical containment field prevents time dilation effects during the startup sequence. Click to synchronize temporal frequencies.",
+            "fr": "🔮 ACTIVATION DU STABILISATEUR TEMPOREL\n\nEngagez le stabilisateur temporel SPHÈRE BLEUE. Ce champ de confinement sphérique empêche les effets de dilatation temporelle pendant la séquence de démarrage. Cliquez pour synchroniser les fréquences temporelles."
+          },
+          "validation": {
+            "en": "✅ Temporal field synchronized - Chronoton particles contained",
+            "fr": "✅ Champ temporel synchronisé - Particules chronoton confinées"
+          },
+          "hint": {
+            "en": "💡 The blue sphere creates a bubble of stable time-space",
+            "fr": "💡 La sphère bleue crée une bulle d'espace-temps stable"
+          }
+        },
+        "step_3": {
+          "instruction": {
+            "en": "🌀 PLASMA INJECTOR ENGAGEMENT\n\nFinally, activate the GREEN CYLINDER plasma injection system. This will begin the controlled fusion reaction. WARNING: Only proceed if previous systems show green status. Click to inject superheated plasma.",
+            "fr": "🌀 ENGAGEMENT DE L'INJECTEUR DE PLASMA\n\nEnfin, activez le système d'injection de plasma CYLINDRE VERT. Cela déclenchera la réaction de fusion contrôlée. AVERTISSEMENT : Ne procédez que si les systèmes précédents affichent un statut vert. Cliquez pour injecter le plasma surchauffé."
+          },
+          "validation": {
+            "en": "✅ Fusion reaction initiated - Reactor output at 100% efficiency",
+            "fr": "✅ Réaction de fusion initiée - Rendement du réacteur à 100%"
+          },
+          "hint": {
+            "en": "💡 The green cylinder channels plasma at 100 million degrees",
+            "fr": "💡 Le cylindre vert canalise le plasma à 100 millions de degrés"
+          }
+        },
+        "step_4": {
+          "instruction": {
+            "en": "⚠️ FINAL SAFETY CHECK\n\nReturn to the YELLOW CAPSULE control station to confirm all systems are operational. This master control unit monitors all reactor subsystems. Click to complete startup sequence.",
+            "fr": "⚠️ VÉRIFICATION DE SÉCURITÉ FINALE\n\nRetournez à la station de contrôle CAPSULE JAUNE pour confirmer que tous les systèmes sont opérationnels. Cette unité de contrôle maître surveille tous les sous-systèmes du réacteur. Cliquez pour terminer la séquence de démarrage."
+          },
+          "validation": {
+            "en": "✅ REACTOR ONLINE - All systems nominal. Welcome to the future!",
+            "fr": "✅ RÉACTEUR EN LIGNE - Tous les systèmes nominaux. Bienvenue dans le futur!"
+          },
+          "hint": {
+            "en": "💡 The yellow capsule is your command center",
+            "fr": "💡 La capsule jaune est votre centre de commande"
+          }
+        }
+      }
+    }
+  }
+}
