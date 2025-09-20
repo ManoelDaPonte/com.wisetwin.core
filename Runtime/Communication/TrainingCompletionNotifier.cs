@@ -46,12 +46,9 @@ namespace WiseTwin
             {
                 // Production mode: Send to JavaScript
                 #if UNITY_WEBGL && !UNITY_EDITOR
-                    // Envoyer l'ancien signal de complétion (pour compatibilité)
-                    NotifyFormationCompleted();
-                    LogDebug("📡 Training completion sent to web application");
-
-                    // Envoyer les analytics détaillées si disponibles
+                    // Envoyer UNIQUEMENT les analytics (qui contiennent tout)
                     SendAnalytics();
+                    // Plus besoin de NotifyFormationCompleted() car completionStatus = "completed" dans les analytics
                 #else
                     LogDebug("⚠️ Production mode but not in WebGL build - notification not sent");
                     // En mode éditeur, afficher les analytics dans la console

@@ -18,7 +18,16 @@ mergeInto(LibraryManager.library, {
         try {
             var analytics = JSON.parse(jsonData);
 
-            // Envoyer à la page parent React
+            // 1. Pour react-unity-webgl - Envoyer un message Unity
+            if (typeof unityInstance !== 'undefined' && unityInstance) {
+                // react-unity-webgl écoute ces événements
+                if (typeof ReactUnityWebGL !== 'undefined' && ReactUnityWebGL.dispatchReactUnityEvent) {
+                    ReactUnityWebGL.dispatchReactUnityEvent("TrainingAnalytics", jsonData);
+                    console.log('[WiseTwin] Analytics sent via react-unity-webgl event');
+                }
+            }
+
+            // 2. Méthode directe - Appeler la fonction globale si elle existe
             if (window.parent && window.parent.ReceiveTrainingAnalytics) {
                 window.parent.ReceiveTrainingAnalytics(analytics);
                 console.log('[WiseTwin] Training analytics sent to parent window');
