@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
+using WiseTwin.Analytics;
 
 namespace WiseTwin.UI
 {
@@ -17,6 +18,12 @@ namespace WiseTwin.UI
         private string currentObjectId;
         private VisualElement rootElement;
         private VisualElement modalContainer;
+
+        // Analytics tracking
+        private TextInteractionData currentTextData;
+        private float displayStartTime;
+        private ScrollView contentScrollView;
+        private float maxScrollPercentage = 0f;
 
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
         {
@@ -34,6 +41,33 @@ namespace WiseTwin.UI
 
             // Créer l'interface
             CreateModernTextUI(title, subtitle, content, showContinueButton);
+
+            // Initialiser le tracking analytics
+            if (TrainingAnalytics.Instance != null)
+            {
+                displayStartTime = Time.time;
+                currentTextData = new TextInteractionData
+                {
+                    textContent = !string.IsNullOrEmpty(title) ? title : "Text Display",
+                    timeDisplayed = 0f,
+                    readComplete = false,
+                    scrollPercentage = 0f
+                };
+
+                // Ne pas appeler TrackTextDisplay ici car il termine immédiatement l'interaction
+                // On va juste démarrer l'interaction et la terminer quand on ferme
+                var textId = $"{objectId}_text";
+                var interaction = TrainingAnalytics.Instance.StartInteraction(objectId, "text", "informative");
+                if (interaction != null)
+                {
+                    interaction.attempts = 1; // Un texte affiché compte comme une tentative
+                    var dataDict = currentTextData.ToDictionary();
+                    foreach (var kvp in dataDict)
+                    {
+                        interaction.AddData(kvp.Key, kvp.Value);
+                    }
+                }
+            }
         }
 
         void CreateModernTextUI(string title, string subtitle, string content, bool showContinueButton)
@@ -141,6 +175,13 @@ namespace WiseTwin.UI
             var scrollView = new ScrollView();
             scrollView.mode = ScrollViewMode.Vertical;
             scrollView.style.flexGrow = 1;
+            contentScrollView = scrollView;
+
+            // Tracker le scroll pour analytics
+            scrollView.RegisterCallback<WheelEvent>((evt) => TrackScrollProgress());
+            scrollView.RegisterCallback<GeometryChangedEvent>((evt) => TrackScrollProgress());
+            // Tracker aussi les changements de valeur du conteneur
+            scrollView.contentContainer.RegisterCallback<GeometryChangedEvent>((evt) => TrackScrollProgress());
 
             // Padding pour le contenu
             var contentContainer = new VisualElement();
@@ -163,6 +204,13 @@ namespace WiseTwin.UI
                 buttonContainer.style.alignItems = Align.Center;
 
                 var continueButton = new Button(() => {
+                    // Marquer comme lu complètement si on clique sur continuer
+                    if (currentTextData != null)
+                    {
+                        currentTextData.readComplete = true;
+                        currentTextData.timeDisplayed = Time.time - displayStartTime;
+                        currentTextData.scrollPercentage = maxScrollPercentage;
+                    }
                     OnCompleted?.Invoke(currentObjectId, true);
                     Close();
                 });
@@ -468,8 +516,55 @@ namespace WiseTwin.UI
 
         public void Close()
         {
+            // Finaliser le tracking analytics
+            if (TrainingAnalytics.Instance != null && currentTextData != null)
+            {
+                currentTextData.timeDisplayed = Time.time - displayStartTime;
+                currentTextData.scrollPercentage = maxScrollPercentage;
+                // Considérer comme lu si affiché plus de 5 secondes ou scrollé à plus de 70%
+                // ou si le bouton "Continuer" a été cliqué (temps > 1s pour éviter les clics accidentels)
+                currentTextData.readComplete = currentTextData.timeDisplayed > 5f || maxScrollPercentage > 70f || currentTextData.timeDisplayed > 1f;
+
+                // Mettre à jour les données avant de terminer
+                if (TrainingAnalytics.Instance.GetCurrentInteraction() != null)
+                {
+                    var dataDict = currentTextData.ToDictionary();
+                    foreach (var kvp in dataDict)
+                    {
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction(kvp.Key, kvp.Value);
+                    }
+                }
+
+                // Le texte est considéré comme "réussi" s'il a été affiché
+                TrainingAnalytics.Instance.EndCurrentInteraction(true);
+            }
+
             rootElement?.Clear();
             OnClosed?.Invoke(currentObjectId);
+        }
+
+        void TrackScrollProgress()
+        {
+            if (contentScrollView == null || contentScrollView.verticalScroller == null) return;
+
+            var scroller = contentScrollView.verticalScroller;
+
+            // Vérifier si on peut calculer le scroll
+            if (scroller.highValue > scroller.lowValue)
+            {
+                float scrollPercentage = (scroller.value / (scroller.highValue - scroller.lowValue)) * 100f;
+
+                // Garder le maximum atteint
+                if (scrollPercentage > maxScrollPercentage)
+                {
+                    maxScrollPercentage = scrollPercentage;
+
+                    if (currentTextData != null)
+                    {
+                        currentTextData.scrollPercentage = maxScrollPercentage;
+                    }
+                }
+            }
         }
 
         // Méthodes utilitaires

@@ -3,6 +3,7 @@ using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
 using System.Linq;
+using WiseTwin.Analytics;
 
 namespace WiseTwin.UI
 {
@@ -44,6 +45,12 @@ namespace WiseTwin.UI
         private VisualElement progressBar;
         private VisualElement progressFill;
         private bool isMonitoringClicks = false;
+
+        // Analytics tracking
+        private ProcedureInteractionData currentStepData;
+        private float stepStartTime;
+        private int wrongClicksCount = 0;
+        private int hintsUsedCount = 0;
 
         public class ProcedureStep
         {
@@ -289,6 +296,25 @@ namespace WiseTwin.UI
 
             var currentStep = steps[currentStepIndex];
             isMonitoringClicks = true;
+            stepStartTime = Time.time;
+            wrongClicksCount = 0;
+            hintsUsedCount = 0;
+
+            // Initialiser le tracking analytics pour cette étape
+            if (TrainingAnalytics.Instance != null)
+            {
+                currentStepData = new ProcedureInteractionData
+                {
+                    stepNumber = currentStepIndex + 1,
+                    totalSteps = steps.Count,
+                    instruction = currentStep.instruction,
+                    hintsUsed = 0,
+                    wrongClicks = 0
+                };
+
+                // TrackProcedureStep appelle déjà StartInteraction, pas besoin de le faire ici
+                TrainingAnalytics.Instance.TrackProcedureStep(currentStep.objectId ?? currentObjectId, currentStepData);
+            }
 
             // Mettre à jour l'UI
             progressLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
@@ -301,6 +327,11 @@ namespace WiseTwin.UI
             if (!string.IsNullOrEmpty(currentStep.hint))
             {
                 stepLabel.text += $"\n\n💡 {currentStep.hint}";
+                hintsUsedCount = 1;
+                if (currentStepData != null)
+                {
+                    currentStepData.hintsUsed = 1;
+                }
             }
 
             // Mettre à jour la barre de progression
@@ -417,6 +448,14 @@ namespace WiseTwin.UI
             currentStep.completed = true;
             isMonitoringClicks = false;
 
+            // Terminer le tracking de cette étape avec succès
+            if (TrainingAnalytics.Instance != null && currentStepData != null)
+            {
+                currentStepData.wrongClicks = wrongClicksCount;
+                currentStepData.hintsUsed = hintsUsedCount;
+                TrainingAnalytics.Instance.EndCurrentInteraction(true);
+            }
+
             // Attendre un peu avant de passer à l'étape suivante
             StartCoroutine(NextStepAfterDelay(0.5f));
         }
@@ -432,6 +471,13 @@ namespace WiseTwin.UI
         public void ResetProcedure()
         {
             Debug.Log("[ProcedureDisplayer] Resetting procedure - clicked outside sequence");
+
+            // Incrémenter le compteur de clics incorrects
+            wrongClicksCount++;
+            if (currentStepData != null)
+            {
+                currentStepData.wrongClicks = wrongClicksCount;
+            }
 
             // Retirer les surbrillances actuelles
             if (currentHighlightedObject != null)
@@ -515,6 +561,12 @@ namespace WiseTwin.UI
             {
                 RemoveHighlight(obj);
                 EnableObjectInteraction(obj, true);
+            }
+
+            // Terminer le tracking si une interaction est en cours
+            if (TrainingAnalytics.Instance != null && TrainingAnalytics.Instance.GetCurrentInteraction() != null)
+            {
+                TrainingAnalytics.Instance.EndCurrentInteraction(true);
             }
 
             // Envoyer l'événement de complétion AVANT de fermer pour que ContentDisplayManager puisse le gérer

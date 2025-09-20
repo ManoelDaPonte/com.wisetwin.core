@@ -43,7 +43,13 @@ namespace WiseTwin.UI
             if (Instance == null)
             {
                 Instance = this;
-                DontDestroyOnLoad(gameObject);
+                // Ne pas appliquer DontDestroyOnLoad si on est dans WiseTwinSystem
+                // C'est le parent WiseTwinSystem qui gère la persistance
+                if (transform.parent == null)
+                {
+                    DontDestroyOnLoad(gameObject);
+                }
+                // Pas de warning si on est enfant de WiseTwinSystem
                 InitializeDisplayers();
                 SetupUIDocument();
 
@@ -59,6 +65,22 @@ namespace WiseTwin.UI
         void InitializeDisplayers()
         {
             contentDisplayers = new Dictionary<ContentType, IContentDisplayer>();
+
+            // S'assurer que TrainingAnalytics existe pour capturer les métriques
+            if (Analytics.TrainingAnalytics.Instance == null)
+            {
+                var analyticsGO = new GameObject("TrainingAnalytics");
+                analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
+
+                // Si on a un parent WiseTwinSystem, mettre TrainingAnalytics dedans
+                var wiseTwinSystem = GameObject.Find("WiseTwinSystem");
+                if (wiseTwinSystem != null)
+                {
+                    analyticsGO.transform.SetParent(wiseTwinSystem.transform);
+                }
+
+                if (debugMode) Debug.Log("[ContentDisplayManager] Created TrainingAnalytics instance");
+            }
 
             // Créer les afficheurs pour chaque type
             var questionDisplayer = new GameObject("QuestionDisplayer").AddComponent<QuestionDisplayer>();

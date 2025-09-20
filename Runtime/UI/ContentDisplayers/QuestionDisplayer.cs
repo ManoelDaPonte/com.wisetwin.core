@@ -3,6 +3,7 @@ using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
 using System.Linq;
+using WiseTwin.Analytics;
 
 namespace WiseTwin.UI
 {
@@ -39,6 +40,11 @@ namespace WiseTwin.UI
         private Label feedbackLabel;
         private string currentFeedback;
         private string currentIncorrectFeedback;
+
+        // Analytics tracking
+        private QuestionInteractionData currentQuestionData;
+        private List<string> currentOptionTexts;
+        private string currentQuestionText;
 
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
         {
@@ -100,7 +106,9 @@ namespace WiseTwin.UI
         private void DisplaySingleQuestion(Dictionary<string, object> contentData)
         {
             hasAnswered = false;
+            isValidating = false; // Réinitialiser le flag de validation
             selectedAnswerIndex = -1;
+            selectedAnswerIndexes.Clear();
 
             if (ContentDisplayManager.Instance?.DebugMode ?? false)
             {
@@ -113,6 +121,8 @@ namespace WiseTwin.UI
             // Extraire les données de la question
             string questionText = ExtractLocalizedText(contentData, "text", lang);
             var options = ExtractLocalizedList(contentData, "options", lang);
+            currentQuestionText = questionText;
+            currentOptionTexts = options;
 
             // Vérifier le mode de sélection (single ou multiple)
             string selectionMode = contentData.ContainsKey("selectionMode")
@@ -185,6 +195,9 @@ namespace WiseTwin.UI
 
             // Créer l'UI pour question unique
             CreateSingleQuestionUI(questionText, options, questionType, feedback, incorrectFeedback);
+
+            // Initialiser le tracking analytics
+            InitializeQuestionTracking();
         }
 
         private void CreateQuestionUI()
@@ -301,6 +314,9 @@ namespace WiseTwin.UI
 
         private void DisplayCurrentQuestion()
         {
+            // Réinitialiser le flag de validation pour chaque nouvelle question
+            isValidating = false;
+
             if (currentQuestionIndex >= questionKeys.Count)
             {
                 // Toutes les questions ont été répondues
@@ -410,6 +426,8 @@ namespace WiseTwin.UI
 
                     // Mettre à jour l'UI
                     questionLabel.text = questionText;
+                    currentQuestionText = questionText;
+                    currentOptionTexts = options;
 
                     // Clear options container et recréer les options
                     optionsContainer.Clear();
@@ -433,6 +451,9 @@ namespace WiseTwin.UI
                     validateButton.clicked -= NextQuestion;
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += ValidateAnswer;
+
+                    // Initialiser le tracking pour cette question
+                    InitializeQuestionTracking();
                 }
             }
         }
@@ -721,9 +742,27 @@ namespace WiseTwin.UI
             }
         }
 
+        private bool isValidating = false; // Protection contre les doubles clics
+
         void ValidateAnswer()
         {
             if (hasAnswered) return;
+
+            // Protection contre les doubles appels rapides
+            if (isValidating) return;
+            isValidating = true;
+
+            // Enregistrer la tentative dans l'analytics
+            if (currentQuestionData != null)
+            {
+                var attemptIndexes = isMultipleChoice ? selectedAnswerIndexes : new List<int> { selectedAnswerIndex };
+                currentQuestionData.AddUserAttempt(attemptIndexes);
+                // IncrementCurrentInteractionAttempts incrémente le compteur d'attempts
+                TrainingAnalytics.Instance?.IncrementCurrentInteractionAttempts();
+
+                // Debug pour vérifier le nombre de tentatives
+                Debug.Log($"[QuestionDisplayer] Attempt #{TrainingAnalytics.Instance?.GetCurrentInteraction()?.attempts} for question");
+            }
 
             bool isCorrect = false;
 
@@ -758,6 +797,20 @@ namespace WiseTwin.UI
             if (isCorrect)
             {
                 hasAnswered = true;
+
+                // Terminer le tracking de cette question avec succès
+                if (currentQuestionData != null)
+                {
+                    currentQuestionData.finalScore = 100f;
+                    // Mettre à jour les données avant de terminer
+                    if (TrainingAnalytics.Instance != null)
+                    {
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", 100f);
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("userAnswers", currentQuestionData.userAnswers);
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("firstAttemptCorrect", currentQuestionData.firstAttemptCorrect);
+                        TrainingAnalytics.Instance.EndCurrentInteraction(true);
+                    }
+                }
                 feedbackContainer.style.backgroundColor = new Color(0.1f, 0.6f, 0.3f, 0.3f);
                 feedbackContainer.style.borderTopWidth = 2;
                 feedbackContainer.style.borderBottomWidth = 2;
@@ -804,11 +857,18 @@ namespace WiseTwin.UI
                 // Permettre de réessayer - changer le texte du bouton
                 validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Réessayer" : "Try Again";
                 validateButton.style.backgroundColor = new Color(0.8f, 0.4f, 0.1f, 1f);
+
+                // Réinitialiser le flag après un court délai pour permettre une nouvelle tentative
+                validateButton.schedule.Execute(() => {
+                    isValidating = false;
+                }).ExecuteLater(300); // 300ms de délai
             }
         }
 
         void NextQuestion()
         {
+            // Réinitialiser le flag de validation pour la prochaine question
+            isValidating = false;
             currentQuestionIndex++;
             if (currentQuestionIndex >= questionKeys.Count)
             {
@@ -825,6 +885,10 @@ namespace WiseTwin.UI
 
         public void Close()
         {
+            // Réinitialiser tous les flags
+            isValidating = false;
+            hasAnswered = false;
+
             rootElement?.Clear();
             OnClosed?.Invoke(currentObjectId);
         }
@@ -941,6 +1005,33 @@ namespace WiseTwin.UI
         string ExtractString(Dictionary<string, object> data, string key)
         {
             return data.ContainsKey(key) ? data[key]?.ToString() ?? "" : "";
+        }
+
+        // Méthode pour initialiser le tracking analytics
+        void InitializeQuestionTracking()
+        {
+            if (TrainingAnalytics.Instance == null)
+            {
+                Debug.LogWarning("[QuestionDisplayer] TrainingAnalytics not available - creating instance");
+                var analyticsGO = new GameObject("TrainingAnalytics");
+                analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
+            }
+
+            // Créer les données de la question
+            currentQuestionData = new QuestionInteractionData();
+            currentQuestionData.questionText = currentQuestionText;
+            currentQuestionData.options = currentOptionTexts ?? new List<string>();
+            currentQuestionData.correctAnswers = isMultipleChoice ? correctAnswerIndexes : new List<int> { correctAnswerIndex };
+
+            // Démarrer l'interaction
+            string questionId = currentQuestionIndex >= 0 && questionKeys != null
+                ? $"{currentObjectId}_{questionKeys[currentQuestionIndex]}"
+                : $"{currentObjectId}_question";
+
+            var subtype = isMultipleChoice ? "multiple_choice" : "single_choice";
+
+            Debug.Log($"[QuestionDisplayer] Initializing tracking for question: {questionId}");
+            TrainingAnalytics.Instance.TrackQuestionInteraction(currentObjectId, questionId, currentQuestionData);
         }
     }
 }

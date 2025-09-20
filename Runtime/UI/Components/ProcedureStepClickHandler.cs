@@ -123,7 +123,11 @@ namespace WiseTwin
         {
             if (!isActive) return;
 
-            Debug.Log($"[ProcedureStepClickHandler] Object {gameObject.name} clicked for step {stepIndex + 1}");
+            // Ne logger que si le debug mode est activé dans ContentDisplayManager
+            if (UI.ContentDisplayManager.Instance?.DebugMode ?? false)
+            {
+                Debug.Log($"[ProcedureStepClickHandler] Object {gameObject.name} clicked for step {stepIndex + 1}");
+            }
 
             // Désactiver ce handler pour éviter les clics multiples
             isActive = false;

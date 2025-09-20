@@ -8,5 +8,30 @@ mergeInto(LibraryManager.library, {
         } else {
             console.log('[WiseTwin] NotifyFormationCompleted called but no handler found in parent window');
         }
+    },
+
+    SendTrainingAnalytics: function(jsonPtr) {
+        // Convertir le pointeur C# string en JavaScript string
+        var jsonData = UTF8ToString(jsonPtr);
+
+        // Parser le JSON pour vérification
+        try {
+            var analytics = JSON.parse(jsonData);
+
+            // Envoyer à la page parent React
+            if (window.parent && window.parent.ReceiveTrainingAnalytics) {
+                window.parent.ReceiveTrainingAnalytics(analytics);
+                console.log('[WiseTwin] Training analytics sent to parent window');
+            } else if (window.ReceiveTrainingAnalytics) {
+                window.ReceiveTrainingAnalytics(analytics);
+                console.log('[WiseTwin] Training analytics sent to current window');
+            } else {
+                console.log('[WiseTwin] Training analytics (no handler found):');
+                console.log(analytics);
+            }
+        } catch (error) {
+            console.error('[WiseTwin] Failed to parse analytics JSON:', error);
+            console.log('[WiseTwin] Raw JSON:', jsonData);
+        }
     }
 });

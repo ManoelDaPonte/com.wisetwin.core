@@ -273,6 +273,13 @@ namespace WiseTwin.UI
             {
                 completionNotifier.FormationCompleted(Application.productName);
                 Debug.Log("[TrainingCompletionUI] Training completion notified to web application");
+
+                // Afficher le JSON des analytics si disponible
+                if (Analytics.TrainingAnalytics.Instance != null)
+                {
+                    string analyticsJson = Analytics.TrainingAnalytics.Instance.ExportAnalytics();
+                    Debug.Log($"[TrainingCompletionUI] Analytics JSON sent:\n{analyticsJson}");
+                }
             }
             else
             {
@@ -281,6 +288,13 @@ namespace WiseTwin.UI
                 tempNotifier.FormationCompleted(Application.productName);
                 Destroy(tempNotifier.gameObject, 1f);
                 Debug.Log("[TrainingCompletionUI] Created temporary notifier for completion");
+
+                // Afficher le JSON des analytics si disponible
+                if (Analytics.TrainingAnalytics.Instance != null)
+                {
+                    string analyticsJson = Analytics.TrainingAnalytics.Instance.ExportAnalytics();
+                    Debug.Log($"[TrainingCompletionUI] Analytics JSON sent:\n{analyticsJson}");
+                }
             }
         }
 

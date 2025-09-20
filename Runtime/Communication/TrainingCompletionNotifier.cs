@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Runtime.InteropServices;
+using WiseTwin.Analytics;
 
 namespace WiseTwin
 {
@@ -18,6 +19,9 @@ namespace WiseTwin
         // JavaScript interop for WebGL
         [DllImport("__Internal")]
         private static extern void NotifyFormationCompleted();
+
+        [DllImport("__Internal")]
+        private static extern void SendTrainingAnalytics(string jsonData);
         
         void Start()
         {
@@ -32,21 +36,65 @@ namespace WiseTwin
         /// <param name="trainingName">Optional training name</param>
         public void FormationCompleted(string trainingName = null)
         {
+            // Marquer la formation comme terminée dans l'analytics
+            if (TrainingAnalytics.Instance != null)
+            {
+                TrainingAnalytics.Instance.CompleteTraining("completed");
+            }
+
             if (ShouldUseProductionMode())
             {
                 // Production mode: Send to JavaScript
                 #if UNITY_WEBGL && !UNITY_EDITOR
+                    // Envoyer l'ancien signal de complétion (pour compatibilité)
                     NotifyFormationCompleted();
                     LogDebug("📡 Training completion sent to web application");
+
+                    // Envoyer les analytics détaillées si disponibles
+                    SendAnalytics();
                 #else
                     LogDebug("⚠️ Production mode but not in WebGL build - notification not sent");
+                    // En mode éditeur, afficher les analytics dans la console
+                    if (TrainingAnalytics.Instance != null)
+                    {
+                        string analytics = TrainingAnalytics.Instance.ExportAnalytics();
+                        LogDebug($"📊 Analytics data:\n{analytics}");
+                    }
                 #endif
             }
             else
             {
                 // Local mode: Debug log only
                 LogDebug($"🧪 Local Mode: Training '{trainingName ?? GetProjectName()}' completed");
+
+                // Afficher les analytics en mode local
+                if (TrainingAnalytics.Instance != null)
+                {
+                    string analytics = TrainingAnalytics.Instance.ExportAnalytics();
+                    LogDebug($"📊 Analytics data:\n{analytics}");
+                }
             }
+        }
+
+        /// <summary>
+        /// Envoie les analytics complètes à l'application web
+        /// </summary>
+        void SendAnalytics()
+        {
+            if (TrainingAnalytics.Instance == null)
+            {
+                LogDebug("⚠️ TrainingAnalytics not available - no analytics sent");
+                return;
+            }
+
+            string analyticsJson = TrainingAnalytics.Instance.ExportAnalytics();
+
+            #if UNITY_WEBGL && !UNITY_EDITOR
+                SendTrainingAnalytics(analyticsJson);
+                LogDebug("📊 Training analytics sent to web application");
+            #else
+                LogDebug($"📊 Analytics would be sent in WebGL build:\n{analyticsJson}");
+            #endif
         }
         
         /// <summary>

@@ -1193,12 +1193,17 @@ MonoBehaviour:
   useDragDropSequence: 0
   procedureSequence: []
   debugMode: 0
+--- !u!1 &1944170551 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8156962989298695419, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+  m_PrefabInstance: {fileID: 4479523053237671175}
+  m_PrefabAsset: {fileID: 0}
 --- !u!114 &1944170554 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 798460448257152867, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
   m_PrefabInstance: {fileID: 4479523053237671175}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 1944170551}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 167402a5ed19d4bc7b426b52c6454a2c, type: 3}
@@ -1209,12 +1214,40 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5717370407079796314, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
   m_PrefabInstance: {fileID: 4479523053237671175}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 1944170551}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f284b566a0ebd490f846968564296b9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1944170557
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1944170551}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a700e3c1951bd447cad7f0de38ad8fd5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  runTestOnStart: 0
+  debugOutput: 1
+--- !u!114 &1944170558
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1944170551}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d30bea791d1e45509a30bb4f5d0c75f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  persistAcrossScenes: 1
+  debugMode: 0
 --- !u!1 &1964762685
 GameObject:
   m_ObjectHideFlags: 0
@@ -1364,6 +1397,7 @@ MonoBehaviour:
   autoDetectId: 0
   showNameLabel: 1
   labelColor: {r: 1, g: 1, b: 1, a: 1}
+  enableDebugLogs: 0
 --- !u!1 &1966944349
 GameObject:
   m_ObjectHideFlags: 0
@@ -1638,7 +1672,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8156962989298695419, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      insertIndex: 1
+      addedObject: {fileID: 1944170558}
+    - targetCorrespondingSourceObject: {fileID: 8156962989298695419, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1944170557}
   m_SourcePrefab: {fileID: 100100000, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

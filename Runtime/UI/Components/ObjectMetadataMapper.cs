@@ -9,10 +9,13 @@ public class ObjectMetadataMapper : MonoBehaviour
     [Header("Metadata Mapping")]
     [SerializeField] private string metadataId = "";
     [SerializeField] private bool autoDetectId = true;
-    
+
     [Header("Visual Feedback")]
     [SerializeField] private bool showNameLabel = true;
     [SerializeField] private Color labelColor = Color.white;
+
+    [Header("Debug")]
+    [SerializeField] private bool enableDebugLogs = false;
     
     public string MetadataId
     {
@@ -25,7 +28,10 @@ public class ObjectMetadataMapper : MonoBehaviour
         if (autoDetectId && string.IsNullOrEmpty(metadataId))
         {
             metadataId = GenerateIdFromName();
-            Debug.Log($"[ObjectMetadataMapper] Auto-generated ID for {gameObject.name}: {metadataId}");
+            if (enableDebugLogs)
+            {
+                Debug.Log($"[ObjectMetadataMapper] Auto-generated ID for {gameObject.name}: {metadataId}");
+            }
         }
         
         // S'assurer qu'il y a un collider
@@ -46,7 +52,10 @@ public class ObjectMetadataMapper : MonoBehaviour
                 gameObject.AddComponent<BoxCollider>();
             }
             
-            Debug.Log($"[ObjectMetadataMapper] Added collider to {gameObject.name}");
+            if (enableDebugLogs)
+            {
+                Debug.Log($"[ObjectMetadataMapper] Added collider to {gameObject.name}");
+            }
         }
     }
     

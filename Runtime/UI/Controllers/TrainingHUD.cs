@@ -46,7 +46,13 @@ namespace WiseTwin
             if (Instance == null)
             {
                 Instance = this;
-                DontDestroyOnLoad(gameObject);
+                // Ne pas appliquer DontDestroyOnLoad si on est dans WiseTwinSystem
+                // C'est le parent WiseTwinSystem qui gère la persistance
+                if (transform.parent == null)
+                {
+                    DontDestroyOnLoad(gameObject);
+                }
+                // Pas de warning si on est enfant de WiseTwinSystem
             }
             else
             {
@@ -370,6 +376,13 @@ namespace WiseTwin
 
             // Calculer le temps total
             float totalTime = Time.time - startTime;
+
+            // S'assurer que TrainingAnalytics existe avant de créer l'UI de complétion
+            if (Analytics.TrainingAnalytics.Instance == null)
+            {
+                var analyticsGO = new GameObject("TrainingAnalytics");
+                analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
+            }
 
             // Chercher ou créer l'UI de complétion
             var completionUI = FindFirstObjectByType<UI.TrainingCompletionUI>();
