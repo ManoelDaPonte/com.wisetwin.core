@@ -1603,7 +1603,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: useProductionMode
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 764553335731459961, guid: 5e3b0f11750e3422ab2c21b943ca5f9d, type: 3}
       propertyPath: completionNotifier

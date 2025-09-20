@@ -74,6 +74,12 @@ public class WiseTwinEditor : EditorWindow
         LoadSettings();
         LoadLanguagePreference();
         InitializeProjectId();
+
+        // Synchroniser automatiquement avec WiseTwinManager au chargement
+        EditorApplication.delayCall += () =>
+        {
+            SyncWithSceneManager();
+        };
         LoadExistingJSONContent();
         InitializeUnityContent();
     }
@@ -407,13 +413,34 @@ public class WiseTwinEditor : EditorWindow
         {
             useLocalMode = newUseLocalMode;
             EditorUtility.SetDirty(this);
+            // Appliquer immédiatement au WiseTwinManager dans la scène
+            ApplyLocalModeToManager();
         }
         
         EditorGUILayout.HelpBox(
             useLocalMode ?
-            "🏠 Local Mode: Will load metadata from StreamingAssets folder" :
-            "☁️ Production Mode: Will load metadata from Azure API",
+            "🏠 Local Mode: Will load metadata from StreamingAssets folder\n⚠️ Les changements sont appliqués automatiquement à la scène" :
+            "☁️ Production Mode: Will load metadata from Azure API\n✅ Les changements sont appliqués automatiquement à la scène",
             MessageType.Info);
+
+        // Afficher l'état actuel du WiseTwinManager
+        WiseTwin.WiseTwinManager currentManager = FindFirstObjectByType<WiseTwin.WiseTwinManager>();
+        if (currentManager != null)
+        {
+            bool currentProdMode = currentManager.IsProductionMode();
+            if (currentProdMode == useLocalMode) // Si désynchronisé
+            {
+                EditorGUILayout.HelpBox(
+                    "⚠️ Synchronisation en cours avec WiseTwinManager...",
+                    MessageType.Warning);
+            }
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(
+                "⚠️ WiseTwinManager non trouvé dans la scène. Ajoutez-le via 'Setup Scene' ci-dessous.",
+                MessageType.Warning);
+        }
 
         EditorGUILayout.Space(10);
 
@@ -898,7 +925,24 @@ public class WiseTwinEditor : EditorWindow
         }
     }
 
-    void ApplySettingsToScene()
+    void SyncWithSceneManager()
+    {
+        // Synchroniser l'état de l'éditeur avec le WiseTwinManager de la scène
+        WiseTwin.WiseTwinManager manager = FindFirstObjectByType<WiseTwin.WiseTwinManager>();
+        if (manager != null)
+        {
+            SerializedObject managerSO = new SerializedObject(manager);
+            SerializedProperty prodModeProp = managerSO.FindProperty("useProductionMode");
+            if (prodModeProp != null)
+            {
+                // Lire l'état actuel du manager et synchroniser l'éditeur
+                useLocalMode = !prodModeProp.boolValue;
+                Debug.Log($"[WiseTwinEditor] Synchronisé avec WiseTwinManager: Mode {(useLocalMode ? "Local" : "Production")}");
+            }
+        }
+    }
+
+    void ApplyLocalModeToManager()
     {
         // Chercher le WiseTwinManager dans la scène
         WiseTwin.WiseTwinManager manager = FindFirstObjectByType<WiseTwin.WiseTwinManager>();
@@ -911,13 +955,24 @@ public class WiseTwinEditor : EditorWindow
             {
                 prodModeProp.boolValue = !useLocalMode;  // Inverser car useLocalMode est l'opposé de useProductionMode
                 managerSO.ApplyModifiedProperties();
-                Debug.Log($"✅ WiseTwinManager: Production Mode = {!useLocalMode}");
+                EditorUtility.SetDirty(manager);
+
+                // Marquer la scène comme modifiée pour forcer la sauvegarde
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(manager.gameObject.scene);
+
+                Debug.Log($"✅ WiseTwinManager: Mode {(useLocalMode ? "Local" : "Production")} appliqué automatiquement et scène marquée pour sauvegarde");
             }
         }
         else
         {
-            Debug.LogWarning("❌ WiseTwinManager not found in scene!");
+            Debug.LogWarning("❌ WiseTwinManager not found in scene! Please add WiseTwinManager to apply mode settings.");
         }
+    }
+
+    void ApplySettingsToScene()
+    {
+        // Appliquer le mode local/production
+        ApplyLocalModeToManager();
 
         // Chercher le MetadataLoader dans la scène
         MetadataLoader loader = FindFirstObjectByType<MetadataLoader>();
