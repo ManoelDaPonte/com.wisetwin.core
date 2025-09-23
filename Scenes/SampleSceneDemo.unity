@@ -509,6 +509,7 @@ MonoBehaviour:
   contentType: 1
   specificContentKey: 
   useDragDropSequence: 1
+  enableYellowHighlight: 0
   procedureSequence:
   - {fileID: 720147554}
   - {fileID: 1411303309}
@@ -949,6 +950,7 @@ MonoBehaviour:
   contentType: 0
   specificContentKey: 
   useDragDropSequence: 0
+  enableYellowHighlight: 1
   procedureSequence: []
   debugMode: 0
 --- !u!1 &1411303309
@@ -1191,6 +1193,7 @@ MonoBehaviour:
   contentType: 2
   specificContentKey: 
   useDragDropSequence: 0
+  enableYellowHighlight: 1
   procedureSequence: []
   debugMode: 0
 --- !u!1 &1944170551 stripped
@@ -1379,6 +1382,7 @@ MonoBehaviour:
   contentType: 0
   specificContentKey: 
   useDragDropSequence: 0
+  enableYellowHighlight: 1
   procedureSequence: []
   debugMode: 0
 --- !u!114 &1964762691

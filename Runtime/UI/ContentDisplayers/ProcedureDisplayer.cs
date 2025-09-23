@@ -36,6 +36,7 @@ namespace WiseTwin.UI
         private List<GameObject> sequenceObjects;
         private Dictionary<GameObject, Material> originalMaterials;
         private GameObject currentHighlightedObject;
+        private bool shouldHighlight = true; // Contrôle si on doit surligner ou non
 
         // UI Elements
         private Label titleLabel;
@@ -67,6 +68,17 @@ namespace WiseTwin.UI
             currentObjectId = objectId;
             rootElement = root;
             currentStepIndex = 0;
+
+            // Vérifier si on doit activer le highlight
+            if (contentData.ContainsKey("enableHighlight"))
+            {
+                shouldHighlight = contentData["enableHighlight"] is bool highlight ? highlight : true;
+                Debug.Log($"[ProcedureDisplayer] Highlight enabled: {shouldHighlight}");
+            }
+            else
+            {
+                shouldHighlight = true; // Par défaut, on active le highlight
+            }
 
             // Obtenir la langue actuelle
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
@@ -269,11 +281,20 @@ namespace WiseTwin.UI
             buttonSection.style.borderTopWidth = 1;
             buttonSection.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
 
-            // Info text uniquement
+            // Info text adapté selon si le highlight est activé ou non
             var infoLabel = new Label();
-            infoLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "Cliquez sur l'objet surligné pour valider l'étape"
-                : "Click on the highlighted object to validate the step";
+            if (shouldHighlight)
+            {
+                infoLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Cliquez sur l'objet surligné pour valider l'étape"
+                    : "Click on the highlighted object to validate the step";
+            }
+            else
+            {
+                infoLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Cliquez sur l'objet indiqué pour valider l'étape"
+                    : "Click on the indicated object to validate the step";
+            }
             infoLabel.style.fontSize = 14;
             infoLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
             infoLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -338,8 +359,8 @@ namespace WiseTwin.UI
             float progress = (float)currentStepIndex / steps.Count * 100f;
             progressFill.style.width = Length.Percent(progress);
 
-            // Retirer la surbrillance de l'objet précédent
-            if (currentHighlightedObject != null)
+            // Retirer la surbrillance de l'objet précédent si elle était active
+            if (currentHighlightedObject != null && shouldHighlight)
             {
                 RemoveHighlight(currentHighlightedObject);
 
@@ -351,10 +372,13 @@ namespace WiseTwin.UI
                 }
             }
 
-            // Ajouter la surbrillance au nouvel objet
+            // Ajouter la surbrillance au nouvel objet si l'option est activée
             if (currentStep.targetObject != null)
             {
-                HighlightObject(currentStep.targetObject);
+                if (shouldHighlight)
+                {
+                    HighlightObject(currentStep.targetObject);
+                }
                 currentHighlightedObject = currentStep.targetObject;
 
                 // Ajouter un composant temporaire pour gérer le clic
@@ -479,8 +503,8 @@ namespace WiseTwin.UI
                 currentStepData.wrongClicks = wrongClicksCount;
             }
 
-            // Retirer les surbrillances actuelles
-            if (currentHighlightedObject != null)
+            // Retirer les surbrillances actuelles si elles sont actives
+            if (currentHighlightedObject != null && shouldHighlight)
             {
                 RemoveHighlight(currentHighlightedObject);
 
@@ -556,11 +580,22 @@ namespace WiseTwin.UI
 
         void CompleteProcedure()
         {
-            // Retirer toutes les surbrillances
-            foreach (var obj in sequenceObjects)
+            // Retirer toutes les surbrillances si elles étaient actives
+            if (shouldHighlight)
             {
-                RemoveHighlight(obj);
-                EnableObjectInteraction(obj, true);
+                foreach (var obj in sequenceObjects)
+                {
+                    RemoveHighlight(obj);
+                    EnableObjectInteraction(obj, true);
+                }
+            }
+            else
+            {
+                // Juste réactiver les interactions si pas de highlight
+                foreach (var obj in sequenceObjects)
+                {
+                    EnableObjectInteraction(obj, true);
+                }
             }
 
             // Terminer le tracking si une interaction est en cours
@@ -582,8 +617,8 @@ namespace WiseTwin.UI
             // Désactiver le monitoring des clics
             isMonitoringClicks = false;
 
-            // Nettoyer le GameObject actuellement surligné
-            if (currentHighlightedObject != null)
+            // Nettoyer le GameObject actuellement surligné si le highlight était actif
+            if (currentHighlightedObject != null && shouldHighlight)
             {
                 RemoveHighlight(currentHighlightedObject);
 
@@ -604,7 +639,10 @@ namespace WiseTwin.UI
                 {
                     if (obj != null)
                     {
-                        RemoveHighlight(obj);
+                        if (shouldHighlight)
+                        {
+                            RemoveHighlight(obj);
+                        }
                         EnableObjectInteraction(obj, true);
 
                         // S'assurer qu'aucun handler ne reste

@@ -36,6 +36,7 @@ namespace WiseTwin
 
         [Header("Procedure Settings (Only for Procedure type)")]
         [SerializeField] private bool useDragDropSequence = false;
+        [SerializeField] private bool enableYellowHighlight = true; // Option pour activer/désactiver le clignotement jaune
         [SerializeField] private List<GameObject> procedureSequence = new List<GameObject>();
 
         [Header("Debug")]
@@ -298,6 +299,8 @@ namespace WiseTwin
                     var procedureData = CreateDynamicProcedureData();
 
                     if (debugMode) Debug.Log($"[InteractableObject] Displaying drag & drop procedure with {procedureSequence.Count} steps");
+                    // Passer l'option de highlight avec les données
+                    procedureData["enableHighlight"] = enableYellowHighlight;
                     ContentDisplayManager.Instance.DisplayContent(objectId, contentType, procedureData);
                 }
                 else
@@ -403,6 +406,11 @@ namespace WiseTwin
                             }
 
                             if (debugMode) Debug.Log($"[InteractableObject] Displaying content for {objectId} with type {contentType}");
+                            // Ajouter l'option de highlight si c'est une procédure
+                            if (contentType == ContentType.Procedure)
+                            {
+                                contentData["enableHighlight"] = enableYellowHighlight;
+                            }
                             ContentDisplayManager.Instance.DisplayContent(objectId, contentType, contentData);
                         }
                         else
@@ -473,6 +481,9 @@ namespace WiseTwin
             // Si on a trouvé des métadatas de procédure, les utiliser pour titre et description
             if (metadataProcedure != null)
             {
+                // Ajouter l'option de highlight aux données
+                procedureData["enableHighlight"] = enableYellowHighlight;
+
                 // Copier le titre et la description depuis les métadatas
                 if (metadataProcedure.ContainsKey("title"))
                     procedureData["title"] = metadataProcedure["title"];

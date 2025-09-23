@@ -13,6 +13,7 @@ namespace WiseTwin.EditorExtensions
     {
         SerializedProperty contentType;
         SerializedProperty useDragDropSequence;
+        SerializedProperty enableYellowHighlight;
         SerializedProperty procedureSequence;
         SerializedProperty specificContentKey;
         SerializedProperty debugMode;
@@ -30,6 +31,7 @@ namespace WiseTwin.EditorExtensions
             // Content properties
             contentType = serializedObject.FindProperty("contentType");
             useDragDropSequence = serializedObject.FindProperty("useDragDropSequence");
+            enableYellowHighlight = serializedObject.FindProperty("enableYellowHighlight");
             procedureSequence = serializedObject.FindProperty("procedureSequence");
             specificContentKey = serializedObject.FindProperty("specificContentKey");
             debugMode = serializedObject.FindProperty("debugMode");
@@ -118,6 +120,11 @@ namespace WiseTwin.EditorExtensions
         void ShowProcedureOptions()
         {
             EditorGUILayout.Space(5);
+
+            // Toggle pour activer/désactiver le clignotement jaune
+            EditorGUILayout.PropertyField(enableYellowHighlight,
+                new GUIContent("Enable Yellow Highlight",
+                "Enable to highlight procedure objects in yellow. When disabled, objects won't be highlighted."));
 
             // Toggle pour utiliser le drag & drop
             EditorGUILayout.PropertyField(useDragDropSequence,
