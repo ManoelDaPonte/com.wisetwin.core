@@ -46,9 +46,11 @@ namespace WiseTwin
             {
                 // Production mode: Send to JavaScript
                 #if UNITY_WEBGL && !UNITY_EDITOR
-                    // Envoyer UNIQUEMENT les analytics (qui contiennent tout)
+                    // Envoyer les analytics ET la notification de completion
+                    Debug.Log("[TrainingCompletionNotifier] WebGL Production Mode - Sending analytics and completion notification");
                     SendAnalytics();
-                    // Plus besoin de NotifyFormationCompleted() car completionStatus = "completed" dans les analytics
+                    NotifyFormationCompleted(); // Nécessaire pour déclencher l'événement de completion côté React
+                    Debug.Log("[TrainingCompletionNotifier] Notifications sent successfully");
                 #else
                     LogDebug("⚠️ Production mode but not in WebGL build - notification not sent");
                     // En mode éditeur, afficher les analytics dans la console
@@ -87,8 +89,9 @@ namespace WiseTwin
             string analyticsJson = TrainingAnalytics.Instance.ExportAnalytics();
 
             #if UNITY_WEBGL && !UNITY_EDITOR
+                Debug.Log($"[TrainingCompletionNotifier] Sending analytics JSON ({analyticsJson.Length} chars)");
                 SendTrainingAnalytics(analyticsJson);
-                LogDebug("📊 Training analytics sent to web application");
+                Debug.Log("[TrainingCompletionNotifier] 📊 Training analytics sent to web application");
             #else
                 LogDebug($"📊 Analytics would be sent in WebGL build:\n{analyticsJson}");
             #endif

@@ -50,13 +50,25 @@ namespace WiseTwin.UI
             // Assigner le PanelSettings si nécessaire
             if (uiDocument.panelSettings == null)
             {
-                #if UNITY_EDITOR
-                var panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/WiseTwinPanelSettings.asset");
-                if (panelSettings != null)
+                // Essayer de récupérer le PanelSettings depuis un autre UIDocument existant
+                var existingUIDoc = FindFirstObjectByType<UIDocument>();
+                if (existingUIDoc != null && existingUIDoc != uiDocument && existingUIDoc.panelSettings != null)
                 {
-                    uiDocument.panelSettings = panelSettings;
+                    uiDocument.panelSettings = existingUIDoc.panelSettings;
+                    Debug.Log("[TrainingCompletionUI] PanelSettings copied from existing UIDocument");
                 }
-                #endif
+                else
+                {
+                    // Créer un PanelSettings par défaut avec un Theme
+                    var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+
+                    // Créer un ThemeStyleSheet par défaut pour éviter l'erreur de rendu
+                    var defaultTheme = ScriptableObject.CreateInstance<ThemeStyleSheet>();
+                    panelSettings.themeStyleSheet = defaultTheme;
+
+                    uiDocument.panelSettings = panelSettings;
+                    Debug.LogWarning("[TrainingCompletionUI] Created default PanelSettings with theme - UI should display now");
+                }
             }
 
             rootElement = uiDocument.rootVisualElement;
@@ -73,6 +85,8 @@ namespace WiseTwin.UI
         /// </summary>
         public void ShowCompletionScreen(float trainingTime, int modulesCompleted)
         {
+            Debug.Log($"[TrainingCompletionUI] Showing completion screen - Time: {trainingTime}s, Modules: {modulesCompleted}");
+
             totalTime = trainingTime;
             totalInteractions = modulesCompleted;
 
@@ -83,6 +97,8 @@ namespace WiseTwin.UI
 
             // Auto-close après un délai
             StartCoroutine(AutoCloseAfterDelay());
+
+            Debug.Log("[TrainingCompletionUI] Completion screen displayed");
         }
 
         void CreateCompletionUI()
@@ -267,35 +283,42 @@ namespace WiseTwin.UI
 
         void NotifyTrainingCompletion()
         {
+            Debug.Log("[TrainingCompletionUI] Starting training completion notification...");
+
+            // S'assurer que les analytics sont complètes avant l'envoi
+            if (Analytics.TrainingAnalytics.Instance != null)
+            {
+                // Marquer la formation comme complétée si ce n'est pas déjà fait
+                Analytics.TrainingAnalytics.Instance.CompleteTraining("completed");
+
+                string analyticsJson = Analytics.TrainingAnalytics.Instance.ExportAnalytics();
+                Debug.Log($"[TrainingCompletionUI] Analytics ready - Size: {analyticsJson.Length} chars");
+            }
+
             // Utiliser le TrainingCompletionNotifier
             var completionNotifier = FindFirstObjectByType<TrainingCompletionNotifier>();
             if (completionNotifier != null)
             {
                 completionNotifier.FormationCompleted(Application.productName);
-                Debug.Log("[TrainingCompletionUI] Training completion notified to web application");
-
-                // Afficher le JSON des analytics si disponible
-                if (Analytics.TrainingAnalytics.Instance != null)
-                {
-                    string analyticsJson = Analytics.TrainingAnalytics.Instance.ExportAnalytics();
-                    Debug.Log($"[TrainingCompletionUI] Analytics JSON sent:\n{analyticsJson}");
-                }
+                Debug.Log("[TrainingCompletionUI] Training completion notified via existing notifier");
             }
             else
             {
+                Debug.LogWarning("[TrainingCompletionUI] TrainingCompletionNotifier not found - creating temporary instance");
                 // Si pas trouvé, en créer un temporairement
                 var tempNotifier = new GameObject("TempCompletionNotifier").AddComponent<TrainingCompletionNotifier>();
-                tempNotifier.FormationCompleted(Application.productName);
-                Destroy(tempNotifier.gameObject, 1f);
-                Debug.Log("[TrainingCompletionUI] Created temporary notifier for completion");
-
-                // Afficher le JSON des analytics si disponible
-                if (Analytics.TrainingAnalytics.Instance != null)
-                {
-                    string analyticsJson = Analytics.TrainingAnalytics.Instance.ExportAnalytics();
-                    Debug.Log($"[TrainingCompletionUI] Analytics JSON sent:\n{analyticsJson}");
-                }
+                // Attendre un frame avant d'appeler FormationCompleted pour s'assurer que Start() est appelé
+                StartCoroutine(CallFormationCompletedDelayed(tempNotifier));
             }
+        }
+
+        System.Collections.IEnumerator CallFormationCompletedDelayed(TrainingCompletionNotifier notifier)
+        {
+            yield return null; // Attendre un frame
+            notifier.FormationCompleted(Application.productName);
+            Debug.Log("[TrainingCompletionUI] Training completion notified via temporary notifier");
+            yield return new WaitForSeconds(1f);
+            Destroy(notifier.gameObject);
         }
 
         IEnumerator AutoCloseAfterDelay()
