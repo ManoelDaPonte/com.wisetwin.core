@@ -515,6 +515,8 @@ MonoBehaviour:
   - {fileID: 1411303309}
   - {fileID: 1069217861}
   - {fileID: 2122491365}
+  useResetScript: 0
+  resetScript: {fileID: 0}
   debugMode: 0
 --- !u!1 &720147554
 GameObject:
@@ -952,6 +954,8 @@ MonoBehaviour:
   useDragDropSequence: 0
   enableYellowHighlight: 1
   procedureSequence: []
+  useResetScript: 0
+  resetScript: {fileID: 0}
   debugMode: 0
 --- !u!1 &1411303309
 GameObject:
@@ -1195,6 +1199,8 @@ MonoBehaviour:
   useDragDropSequence: 0
   enableYellowHighlight: 1
   procedureSequence: []
+  useResetScript: 0
+  resetScript: {fileID: 0}
   debugMode: 0
 --- !u!1 &1944170551 stripped
 GameObject:
@@ -1384,6 +1390,8 @@ MonoBehaviour:
   useDragDropSequence: 0
   enableYellowHighlight: 1
   procedureSequence: []
+  useResetScript: 0
+  resetScript: {fileID: 0}
   debugMode: 0
 --- !u!114 &1964762691
 MonoBehaviour:

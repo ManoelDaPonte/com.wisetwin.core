@@ -18,6 +18,10 @@ namespace WiseTwin.EditorExtensions
         SerializedProperty specificContentKey;
         SerializedProperty debugMode;
 
+        // Reset script properties
+        SerializedProperty useResetScript;
+        SerializedProperty resetScript;
+
         // Visual feedback properties
         SerializedProperty highlightOnHover;
         SerializedProperty hoverMode;
@@ -35,6 +39,10 @@ namespace WiseTwin.EditorExtensions
             procedureSequence = serializedObject.FindProperty("procedureSequence");
             specificContentKey = serializedObject.FindProperty("specificContentKey");
             debugMode = serializedObject.FindProperty("debugMode");
+
+            // Reset properties
+            useResetScript = serializedObject.FindProperty("useResetScript");
+            resetScript = serializedObject.FindProperty("resetScript");
 
             // Visual properties
             highlightOnHover = serializedObject.FindProperty("highlightOnHover");
@@ -181,6 +189,40 @@ namespace WiseTwin.EditorExtensions
 
                 EditorGUILayout.HelpBox("Procedure will be loaded from metadata file (objects and texts). " +
                     "Enable 'Use Drag & Drop Sequence' to define objects manually.", MessageType.Info);
+            }
+
+            // Reset Script Options
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Reset Options", EditorStyles.miniBoldLabel);
+
+            EditorGUILayout.PropertyField(useResetScript,
+                new GUIContent("Use Reset Script",
+                "Enable to call a custom reset script when the procedure restarts (user clicks outside sequence)"));
+
+            if (useResetScript.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(resetScript,
+                    new GUIContent("Reset Script",
+                    "MonoBehaviour implementing IProcedureReset interface"));
+
+                if (resetScript.objectReferenceValue != null)
+                {
+                    MonoBehaviour script = resetScript.objectReferenceValue as MonoBehaviour;
+                    if (script != null)
+                    {
+                        // Vérifier si le script implémente l'interface
+                        if (!(script is WiseTwin.UI.IProcedureReset))
+                        {
+                            EditorGUILayout.HelpBox("The selected script must implement IProcedureReset interface!", MessageType.Warning);
+                        }
+                        else
+                        {
+                            EditorGUILayout.HelpBox("Reset script will be called when procedure restarts.", MessageType.Info);
+                        }
+                    }
+                }
+                EditorGUI.indentLevel--;
             }
         }
 

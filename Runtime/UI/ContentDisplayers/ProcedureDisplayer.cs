@@ -37,6 +37,7 @@ namespace WiseTwin.UI
         private Dictionary<GameObject, Material> originalMaterials;
         private GameObject currentHighlightedObject;
         private bool shouldHighlight = true; // Contrôle si on doit surligner ou non
+        private IProcedureReset resetScript; // Script de reset personnalisé
 
         // UI Elements
         private Label titleLabel;
@@ -78,6 +79,16 @@ namespace WiseTwin.UI
             else
             {
                 shouldHighlight = true; // Par défaut, on active le highlight
+            }
+
+            // Récupérer le script de reset si fourni
+            if (contentData.ContainsKey("resetScript"))
+            {
+                resetScript = contentData["resetScript"] as IProcedureReset;
+                if (resetScript != null)
+                {
+                    Debug.Log($"[ProcedureDisplayer] Reset script configured");
+                }
             }
 
             // Obtenir la langue actuelle
@@ -501,6 +512,20 @@ namespace WiseTwin.UI
             if (currentStepData != null)
             {
                 currentStepData.wrongClicks = wrongClicksCount;
+            }
+
+            // Appeler le script de reset si configuré
+            if (resetScript != null && sequenceObjects.Count > 0)
+            {
+                try
+                {
+                    resetScript.ResetProcedure(sequenceObjects.ToArray());
+                    Debug.Log("[ProcedureDisplayer] Custom reset script executed");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[ProcedureDisplayer] Error executing reset script: {e.Message}");
+                }
             }
 
             // Retirer les surbrillances actuelles si elles sont actives

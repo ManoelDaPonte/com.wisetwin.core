@@ -39,6 +39,10 @@ namespace WiseTwin
         [SerializeField] private bool enableYellowHighlight = true; // Option pour activer/désactiver le clignotement jaune
         [SerializeField] private List<GameObject> procedureSequence = new List<GameObject>();
 
+        [Header("Reset Settings (Only for Procedure type)")]
+        [SerializeField] private bool useResetScript = false;
+        [SerializeField] private MonoBehaviour resetScript = null;
+
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
 
@@ -301,6 +305,19 @@ namespace WiseTwin
                     if (debugMode) Debug.Log($"[InteractableObject] Displaying drag & drop procedure with {procedureSequence.Count} steps");
                     // Passer l'option de highlight avec les données
                     procedureData["enableHighlight"] = enableYellowHighlight;
+                    // Passer le script de reset si configuré
+                    if (useResetScript && resetScript != null)
+                    {
+                        var resetInterface = resetScript as IProcedureReset;
+                        if (resetInterface != null)
+                        {
+                            procedureData["resetScript"] = resetInterface;
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[InteractableObject] Reset script {resetScript.name} does not implement IProcedureReset interface");
+                        }
+                    }
                     ContentDisplayManager.Instance.DisplayContent(objectId, contentType, procedureData);
                 }
                 else
@@ -410,6 +427,19 @@ namespace WiseTwin
                             if (contentType == ContentType.Procedure)
                             {
                                 contentData["enableHighlight"] = enableYellowHighlight;
+                                // Passer le script de reset si configuré
+                                if (useResetScript && resetScript != null)
+                                {
+                                    var resetInterface = resetScript as IProcedureReset;
+                                    if (resetInterface != null)
+                                    {
+                                        contentData["resetScript"] = resetInterface;
+                                    }
+                                    else
+                                    {
+                                        Debug.LogWarning($"[InteractableObject] Reset script {resetScript.name} does not implement IProcedureReset interface");
+                                    }
+                                }
                             }
                             ContentDisplayManager.Instance.DisplayContent(objectId, contentType, contentData);
                         }
@@ -483,6 +513,19 @@ namespace WiseTwin
             {
                 // Ajouter l'option de highlight aux données
                 procedureData["enableHighlight"] = enableYellowHighlight;
+                // Ajouter le script de reset si configuré
+                if (useResetScript && resetScript != null)
+                {
+                    var resetInterface = resetScript as IProcedureReset;
+                    if (resetInterface != null)
+                    {
+                        procedureData["resetScript"] = resetInterface;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[InteractableObject] Reset script {resetScript.name} does not implement IProcedureReset interface");
+                    }
+                }
 
                 // Copier le titre et la description depuis les métadatas
                 if (metadataProcedure.ContainsKey("title"))
