@@ -46,26 +46,16 @@ namespace WiseTwin.UI
             // Assigner le PanelSettings si nécessaire
             if (uiDocument.panelSettings == null)
             {
-                // Charger le PanelSettings depuis Resources (priorité)
-                var panelSettingsFromResources = UnityEngine.Resources.Load<PanelSettings>("WiseTwinPanelSettings");
-                if (panelSettingsFromResources != null)
+                // Charger le PanelSettings depuis Resources
+                var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
+                if (panelSettings != null)
                 {
-                    uiDocument.panelSettings = panelSettingsFromResources;
+                    uiDocument.panelSettings = panelSettings;
                     Debug.Log("[TrainingCompletionUI] PanelSettings loaded from Resources");
                 }
                 else
                 {
-                    // Essayer de récupérer depuis un autre UIDocument existant
-                    var existingUIDoc = FindFirstObjectByType<UIDocument>();
-                    if (existingUIDoc != null && existingUIDoc != uiDocument && existingUIDoc.panelSettings != null)
-                    {
-                        uiDocument.panelSettings = existingUIDoc.panelSettings;
-                        Debug.Log("[TrainingCompletionUI] PanelSettings copied from existing UIDocument");
-                    }
-                    else
-                    {
-                        Debug.LogError("[TrainingCompletionUI] No PanelSettings found! Please create WiseTwinPanelSettings.asset in Resources folder. Check Packages/com.wisetwin.core/Runtime/Resources/README.md for instructions.");
-                    }
+                    Debug.LogError("[TrainingCompletionUI] Could not find WiseTwinPanelSettings in Resources folder!");
                 }
             }
 

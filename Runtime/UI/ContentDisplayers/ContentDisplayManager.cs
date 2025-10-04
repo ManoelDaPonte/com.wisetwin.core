@@ -127,20 +127,17 @@ namespace WiseTwin.UI
             // Assigner le PanelSettings s'il n'est pas déjà assigné
             if (uiDocument.panelSettings == null)
             {
-                Debug.LogWarning("[ContentDisplayManager] PanelSettings is null! UI won't display. Please assign WiseTwinPanelSettings to the UIDocument component.");
-
-                #if UNITY_EDITOR
-                var panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/WiseTwinPanelSettings.asset");
+                // Charger le PanelSettings depuis Resources
+                var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
                 if (panelSettings != null)
                 {
                     uiDocument.panelSettings = panelSettings;
-                    if (debugMode) Debug.Log("[ContentDisplayManager] Auto-assigned PanelSettings from Assets");
+                    if (debugMode) Debug.Log("[ContentDisplayManager] PanelSettings loaded from Resources");
                 }
                 else
                 {
-                    Debug.LogError("[ContentDisplayManager] Could not find WiseTwinPanelSettings.asset! Please create it and assign it manually.");
+                    Debug.LogError("[ContentDisplayManager] Could not find WiseTwinPanelSettings in Resources folder!");
                 }
-                #endif
             }
             else
             {

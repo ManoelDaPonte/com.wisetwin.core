@@ -83,13 +83,16 @@ namespace WiseTwin
             // Assigner le PanelSettings s'il n'est pas déjà assigné
             if (uiDocument.panelSettings == null)
             {
-                #if UNITY_EDITOR
-                var panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/WiseTwinPanelSettings.asset");
+                var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
                 if (panelSettings != null)
                 {
                     uiDocument.panelSettings = panelSettings;
+                    Debug.Log("[TrainingHUD] PanelSettings loaded from Resources");
                 }
-                #endif
+                else
+                {
+                    Debug.LogError("[TrainingHUD] Could not find WiseTwinPanelSettings in Resources folder!");
+                }
             }
 
             root = uiDocument.rootVisualElement;

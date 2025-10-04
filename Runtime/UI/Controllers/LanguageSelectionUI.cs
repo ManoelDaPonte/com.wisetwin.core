@@ -58,28 +58,19 @@ namespace WiseTwin
                 uiDocument = gameObject.AddComponent<UIDocument>();
             }
 
-            // IMPORTANT : Assigner le PanelSettings s'il n'est pas déjà assigné
+            // Assigner le PanelSettings s'il n'est pas déjà assigné
             if (uiDocument.panelSettings == null)
             {
-                // Essayer de charger depuis Resources d'abord (pour le runtime)
+                // Charger le PanelSettings depuis Resources
                 var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
-
-                #if UNITY_EDITOR
-                // En éditeur, essayer aussi depuis AssetDatabase
-                if (panelSettings == null)
-                {
-                    panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/WiseTwinPanelSettings.asset");
-                }
-                #endif
-
                 if (panelSettings != null)
                 {
                     uiDocument.panelSettings = panelSettings;
-                    if (debugMode) Debug.Log("[LanguageSelectionUI] PanelSettings assigned successfully");
+                    if (debugMode) Debug.Log("[LanguageSelectionUI] PanelSettings loaded from Resources");
                 }
                 else
                 {
-                    Debug.LogError("[LanguageSelectionUI] ⚠️ No PanelSettings found! UI won't display. Please manually assign WiseTwinPanelSettings.asset to the UIDocument component in the Inspector.");
+                    Debug.LogError("[LanguageSelectionUI] Could not find WiseTwinPanelSettings in Resources folder!");
                 }
             }
 
