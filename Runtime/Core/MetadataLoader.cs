@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
 public class MetadataLoader : MonoBehaviour
 {
@@ -31,9 +32,9 @@ public class MetadataLoader : MonoBehaviour
     [SerializeField, Tooltip("Log prefix for easy filtering")]
     private string logPrefix = "[MetadataLoader]";
     
-    [Header("📋 Project Info")]
-    [Tooltip("Project name (auto-generated from Unity project)")]
-    private string projectName;
+    [Header("📋 Scene Info")]
+    [Tooltip("Scene name (auto-detected from active scene)")]
+    private string sceneName;
     
     // Events simples
     public System.Action<Dictionary<string, object>> OnMetadataLoaded;
@@ -48,7 +49,7 @@ public class MetadataLoader : MonoBehaviour
     
     // Propriétés publiques
     public bool IsLoaded => loadedMetadata != null;
-    public string ProjectName => projectName;
+    public string SceneName => sceneName;
     public Dictionary<string, object> GetMetadata() => loadedMetadata;
     public Dictionary<string, object> GetUnityData() => unityData;
     
@@ -64,7 +65,7 @@ public class MetadataLoader : MonoBehaviour
                 DontDestroyOnLoad(gameObject);
             }
 
-            InitializeProjectName();
+            InitializeSceneName();
         }
         else
         {
@@ -72,27 +73,20 @@ public class MetadataLoader : MonoBehaviour
         }
     }
     
-    void InitializeProjectName()
+    void InitializeSceneName()
     {
-        // Try to get project name from WiseTwinManager first
-        if (WiseTwin.WiseTwinManager.Instance != null)
+        // Get the active scene name
+        sceneName = SceneManager.GetActiveScene().name;
+
+        if (string.IsNullOrEmpty(sceneName))
         {
-            string managerProjectName = WiseTwin.WiseTwinManager.Instance.ProjectName;
-            if (!string.IsNullOrEmpty(managerProjectName))
-            {
-                projectName = managerProjectName;
-                DebugLog($"📋 Project name from WiseTwinManager: {projectName}");
-                return;
-            }
+            sceneName = "default-scene";
+            DebugLog($"⚠️ Could not get scene name, using fallback: {sceneName}");
         }
-        
-        // Fallback to Unity project name
-        projectName = Application.productName;
-        if (string.IsNullOrEmpty(projectName))
+        else
         {
-            projectName = "unity-project";
+            DebugLog($"📋 Scene name detected: {sceneName}");
         }
-        DebugLog($"📋 Project name (fallback): {projectName}");
     }
     
     void Start()
@@ -105,7 +99,7 @@ public class MetadataLoader : MonoBehaviour
             DebugLog($"📡 API URL: {apiBaseUrl}");
             DebugLog($"📦 Container ID: {containerId}");
             DebugLog($"🏗️ Build Type: {buildType}");
-            DebugLog($"📋 Build Name: {projectName}");
+            DebugLog($"📋 Scene Name: {sceneName}");
         }
 
         LoadMetadata();
@@ -130,7 +124,7 @@ public class MetadataLoader : MonoBehaviour
     {
         DebugLog("📂 Chargement des métadonnées locales...");
         
-        string fileName = $"{projectName}-metadata.json";
+        string fileName = $"{sceneName}-metadata.json";
         string[] possiblePaths = {
             Path.Combine(Application.streamingAssetsPath, fileName),
             Path.Combine(Application.streamingAssetsPath, "metadata.json"),
@@ -165,7 +159,7 @@ public class MetadataLoader : MonoBehaviour
         }
         else
         {
-            string error = $"❌ Aucun fichier trouvé pour '{projectName}'";
+            string error = $"❌ Aucun fichier trouvé pour '{sceneName}'";
             DebugLog(error);
             OnLoadError?.Invoke(error);
         }
@@ -191,7 +185,7 @@ public class MetadataLoader : MonoBehaviour
 
         // Construction de l'URL Azure Storage
         // Format: https://storage.blob.core.windows.net/container/buildType/projectName-metadata.json
-        string fileName = $"{projectName}-metadata.json";
+        string fileName = $"{sceneName}-metadata.json";
         string url = $"{azureStorageUrl.TrimEnd('/')}/{containerId}/{buildType}/{fileName}";
 
         DebugLog($"📡 Azure Storage URL: {url}");
@@ -340,8 +334,8 @@ public class MetadataLoader : MonoBehaviour
         string url = apiBaseUrl;
         List<string> parameters = new List<string>();
         
-        if (!string.IsNullOrEmpty(projectName))
-            parameters.Add($"buildName={UnityWebRequest.EscapeURL(projectName)}");
+        if (!string.IsNullOrEmpty(sceneName))
+            parameters.Add($"buildName={UnityWebRequest.EscapeURL(sceneName)}");
         
         if (!string.IsNullOrEmpty(buildType))
             parameters.Add($"buildType={UnityWebRequest.EscapeURL(buildType)}");
@@ -510,7 +504,7 @@ public class MetadataLoader : MonoBehaviour
         GUILayout.Label("🎯 MetadataLoader", boldStyle);
         bool useLocalMode = GetUseLocalMode();
         GUILayout.Label($"Mode: {(useLocalMode ? "Local" : "Production")}");
-        GUILayout.Label($"Project: {projectName}");
+        GUILayout.Label($"Scene: {sceneName}");
         GUILayout.Label($"Loaded: {(IsLoaded ? "✅" : "❌")}");
         
         if (IsLoaded)

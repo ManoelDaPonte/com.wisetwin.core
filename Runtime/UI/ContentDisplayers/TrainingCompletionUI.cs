@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 using System;
+using UnityEngine.SceneManagement;
 
 namespace WiseTwin.UI
 {
@@ -242,7 +243,7 @@ namespace WiseTwin.UI
             var completionNotifier = FindFirstObjectByType<TrainingCompletionNotifier>();
             if (completionNotifier != null)
             {
-                completionNotifier.FormationCompleted(Application.productName);
+                completionNotifier.FormationCompleted(SceneManager.GetActiveScene().name);
                 Debug.Log("[TrainingCompletionUI] Completion notification sent");
             }
             else

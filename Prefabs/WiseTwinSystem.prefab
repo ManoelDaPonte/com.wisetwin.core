@@ -286,7 +286,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enableDebugLogs: 0
   logPrefix: '[WiseTwinManager]'
-  useProductionMode: 1
+  useProductionMode: 0
   metadataLoader: {fileID: 5717370407079796314}
   completionNotifier: {fileID: 798460448257152867}
 --- !u!114 &5050161787946064431
@@ -362,7 +362,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   runTestOnStart: 0
-  debugOutput: 1
+  debugOutput: 0
 --- !u!114 &5350361062929066626
 MonoBehaviour:
   m_ObjectHideFlags: 0

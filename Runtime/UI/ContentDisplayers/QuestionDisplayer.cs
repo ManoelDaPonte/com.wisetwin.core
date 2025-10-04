@@ -13,6 +13,10 @@ namespace WiseTwin.UI
     /// </summary>
     public class QuestionDisplayer : MonoBehaviour, IContentDisplayer
     {
+        [Header("🔧 Debug Settings")]
+        [SerializeField, Tooltip("Enable debug logs for this component")]
+        private bool enableDebugLogs = false;
+
         public event Action<string> OnClosed;
         public event Action<string, bool> OnCompleted;
 
@@ -84,7 +88,7 @@ namespace WiseTwin.UI
 
                 if (ContentDisplayManager.Instance?.DebugMode ?? false)
                 {
-                    Debug.Log($"[QuestionDisplayer] Found {questionKeys.Count} questions for {objectId}");
+                    LogDebug($"Found {questionKeys.Count} questions for {objectId}");
                 }
 
                 if (questionKeys.Count > 0)
@@ -97,7 +101,7 @@ namespace WiseTwin.UI
                 {
                     if (ContentDisplayManager.Instance?.DebugMode ?? false)
                     {
-                        Debug.LogError($"[QuestionDisplayer] No questions found for {objectId}");
+                        LogError($"No questions found for {objectId}");
                     }
                 }
             }
@@ -112,7 +116,7 @@ namespace WiseTwin.UI
 
             if (ContentDisplayManager.Instance?.DebugMode ?? false)
             {
-                Debug.Log($"[QuestionDisplayer] Displaying single question for {currentObjectId}");
+                LogDebug($"Displaying single question for {currentObjectId}");
             }
 
             // Obtenir la langue actuelle
@@ -140,7 +144,7 @@ namespace WiseTwin.UI
                     var correctAnswers = contentData["correctAnswers"];
                     if (ContentDisplayManager.Instance?.DebugMode ?? false)
                     {
-                        Debug.Log($"[QuestionDisplayer] correctAnswers type: {correctAnswers?.GetType()?.Name ?? "null"}");
+                        LogDebug($"correctAnswers type: {correctAnswers?.GetType()?.Name ?? "null"}");
                     }
 
                     if (correctAnswers is Newtonsoft.Json.Linq.JArray jarray)
@@ -166,14 +170,14 @@ namespace WiseTwin.UI
 
                     if (ContentDisplayManager.Instance?.DebugMode ?? false)
                     {
-                        Debug.Log($"[QuestionDisplayer] Loaded correct answers for multiple choice: {string.Join(", ", correctAnswerIndexes)}");
+                        LogDebug($"Loaded correct answers for multiple choice: {string.Join(", ", correctAnswerIndexes)}");
                     }
                 }
                 else
                 {
                     if (ContentDisplayManager.Instance?.DebugMode ?? false)
                     {
-                        Debug.LogWarning("[QuestionDisplayer] No correctAnswers field found for multiple choice question!");
+                        LogWarning("No correctAnswers field found for multiple choice question!");
                     }
                 }
             }
@@ -189,8 +193,8 @@ namespace WiseTwin.UI
 
             if (ContentDisplayManager.Instance?.DebugMode ?? false)
             {
-                Debug.Log($"[QuestionDisplayer] Question: {questionText}");
-                Debug.Log($"[QuestionDisplayer] Options count: {options?.Count ?? 0}");
+                LogDebug($"Question: {questionText}");
+                LogDebug($"Options count: {options?.Count ?? 0}");
             }
 
             // Créer l'UI pour question unique
@@ -221,6 +225,7 @@ namespace WiseTwin.UI
             questionBox.style.maxWidth = Length.Percent(90);
             questionBox.style.maxHeight = Length.Percent(80);
             questionBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
+            questionBox.style.overflow = Overflow.Hidden; // Cacher le dépassement
             questionBox.style.borderTopLeftRadius = 25;
             questionBox.style.borderTopRightRadius = 25;
             questionBox.style.borderBottomLeftRadius = 25;
@@ -264,9 +269,11 @@ namespace WiseTwin.UI
             questionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             questionBox.Add(questionLabel);
 
-            // Container des options
-            optionsContainer = new VisualElement();
+            // Container des options avec scroll
+            optionsContainer = new ScrollView();
             optionsContainer.style.marginBottom = 30;
+            optionsContainer.style.maxHeight = 400; // Hauteur max avant scroll
+            optionsContainer.style.flexGrow = 1;
             questionBox.Add(optionsContainer);
 
             // Zone de feedback (cachée au début)
@@ -331,7 +338,7 @@ namespace WiseTwin.UI
             string currentKey = questionKeys[currentQuestionIndex];
             if (ContentDisplayManager.Instance?.DebugMode ?? false)
             {
-                Debug.Log($"[QuestionDisplayer] Displaying question {currentQuestionIndex + 1}/{questionKeys.Count}: {currentKey}");
+                LogDebug($"Displaying question {currentQuestionIndex + 1}/{questionKeys.Count}: {currentKey}");
             }
 
             // Mise à jour de l'indicateur de progression
@@ -366,7 +373,7 @@ namespace WiseTwin.UI
                     {
                         if (ContentDisplayManager.Instance?.DebugMode ?? false)
                         {
-                            Debug.LogError($"[QuestionDisplayer] Failed to convert question data: {e.Message}");
+                            LogError($"Failed to convert question data: {e.Message}");
                         }
                     }
                 }
@@ -482,6 +489,7 @@ namespace WiseTwin.UI
             questionBox.style.maxWidth = Length.Percent(90);
             questionBox.style.maxHeight = Length.Percent(80);
             questionBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
+            questionBox.style.overflow = Overflow.Hidden; // Cacher le dépassement
             questionBox.style.borderTopLeftRadius = 25;
             questionBox.style.borderTopRightRadius = 25;
             questionBox.style.borderBottomLeftRadius = 25;
@@ -517,9 +525,11 @@ namespace WiseTwin.UI
             questionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             questionBox.Add(questionLabel);
 
-            // Container des options
-            optionsContainer = new VisualElement();
+            // Container des options avec scroll
+            optionsContainer = new ScrollView();
             optionsContainer.style.marginBottom = 30;
+            optionsContainer.style.maxHeight = 400; // Hauteur max avant scroll
+            optionsContainer.style.flexGrow = 1;
 
             // Créer les boutons d'options
             for (int i = 0; i < options.Count; i++)
@@ -588,6 +598,7 @@ namespace WiseTwin.UI
             optionContainer.style.paddingLeft = 15;
             optionContainer.style.paddingRight = 15;
             optionContainer.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
+            optionContainer.style.minHeight = 50; // Hauteur minimum pour éviter l'écrasement
             optionContainer.style.borderTopLeftRadius = 10;
             optionContainer.style.borderTopRightRadius = 10;
             optionContainer.style.borderBottomLeftRadius = 10;
@@ -642,7 +653,10 @@ namespace WiseTwin.UI
             label.style.fontSize = 18;
             label.style.color = Color.white;
             label.style.flexGrow = 1;
+            label.style.flexShrink = 1;
             label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.overflow = Overflow.Hidden;
+            label.style.textOverflow = TextOverflow.Clip;
 
             optionContainer.Add(indicator);
             optionContainer.Add(label);
@@ -761,7 +775,7 @@ namespace WiseTwin.UI
                 TrainingAnalytics.Instance?.IncrementCurrentInteractionAttempts();
 
                 // Debug pour vérifier le nombre de tentatives
-                Debug.Log($"[QuestionDisplayer] Attempt #{TrainingAnalytics.Instance?.GetCurrentInteraction()?.attempts} for question");
+                LogDebug($"Attempt #{TrainingAnalytics.Instance?.GetCurrentInteraction()?.attempts} for question");
             }
 
             bool isCorrect = false;
@@ -776,8 +790,8 @@ namespace WiseTwin.UI
 
                 if (ContentDisplayManager.Instance?.DebugMode ?? false)
                 {
-                    Debug.Log($"[QuestionDisplayer] Selected answers: {string.Join(", ", selectedAnswerIndexes)}");
-                    Debug.Log($"[QuestionDisplayer] Correct answers: {string.Join(", ", correctAnswerIndexes)}");
+                    LogDebug($"Selected answers: {string.Join(", ", selectedAnswerIndexes)}");
+                    LogDebug($"Correct answers: {string.Join(", ", correctAnswerIndexes)}");
                 }
 
                 isCorrect = selectedAnswerIndexes.Count == correctAnswerIndexes.Count &&
@@ -984,7 +998,7 @@ namespace WiseTwin.UI
 
             if (ContentDisplayManager.Instance?.DebugMode ?? false)
             {
-                Debug.Log($"[QuestionDisplayer] ExtractLocalizedList for '{key}' in '{language}': found {result.Count} items");
+                LogDebug($"ExtractLocalizedList for '{key}' in '{language}': found {result.Count} items");
             }
             return result;
         }
@@ -1012,7 +1026,7 @@ namespace WiseTwin.UI
         {
             if (TrainingAnalytics.Instance == null)
             {
-                Debug.LogWarning("[QuestionDisplayer] TrainingAnalytics not available - creating instance");
+                LogWarning("TrainingAnalytics not available - creating instance");
                 var analyticsGO = new GameObject("TrainingAnalytics");
                 analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
             }
@@ -1030,8 +1044,29 @@ namespace WiseTwin.UI
 
             var subtype = isMultipleChoice ? "multiple_choice" : "single_choice";
 
-            Debug.Log($"[QuestionDisplayer] Initializing tracking for question: {questionId}");
+            LogDebug($"Initializing tracking for question: {questionId}");
             TrainingAnalytics.Instance.TrackQuestionInteraction(currentObjectId, questionId, currentQuestionData);
+        }
+
+        private void LogDebug(string message)
+        {
+            if (enableDebugLogs)
+            {
+                Debug.Log($"[QuestionDisplayer] {message}");
+            }
+        }
+
+        private void LogWarning(string message)
+        {
+            if (enableDebugLogs)
+            {
+                Debug.LogWarning($"[QuestionDisplayer] {message}");
+            }
+        }
+
+        private void LogError(string message)
+        {
+            Debug.LogError($"[QuestionDisplayer] {message}");
         }
     }
 }

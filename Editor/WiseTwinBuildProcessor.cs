@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using UnityEngine.SceneManagement;
 
 namespace WiseTwin.Editor
 {
@@ -51,8 +52,18 @@ namespace WiseTwin.Editor
             // S'assurer que les métadonnées sont présentes en mode local
             if (!isProductionMode)
             {
-                string projectName = Application.productName.ToLower().Replace(" ", "-");
-                string metadataPath = $"Assets/StreamingAssets/{projectName}-metadata.json";
+                // Obtenir le nom de la première scène dans le build
+                string sceneName = "default-scene";
+                if (report.summary.guid.ToString() != System.Guid.Empty.ToString())
+                {
+                    var scenePaths = EditorBuildSettings.scenes;
+                    if (scenePaths.Length > 0 && scenePaths[0].enabled)
+                    {
+                        sceneName = System.IO.Path.GetFileNameWithoutExtension(scenePaths[0].path).ToLower().Replace(" ", "-");
+                    }
+                }
+
+                string metadataPath = $"Assets/StreamingAssets/{sceneName}-metadata.json";
 
                 if (!System.IO.File.Exists(metadataPath))
                 {
@@ -61,7 +72,7 @@ namespace WiseTwin.Editor
 
                     bool createMetadata = EditorUtility.DisplayDialog(
                         "WiseTwin - Métadonnées Manquantes",
-                        $"Le fichier de métadonnées '{projectName}-metadata.json' est manquant dans StreamingAssets.\n\n" +
+                        $"Le fichier de métadonnées '{sceneName}-metadata.json' est manquant dans StreamingAssets.\n\n" +
                         "Voulez-vous ouvrir l'éditeur WiseTwin pour générer les métadonnées?",
                         "Ouvrir l'éditeur",
                         "Annuler le build"

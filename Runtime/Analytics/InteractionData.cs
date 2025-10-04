@@ -82,6 +82,9 @@ namespace WiseTwin.Analytics
     [Serializable]
     public class QuestionInteractionData
     {
+        // Configuration statique pour les logs
+        public static bool EnableDebugLogs { get; set; } = false;
+
         public string questionText;
         public List<string> options;
         public List<int> correctAnswers;
@@ -106,7 +109,7 @@ namespace WiseTwin.Analytics
             if (userAnswers.Count == 1)
             {
                 firstAttemptCorrect = CheckIfCorrect(attempt);
-                Debug.Log($"[QuestionInteractionData] First attempt check - Answer: {string.Join(",", attempt)}, Correct: {string.Join(",", correctAnswers)}, Result: {firstAttemptCorrect}");
+                LogDebug($"First attempt check - Answer: {string.Join(",", attempt)}, Correct: {string.Join(",", correctAnswers)}, Result: {firstAttemptCorrect}");
             }
 
             // Mettre à jour le score si c'est correct
@@ -144,6 +147,14 @@ namespace WiseTwin.Analytics
                 ["firstAttemptCorrect"] = firstAttemptCorrect,
                 ["finalScore"] = finalScore
             };
+        }
+
+        private static void LogDebug(string message)
+        {
+            if (EnableDebugLogs)
+            {
+                Debug.Log($"[QuestionInteractionData] {message}");
+            }
         }
     }
 

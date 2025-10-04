@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 namespace WiseTwin
 {
@@ -39,7 +40,7 @@ namespace WiseTwin
         
         // Quick access properties
         public bool IsMetadataLoaded => metadataLoader != null && metadataLoader.IsLoaded;
-        public string ProjectName => GetProjectName();
+        public string SceneName => GetSceneName();
         
         // Events
         public System.Action<Dictionary<string, object>> OnMetadataReady;
@@ -201,7 +202,7 @@ namespace WiseTwin
                 return;
             }
             
-            DebugLog($"🎉 Training completed: {trainingName ?? ProjectName}");
+            DebugLog($"🎉 Training completed: {trainingName ?? SceneName}");
             completionNotifier.FormationCompleted(trainingName);
             OnTrainingCompleted?.Invoke();
         }
@@ -248,7 +249,7 @@ namespace WiseTwin
         {
             var status = new System.Text.StringBuilder();
             status.AppendLine($"🎯 WiseTwin Manager Status");
-            status.AppendLine($"Project: {ProjectName}");
+            status.AppendLine($"Scene: {SceneName}");
             status.AppendLine($"MetadataLoader: {(metadataLoader != null ? "✅" : "❌")}");
             status.AppendLine($"CompletionNotifier: {(completionNotifier != null ? "✅" : "❌")}");
             status.AppendLine($"Test Mode: {(IsProductionMode() ? "❌ Production" : "✅ Local")}");
@@ -322,39 +323,21 @@ namespace WiseTwin
                     return "en";
             }
         }
-        
         /// <summary>
-        /// Set custom project name (overrides Unity's productName)
+        /// Get current scene name
         /// </summary>
-        /// <param name="projectName">Custom project name</param>
-        public void SetCustomProjectName(string projectName)
+        /// <returns>Scene name</returns>
+        string GetSceneName()
         {
-            PlayerPrefs.SetString("WiseTwin_ProjectName", projectName);
-            PlayerPrefs.Save();
-            DebugLog($"📋 Custom project name set to: {projectName}");
-        }
-        
-        /// <summary>
-        /// Get project name (custom or Unity's productName)
-        /// </summary>
-        /// <returns>Project name</returns>
-        string GetProjectName()
-        {
-            // Try custom project name first
-            string customName = PlayerPrefs.GetString("WiseTwin_ProjectName", "");
-            if (!string.IsNullOrEmpty(customName))
+            // Use metadata loader's scene name if available
+            if (metadataLoader != null && !string.IsNullOrEmpty(metadataLoader.SceneName))
             {
-                return customName;
+                return metadataLoader.SceneName;
             }
-            
-            // Use metadata loader's name if available
-            if (metadataLoader != null && !string.IsNullOrEmpty(metadataLoader.ProjectName))
-            {
-                return metadataLoader.ProjectName;
-            }
-            
-            // Fallback to Unity's product name
-            return !string.IsNullOrEmpty(Application.productName) ? Application.productName : "unity-project";
+
+            // Fallback to current active scene
+            string sceneName = SceneManager.GetActiveScene().name;
+            return !string.IsNullOrEmpty(sceneName) ? sceneName : "default-scene";
         }
         
         #endregion
@@ -414,7 +397,7 @@ namespace WiseTwin
             boldStyle.fontStyle = FontStyle.Bold;
             
             GUILayout.Label("🎯 WiseTwin Manager", boldStyle);
-            GUILayout.Label($"Project: {ProjectName}");
+            GUILayout.Label($"Scene: {SceneName}");
             GUILayout.Label($"Metadata: {(IsMetadataLoaded ? "✅ Loaded" : "❌ Loading...")}");
             
             if (IsMetadataLoaded)

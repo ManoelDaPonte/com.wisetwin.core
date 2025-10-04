@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using UnityEngine.SceneManagement;
 
 #if UNITY_EDITOR
 
@@ -47,7 +48,7 @@ public class WiseTwinEditor : EditorWindow
     private Vector2 unityContentScrollPosition;
     private bool hasLoadedExistingJSON = false;
     private string currentLoadedFile = "";
-    private string projectId; // Auto-generated from Unity project name
+    private string sceneId; // Auto-generated from current scene name
     
     // UI State
     private Vector2 scrollPosition;
@@ -73,7 +74,7 @@ public class WiseTwinEditor : EditorWindow
         settingsFilePath = Path.Combine(Application.persistentDataPath, "WiseTwinSettings.json");
         LoadSettings();
         LoadLanguagePreference();
-        InitializeProjectId();
+        InitializeSceneId();
 
         // Synchroniser automatiquement avec WiseTwinManager au chargement
         EditorApplication.delayCall += () =>
@@ -155,28 +156,20 @@ public class WiseTwinEditor : EditorWindow
     }
     
     
-    void InitializeProjectId()
+    void InitializeSceneId()
     {
-        // Try to get custom project name first
-        string savedProjectName = PlayerPrefs.GetString("WiseTwin_ProjectName", "");
-        if (!string.IsNullOrEmpty(savedProjectName))
+        // Get current scene name
+        sceneId = SceneManager.GetActiveScene().name;
+        if (string.IsNullOrEmpty(sceneId))
         {
-            projectId = savedProjectName;
-            return;
-        }
-        
-        // Fallback to Unity project name
-        projectId = Application.productName;
-        if (string.IsNullOrEmpty(projectId))
-        {
-            projectId = "unity-project";
+            sceneId = "default-scene";
         }
     }
     
     void LoadExistingJSONContent()
     {
         
-        string targetFileName = $"{projectId}-metadata.json";
+        string targetFileName = $"{sceneId}-metadata.json";
         
         // Possible paths to search for JSON file
         string[] possiblePaths = {
@@ -375,7 +368,7 @@ public class WiseTwinEditor : EditorWindow
     void DrawLoadedFileInfo()
     {
         EditorGUILayout.BeginVertical("box");
-        EditorGUILayout.LabelField($"🎯 Project: {projectId} (based on Unity name)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField($"🎯 Scene: {sceneId} (current active scene)", EditorStyles.boldLabel);
         
         if (hasLoadedExistingJSON)
         {
@@ -507,7 +500,7 @@ public class WiseTwinEditor : EditorWindow
         EditorGUILayout.BeginVertical("box");
         
         EditorGUI.BeginDisabledGroup(true);
-        EditorGUILayout.TextField("Project Name", Application.productName);
+        EditorGUILayout.TextField("Scene Name", sceneId);
         EditorGUILayout.TextField("Company Name", Application.companyName);
         EditorGUILayout.TextField("Unity Version", Application.unityVersion);
         EditorGUI.EndDisabledGroup();
@@ -525,17 +518,11 @@ public class WiseTwinEditor : EditorWindow
         EditorGUILayout.LabelField("📋 Basic Configuration", EditorStyles.boldLabel);
         EditorGUILayout.BeginVertical("box");
         
-        // Project ID modifiable
-        string newProjectId = EditorGUILayout.TextField("Project ID", projectId);
-        if (newProjectId != projectId)
-        {
-            projectId = newProjectId;
-            // Save custom project name
-            PlayerPrefs.SetString("WiseTwin_ProjectName", projectId);
-            PlayerPrefs.Save();
-            EditorUtility.SetDirty(this);
-        }
-        EditorGUILayout.HelpBox("This ID will be used for metadata filename and across all components", MessageType.Info);
+        // Scene ID (read-only, based on active scene)
+        EditorGUI.BeginDisabledGroup(true);
+        EditorGUILayout.TextField("Scene Name", sceneId);
+        EditorGUI.EndDisabledGroup();
+        EditorGUILayout.HelpBox($"Metadata will be saved as: {sceneId}-metadata.json", MessageType.Info);
         
         projectTitle = EditorGUILayout.TextField("Title", projectTitle);
         
@@ -747,7 +734,7 @@ public class WiseTwinEditor : EditorWindow
     {
         var metadata = new FormationMetadataComplete
         {
-            id = projectId,
+            id = sceneId,
             title = projectTitle,
             description = projectDescription,
             version = projectVersion,
@@ -803,7 +790,7 @@ public class WiseTwinEditor : EditorWindow
         var metadata = GenerateCompleteMetadata();
         string json = JsonConvert.SerializeObject(metadata, Formatting.Indented);
         
-        string fileName = $"{projectId}-metadata.json";
+        string fileName = $"{sceneId}-metadata.json";
         string fullPath = Path.Combine(streamingAssetsPath, fileName);
         
         File.WriteAllText(fullPath, json);
@@ -833,8 +820,7 @@ public class WiseTwinEditor : EditorWindow
         }
 
         // Construire l'URL avec les paramètres
-        string projectName = Application.productName;
-        string url = $"{azureApiUrl}?buildName={UnityEngine.Networking.UnityWebRequest.EscapeURL(projectName)}" +
+        string url = $"{azureApiUrl}?buildName={UnityEngine.Networking.UnityWebRequest.EscapeURL(sceneId)}" +
                      $"&buildType={UnityEngine.Networking.UnityWebRequest.EscapeURL(buildType)}" +
                      $"&containerId={UnityEngine.Networking.UnityWebRequest.EscapeURL(containerId)}";
 
@@ -879,7 +865,7 @@ public class WiseTwinEditor : EditorWindow
                         Directory.CreateDirectory(streamingAssetsPath);
                     }
 
-                    string fileName = $"{projectName}-metadata.json";
+                    string fileName = $"{sceneId}-metadata.json";
                     string filePath = Path.Combine(streamingAssetsPath, fileName);
 
                     File.WriteAllText(filePath, metadataJson);

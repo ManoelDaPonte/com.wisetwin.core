@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Newtonsoft.Json;
+using UnityEngine.SceneManagement;
 
 namespace WiseTwin.Analytics
 {
@@ -63,7 +64,7 @@ namespace WiseTwin.Analytics
         void InitializeSession()
         {
             sessionId = Guid.NewGuid().ToString();
-            trainingId = Application.productName;
+            trainingId = SceneManager.GetActiveScene().name;
             startTime = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'");
             interactions = new List<InteractionData>();
             moduleStartTimes = new Dictionary<string, float>();
@@ -75,7 +76,7 @@ namespace WiseTwin.Analytics
             totalAttempts = 0;
             totalFailedAttempts = 0;
 
-            Debug.Log($"[TrainingAnalytics] Session initialized: {sessionId} for training: {trainingId}");
+            LogDebug($"Session initialized: {sessionId} for training: {trainingId}");
         }
 
         /// <summary>
@@ -92,7 +93,7 @@ namespace WiseTwin.Analytics
             string interactionId = $"{objectId}_{type}_{DateTime.UtcNow.Ticks}";
             currentInteraction = new InteractionData(interactionId, type, subtype, objectId);
 
-            Debug.Log($"[TrainingAnalytics] Started interaction: {interactionId} (type: {type}, subtype: {subtype})");
+            LogDebug($"Started interaction: {interactionId} (type: {type}, subtype: {subtype})");
 
             return currentInteraction;
         }
@@ -127,7 +128,7 @@ namespace WiseTwin.Analytics
                     totalFailedAttempts += currentInteraction.attempts;
                 }
 
-                Debug.Log($"[TrainingAnalytics] Ended interaction: {currentInteraction.interactionId} - Success: {success}, Duration: {currentInteraction.duration}s");
+                LogDebug($"Ended interaction: {currentInteraction.interactionId} - Success: {success}, Duration: {currentInteraction.duration}s");
 
                 currentInteraction = null;
             }
@@ -224,8 +225,8 @@ namespace WiseTwin.Analytics
 
             if (debugMode)
             {
-                Debug.Log($"[TrainingAnalytics] Training completed: {status}");
-                Debug.Log($"[TrainingAnalytics] Total interactions: {totalInteractions}, Success rate: {GetSuccessRate():F2}%");
+                LogDebug($"Training completed: {status}");
+                LogDebug($"Total interactions: {totalInteractions}, Success rate: {GetSuccessRate():F2}%");
             }
 
             if (autoExportOnCompletion)
@@ -233,7 +234,7 @@ namespace WiseTwin.Analytics
                 string analytics = ExportAnalytics();
                 if (debugMode)
                 {
-                    Debug.Log($"[TrainingAnalytics] Exported analytics: {analytics}");
+                    LogDebug($"Exported analytics: {analytics}");
                 }
             }
         }
@@ -303,7 +304,7 @@ namespace WiseTwin.Analytics
 
             if (debugMode)
             {
-                Debug.Log("[TrainingAnalytics] Analytics reset");
+                LogDebug("Analytics reset");
             }
         }
 
@@ -363,7 +364,20 @@ namespace WiseTwin.Analytics
             CompleteTraining();
 
             string json = ExportAnalytics();
-            Debug.Log($"[TrainingAnalytics] Test Export:\n{json}");
+            LogDebug($"Test Export:\n{json}");
+        }
+
+        private void LogDebug(string message)
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[TrainingAnalytics] {message}");
+            }
+        }
+
+        private void LogError(string message)
+        {
+            Debug.LogError($"[TrainingAnalytics] {message}");
         }
     }
 }

@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Runtime.InteropServices;
 using WiseTwin.Analytics;
+using UnityEngine.SceneManagement;
 
 namespace WiseTwin
 {
@@ -45,7 +46,7 @@ namespace WiseTwin
                 Debug.Log("[TrainingCompletionNotifier] Training completion sent successfully");
             #else
                 // En mode éditeur, afficher les analytics dans la console
-                LogDebug($"📊 Training '{trainingName ?? GetProjectName()}' completed");
+                LogDebug($"📊 Training '{trainingName ?? GetSceneName()}' completed");
                 if (TrainingAnalytics.Instance != null)
                 {
                     string analytics = TrainingAnalytics.Instance.ExportAnalytics();
@@ -87,16 +88,16 @@ namespace WiseTwin
             FormationCompleted("Test Training");
         }
         
-        string GetProjectName()
+        string GetSceneName()
         {
             if (WiseTwinManager.Instance != null)
             {
-                return WiseTwinManager.Instance.ProjectName;
+                return WiseTwinManager.Instance.SceneName;
             }
-            
+
             // Fallback if WiseTwinManager not available
-            string projectName = Application.productName;
-            return string.IsNullOrEmpty(projectName) ? "Unity Training" : projectName;
+            string sceneName = SceneManager.GetActiveScene().name;
+            return string.IsNullOrEmpty(sceneName) ? "Default Scene" : sceneName;
         }
         
         void LogDebug(string message)
