@@ -16,17 +16,13 @@ namespace WiseTwin
         [SerializeField, Tooltip("Log prefix for easy filtering")]
         private string logPrefix = "[TrainingCompletionNotifier]";
 
-        // JavaScript interop for WebGL
+        // JavaScript interop for WebGL - Simplified to single call
         [DllImport("__Internal")]
-        private static extern void NotifyFormationCompleted();
-
-        [DllImport("__Internal")]
-        private static extern void SendTrainingAnalytics(string jsonData);
+        private static extern void SendTrainingCompleted(string jsonData);
         
         void Start()
         {
-            // Get settings from WiseTwinManager
-            UpdateSettingsFromManager();
+            // Initialization if needed
         }
         
         
@@ -42,41 +38,24 @@ namespace WiseTwin
                 TrainingAnalytics.Instance.CompleteTraining("completed");
             }
 
-            if (ShouldUseProductionMode())
-            {
-                // Production mode: Send to JavaScript
-                #if UNITY_WEBGL && !UNITY_EDITOR
-                    // Envoyer les analytics ET la notification de completion
-                    Debug.Log("[TrainingCompletionNotifier] WebGL Production Mode - Sending analytics and completion notification");
-                    SendAnalytics();
-                    NotifyFormationCompleted(); // Nécessaire pour déclencher l'événement de completion côté React
-                    Debug.Log("[TrainingCompletionNotifier] Notifications sent successfully");
-                #else
-                    LogDebug("⚠️ Production mode but not in WebGL build - notification not sent");
-                    // En mode éditeur, afficher les analytics dans la console
-                    if (TrainingAnalytics.Instance != null)
-                    {
-                        string analytics = TrainingAnalytics.Instance.ExportAnalytics();
-                        LogDebug($"📊 Analytics data:\n{analytics}");
-                    }
-                #endif
-            }
-            else
-            {
-                // Local mode: Debug log only
-                LogDebug($"🧪 Local Mode: Training '{trainingName ?? GetProjectName()}' completed");
-
-                // Afficher les analytics en mode local
+            // Toujours envoyer les analytics en WebGL, peu importe le mode
+            #if UNITY_WEBGL && !UNITY_EDITOR
+                Debug.Log("[TrainingCompletionNotifier] Sending training completion data");
+                SendAnalytics();
+                Debug.Log("[TrainingCompletionNotifier] Training completion sent successfully");
+            #else
+                // En mode éditeur, afficher les analytics dans la console
+                LogDebug($"📊 Training '{trainingName ?? GetProjectName()}' completed");
                 if (TrainingAnalytics.Instance != null)
                 {
                     string analytics = TrainingAnalytics.Instance.ExportAnalytics();
                     LogDebug($"📊 Analytics data:\n{analytics}");
                 }
-            }
+            #endif
         }
 
         /// <summary>
-        /// Envoie les analytics complètes à l'application web
+        /// Envoie les analytics complètes à l'application web (version simplifiée)
         /// </summary>
         void SendAnalytics()
         {
@@ -89,9 +68,11 @@ namespace WiseTwin
             string analyticsJson = TrainingAnalytics.Instance.ExportAnalytics();
 
             #if UNITY_WEBGL && !UNITY_EDITOR
-                Debug.Log($"[TrainingCompletionNotifier] Sending analytics JSON ({analyticsJson.Length} chars)");
-                SendTrainingAnalytics(analyticsJson);
-                Debug.Log("[TrainingCompletionNotifier] 📊 Training analytics sent to web application");
+                Debug.Log($"[TrainingCompletionNotifier] Sending training completion data ({analyticsJson.Length} chars)");
+
+                // Envoyer tout en un seul appel - React gérera le token
+                SendTrainingCompleted(analyticsJson);
+                Debug.Log("[TrainingCompletionNotifier] 📊 Training completion data sent");
             #else
                 LogDebug($"📊 Analytics would be sent in WebGL build:\n{analyticsJson}");
             #endif
@@ -104,30 +85,6 @@ namespace WiseTwin
         {
             LogDebug("🧪 Testing completion notification");
             FormationCompleted("Test Training");
-        }
-        
-        /// <summary>
-        /// Update settings from WiseTwinManager
-        /// </summary>
-        public void UpdateSettingsFromManager()
-        {
-            // Settings are now managed entirely by WiseTwinManager
-            // This method exists for future extensibility
-        }
-        
-        bool ShouldUseProductionMode()
-        {
-            if (WiseTwinManager.Instance != null)
-            {
-                return WiseTwinManager.Instance.IsProductionMode();
-            }
-            
-            // Fallback: check if we're in WebGL build
-            #if UNITY_WEBGL && !UNITY_EDITOR
-                return true;
-            #else
-                return false;
-            #endif
         }
         
         string GetProjectName()

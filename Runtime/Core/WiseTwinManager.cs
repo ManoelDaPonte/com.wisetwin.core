@@ -364,11 +364,9 @@ namespace WiseTwin
         /// </summary>
         void UpdateComponentSettings()
         {
-            if (completionNotifier != null)
-            {
-                completionNotifier.UpdateSettingsFromManager();
-            }
-            
+            // Les composants gèrent maintenant leurs propres settings
+            // Cette méthode est conservée pour compatibilité future
+
             if (metadataLoader != null)
             {
                 metadataLoader.UpdateSettingsFromManager();

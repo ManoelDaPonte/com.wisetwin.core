@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 using System;
-using System.Collections;
 
 namespace WiseTwin.UI
 {
@@ -10,9 +9,6 @@ namespace WiseTwin.UI
     /// </summary>
     public class TrainingCompletionUI : MonoBehaviour
     {
-        [Header("Visual Settings")]
-        [SerializeField] private float displayDuration = 5f; // Durée avant fermeture automatique
-
         private UIDocument uiDocument;
         private VisualElement rootElement;
         private VisualElement modalContainer;
@@ -50,24 +46,26 @@ namespace WiseTwin.UI
             // Assigner le PanelSettings si nécessaire
             if (uiDocument.panelSettings == null)
             {
-                // Essayer de récupérer le PanelSettings depuis un autre UIDocument existant
-                var existingUIDoc = FindFirstObjectByType<UIDocument>();
-                if (existingUIDoc != null && existingUIDoc != uiDocument && existingUIDoc.panelSettings != null)
+                // Charger le PanelSettings depuis Resources (priorité)
+                var panelSettingsFromResources = UnityEngine.Resources.Load<PanelSettings>("WiseTwinPanelSettings");
+                if (panelSettingsFromResources != null)
                 {
-                    uiDocument.panelSettings = existingUIDoc.panelSettings;
-                    Debug.Log("[TrainingCompletionUI] PanelSettings copied from existing UIDocument");
+                    uiDocument.panelSettings = panelSettingsFromResources;
+                    Debug.Log("[TrainingCompletionUI] PanelSettings loaded from Resources");
                 }
                 else
                 {
-                    // Créer un PanelSettings par défaut avec un Theme
-                    var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-
-                    // Créer un ThemeStyleSheet par défaut pour éviter l'erreur de rendu
-                    var defaultTheme = ScriptableObject.CreateInstance<ThemeStyleSheet>();
-                    panelSettings.themeStyleSheet = defaultTheme;
-
-                    uiDocument.panelSettings = panelSettings;
-                    Debug.LogWarning("[TrainingCompletionUI] Created default PanelSettings with theme - UI should display now");
+                    // Essayer de récupérer depuis un autre UIDocument existant
+                    var existingUIDoc = FindFirstObjectByType<UIDocument>();
+                    if (existingUIDoc != null && existingUIDoc != uiDocument && existingUIDoc.panelSettings != null)
+                    {
+                        uiDocument.panelSettings = existingUIDoc.panelSettings;
+                        Debug.Log("[TrainingCompletionUI] PanelSettings copied from existing UIDocument");
+                    }
+                    else
+                    {
+                        Debug.LogError("[TrainingCompletionUI] No PanelSettings found! Please create WiseTwinPanelSettings.asset in Resources folder. Check Packages/com.wisetwin.core/Runtime/Resources/README.md for instructions.");
+                    }
                 }
             }
 
@@ -95,10 +93,7 @@ namespace WiseTwin.UI
             // Notifier que la formation est terminée
             NotifyTrainingCompletion();
 
-            // Auto-close après un délai
-            StartCoroutine(AutoCloseAfterDelay());
-
-            Debug.Log("[TrainingCompletionUI] Completion screen displayed");
+            Debug.Log("[TrainingCompletionUI] Completion screen displayed - User must quit manually");
         }
 
         void CreateCompletionUI()
@@ -230,47 +225,6 @@ namespace WiseTwin.UI
 
             successBox.Add(scoreContainer);
 
-            // Bouton de fermeture
-            var closeButton = new Button(() => Close());
-            closeButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "Terminer"
-                : "Finish";
-            closeButton.style.width = 200;
-            closeButton.style.height = 50;
-            closeButton.style.fontSize = 18;
-            closeButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.5f, 1f);
-            closeButton.style.color = Color.white;
-            closeButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            closeButton.style.borderTopLeftRadius = 25;
-            closeButton.style.borderTopRightRadius = 25;
-            closeButton.style.borderBottomLeftRadius = 25;
-            closeButton.style.borderBottomRightRadius = 25;
-            closeButton.style.alignSelf = Align.Center;
-
-            // Hover effect
-            closeButton.RegisterCallback<MouseEnterEvent>((evt) => {
-                closeButton.style.backgroundColor = new Color(0.15f, 0.9f, 0.6f, 1f);
-                closeButton.style.scale = new Scale(new Vector3(1.05f, 1.05f, 1f));
-            });
-
-            closeButton.RegisterCallback<MouseLeaveEvent>((evt) => {
-                closeButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.5f, 1f);
-                closeButton.style.scale = new Scale(Vector3.one);
-            });
-
-            successBox.Add(closeButton);
-
-            // Message de redirection
-            var redirectMessage = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "Cette fenêtre se fermera automatiquement..."
-                : "This window will close automatically...");
-            redirectMessage.style.fontSize = 12;
-            redirectMessage.style.color = new Color(0.5f, 0.5f, 0.55f, 0.8f);
-            redirectMessage.style.unityFontStyleAndWeight = FontStyle.Italic;
-            redirectMessage.style.unityTextAlign = TextAnchor.MiddleCenter;
-            redirectMessage.style.marginTop = 20;
-            successBox.Add(redirectMessage);
-
             modalContainer.Add(successBox);
             rootElement.Add(modalContainer);
 
@@ -283,55 +237,31 @@ namespace WiseTwin.UI
 
         void NotifyTrainingCompletion()
         {
-            Debug.Log("[TrainingCompletionUI] Starting training completion notification...");
+            Debug.Log("[TrainingCompletionUI] Sending training completion notification...");
 
             // S'assurer que les analytics sont complètes avant l'envoi
             if (Analytics.TrainingAnalytics.Instance != null)
             {
                 // Marquer la formation comme complétée si ce n'est pas déjà fait
                 Analytics.TrainingAnalytics.Instance.CompleteTraining("completed");
-
-                string analyticsJson = Analytics.TrainingAnalytics.Instance.ExportAnalytics();
-                Debug.Log($"[TrainingCompletionUI] Analytics ready - Size: {analyticsJson.Length} chars");
+                Debug.Log("[TrainingCompletionUI] Training marked as completed in analytics");
             }
 
-            // Utiliser le TrainingCompletionNotifier
+            // Toujours essayer de notifier, peu importe le mode
+            // Le notifier décidera lui-même s'il doit envoyer ou non
             var completionNotifier = FindFirstObjectByType<TrainingCompletionNotifier>();
             if (completionNotifier != null)
             {
                 completionNotifier.FormationCompleted(Application.productName);
-                Debug.Log("[TrainingCompletionUI] Training completion notified via existing notifier");
+                Debug.Log("[TrainingCompletionUI] Completion notification sent");
             }
             else
             {
-                Debug.LogWarning("[TrainingCompletionUI] TrainingCompletionNotifier not found - creating temporary instance");
-                // Si pas trouvé, en créer un temporairement
-                var tempNotifier = new GameObject("TempCompletionNotifier").AddComponent<TrainingCompletionNotifier>();
-                // Attendre un frame avant d'appeler FormationCompleted pour s'assurer que Start() est appelé
-                StartCoroutine(CallFormationCompletedDelayed(tempNotifier));
+                Debug.Log("[TrainingCompletionUI] TrainingCompletionNotifier not found - training completed locally only");
             }
         }
 
-        System.Collections.IEnumerator CallFormationCompletedDelayed(TrainingCompletionNotifier notifier)
-        {
-            yield return null; // Attendre un frame
-            notifier.FormationCompleted(Application.productName);
-            Debug.Log("[TrainingCompletionUI] Training completion notified via temporary notifier");
-            yield return new WaitForSeconds(1f);
-            Destroy(notifier.gameObject);
-        }
 
-        IEnumerator AutoCloseAfterDelay()
-        {
-            yield return new WaitForSeconds(displayDuration);
-            Close();
-        }
-
-        void Close()
-        {
-            rootElement?.Clear();
-            rootElement.pickingMode = PickingMode.Ignore;
-        }
 
         string FormatTime(float seconds)
         {
