@@ -694,8 +694,17 @@ namespace WiseTwin.UI
         {
             var procedureSteps = new List<ProcedureStep>();
 
-            // Chercher les étapes (step_1, step_2, etc.)
-            var stepKeys = data.Keys.Where(k => k.StartsWith("step_")).OrderBy(k => k).ToList();
+            // Chercher les étapes (step_1, step_2, etc.) et les trier numériquement
+            var stepKeys = data.Keys
+                .Where(k => k.StartsWith("step_"))
+                .OrderBy(k =>
+                {
+                    // Extraire le numéro de l'étape pour un tri numérique
+                    if (int.TryParse(k.Replace("step_", ""), out int stepNumber))
+                        return stepNumber;
+                    return 999; // Mettre à la fin si pas de numéro valide
+                })
+                .ToList();
 
             foreach (var stepKey in stepKeys)
             {
