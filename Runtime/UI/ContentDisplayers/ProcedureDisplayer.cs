@@ -18,9 +18,9 @@ namespace WiseTwin.UI
 
         [Header("Visual Settings")]
         [SerializeField] private Color highlightColor = new Color(1f, 0.9f, 0.3f, 1f); // Jaune
-        [SerializeField] private float highlightIntensity = 2f;
+        [SerializeField] private float highlightIntensity = 3.5f; // Augmenté pour plus de visibilité
         [SerializeField] private bool pulseHighlight = true;
-        [SerializeField] private float pulseSpeed = 2f;
+        [SerializeField] private float pulseSpeed = 3f; // Augmenté pour une pulsation plus visible
 
         private string currentObjectId;
         private VisualElement rootElement;
@@ -418,22 +418,14 @@ namespace WiseTwin.UI
             var renderer = obj.GetComponent<Renderer>();
             if (renderer == null) return;
 
-            // Créer un nouveau matériau avec émission
+            // Créer un nouveau matériau avec émission (garde la couleur d'origine)
             Material highlightMaterial = new Material(renderer.material);
 
             // Activer l'émission
             highlightMaterial.EnableKeyword("_EMISSION");
             highlightMaterial.SetColor("_EmissionColor", highlightColor * highlightIntensity);
 
-            // Changer la couleur principale pour un effet jaune
-            if (highlightMaterial.HasProperty("_Color"))
-            {
-                highlightMaterial.SetColor("_Color", highlightColor);
-            }
-            else if (highlightMaterial.HasProperty("_BaseColor"))
-            {
-                highlightMaterial.SetColor("_BaseColor", highlightColor);
-            }
+            // NE PAS changer la couleur de base - garder la couleur originale de l'objet
 
             renderer.material = highlightMaterial;
 
@@ -806,7 +798,8 @@ namespace WiseTwin.UI
 
             time += Time.deltaTime * speed;
             float pulse = (Mathf.Sin(time) + 1f) / 2f; // Valeur entre 0 et 1
-            float currentIntensity = Mathf.Lerp(intensity * 0.5f, intensity, pulse);
+            // Pulse entre 0 (couleur originale) et intensité max (jaune brillant)
+            float currentIntensity = Mathf.Lerp(0f, intensity, pulse);
 
             if (objectRenderer.material.HasProperty("_EmissionColor"))
             {
