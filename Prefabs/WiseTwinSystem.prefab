@@ -217,6 +217,51 @@ MonoBehaviour:
   accentColor: {r: 0.1, g: 0.8, b: 0.6, a: 1}
   backgroundColor: {r: 0.05, g: 0.05, b: 0.05, a: 0.95}
   debugMode: 0
+--- !u!1 &7729856425478814148
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8105644802371884293}
+  - component: {fileID: 6117223306352086062}
+  m_Layer: 0
+  m_Name: UI_Completion
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8105644802371884293
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7729856425478814148}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7123580581372257338}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6117223306352086062
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7729856425478814148}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 480d3addf88fe49cf835b2dfccf25a31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: WiseTwin.Runtime::WiseTwin.UI.TrainingCompletionUI
+  panelSettings: {fileID: 11400000, guid: f66eb1a0ff5884bd9844d7defdc4e88a, type: 2}
 --- !u!1 &8156962989298695419
 GameObject:
   m_ObjectHideFlags: 0
@@ -256,6 +301,7 @@ Transform:
   - {fileID: 5206391385292008709}
   - {fileID: 8781041936539879734}
   - {fileID: 8851228252578287363}
+  - {fileID: 8105644802371884293}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5037827845726321820

@@ -10,6 +10,9 @@ namespace WiseTwin.UI
     /// </summary>
     public class TrainingCompletionUI : MonoBehaviour
     {
+        [Header("UI Settings")]
+        [SerializeField] private PanelSettings panelSettings;
+
         private UIDocument uiDocument;
         private VisualElement rootElement;
         private VisualElement modalContainer;
@@ -47,16 +50,25 @@ namespace WiseTwin.UI
             // Assigner le PanelSettings si nécessaire
             if (uiDocument.panelSettings == null)
             {
-                // Charger le PanelSettings depuis Resources
-                var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
+                // Priorité 1: Utiliser le PanelSettings assigné dans l'inspector
                 if (panelSettings != null)
                 {
                     uiDocument.panelSettings = panelSettings;
-                    Debug.Log("[TrainingCompletionUI] PanelSettings loaded from Resources");
+                    Debug.Log("[TrainingCompletionUI] PanelSettings assigned from Inspector");
                 }
                 else
                 {
-                    Debug.LogError("[TrainingCompletionUI] Could not find WiseTwinPanelSettings in Resources folder!");
+                    // Priorité 2: Charger depuis Resources en fallback
+                    var resourcePanelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
+                    if (resourcePanelSettings != null)
+                    {
+                        uiDocument.panelSettings = resourcePanelSettings;
+                        Debug.Log("[TrainingCompletionUI] PanelSettings loaded from Resources");
+                    }
+                    else
+                    {
+                        Debug.LogError("[TrainingCompletionUI] No PanelSettings assigned and could not find WiseTwinPanelSettings in Resources folder!");
+                    }
                 }
             }
 
