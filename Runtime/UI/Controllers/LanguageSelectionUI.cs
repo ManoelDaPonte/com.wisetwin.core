@@ -617,10 +617,10 @@ namespace WiseTwin
                 {
                     switch(difficulty.ToLower())
                     {
-                        case "beginner": localizedDifficulty = "Débutant"; break;
+                        case "easy": localizedDifficulty = "Facile"; break;
                         case "intermediate": localizedDifficulty = "Intermédiaire"; break;
-                        case "advanced": localizedDifficulty = "Avancé"; break;
-                        case "expert": localizedDifficulty = "Expert"; break;
+                        case "hard": localizedDifficulty = "Avancé"; break;
+                        case "very hard": localizedDifficulty = "Expert"; break;
                     }
                 }
                 string diffText = lang == "fr" ? $"📊 Difficulté : {localizedDifficulty}" : $"📊 Difficulty: {difficulty}";
