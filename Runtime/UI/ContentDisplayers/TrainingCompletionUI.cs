@@ -201,6 +201,15 @@ namespace WiseTwin.UI
             successBox.Add(statsContainer);
 
             // Score ou performance
+            float finalScore = 100f;
+            int totalErrors = 0;
+
+            if (Analytics.TrainingAnalytics.Instance != null)
+            {
+                finalScore = Analytics.TrainingAnalytics.Instance.CalculateScore();
+                totalErrors = Analytics.TrainingAnalytics.Instance.GetTotalErrors();
+            }
+
             var scoreContainer = new VisualElement();
             scoreContainer.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.5f);
             scoreContainer.style.borderTopLeftRadius = 15;
@@ -211,20 +220,65 @@ namespace WiseTwin.UI
             scoreContainer.style.paddingBottom = 20;
             scoreContainer.style.marginBottom = 30;
 
-            var scoreLabel = new Label("100%");
+            var scoreLabel = new Label($"{Mathf.RoundToInt(finalScore)}%");
             scoreLabel.style.fontSize = 48;
-            scoreLabel.style.color = new Color(0.1f, 0.9f, 0.5f, 1f);
+
+            // Couleur du score selon la performance
+            if (finalScore >= 90f)
+                scoreLabel.style.color = new Color(0.1f, 0.9f, 0.5f, 1f); // Vert
+            else if (finalScore >= 70f)
+                scoreLabel.style.color = new Color(0.9f, 0.7f, 0.1f, 1f); // Orange
+            else
+                scoreLabel.style.color = new Color(0.9f, 0.3f, 0.2f, 1f); // Rouge
+
             scoreLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             scoreLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             scoreContainer.Add(scoreLabel);
 
-            var scoreText = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "Score parfait !"
-                : "Perfect score!");
+            string scoreMessage = "";
+            if (finalScore >= 100f)
+            {
+                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Score parfait !"
+                    : "Perfect score!";
+            }
+            else if (finalScore >= 90f)
+            {
+                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Excellent travail !"
+                    : "Excellent work!";
+            }
+            else if (finalScore >= 70f)
+            {
+                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Bon travail !"
+                    : "Good job!";
+            }
+            else
+            {
+                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Peut mieux faire"
+                    : "Room for improvement";
+            }
+
+            var scoreText = new Label(scoreMessage);
             scoreText.style.fontSize = 16;
             scoreText.style.color = new Color(0.8f, 0.8f, 0.85f, 1f);
             scoreText.style.unityTextAlign = TextAnchor.MiddleCenter;
             scoreContainer.Add(scoreText);
+
+            // Afficher le nombre d'erreurs si > 0
+            if (totalErrors > 0)
+            {
+                var errorsLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? $"❌ {totalErrors} erreur(s)"
+                    : $"❌ {totalErrors} error(s)");
+                errorsLabel.style.fontSize = 14;
+                errorsLabel.style.color = new Color(0.7f, 0.5f, 0.5f, 1f);
+                errorsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                errorsLabel.style.marginTop = 10;
+                scoreContainer.Add(errorsLabel);
+            }
 
             successBox.Add(scoreContainer);
 

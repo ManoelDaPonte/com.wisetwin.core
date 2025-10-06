@@ -11,8 +11,7 @@ namespace WiseTwin
     [RequireComponent(typeof(Collider))]
     public class InteractableObject : MonoBehaviour
     {
-
-        [Header("Visual Feedback")]
+        [Header("Visual Fedback")]
         [SerializeField] private bool highlightOnHover = true;
         [SerializeField] private HoverMode hoverMode = HoverMode.MultiplyColor;
         [SerializeField] private Color hoverColor = new Color(1.2f, 1.2f, 1.2f, 1f);
@@ -37,6 +36,7 @@ namespace WiseTwin
         [Header("Procedure Settings (Only for Procedure type)")]
         [SerializeField] private bool useDragDropSequence = false;
         [SerializeField] private bool enableYellowHighlight = true; // Option pour activer/désactiver le clignotement jaune
+        [SerializeField] private bool keepProgressOnOtherClick = false; // Ne pas réinitialiser la progression en mode procédure
         [SerializeField] private List<GameObject> procedureSequence = new List<GameObject>();
 
         [Header("Reset Settings (Only for Procedure type)")]
@@ -305,6 +305,7 @@ namespace WiseTwin
                     if (debugMode) Debug.Log($"[InteractableObject] Displaying drag & drop procedure with {procedureSequence.Count} steps");
                     // Passer l'option de highlight avec les données
                     procedureData["enableHighlight"] = enableYellowHighlight;
+                    procedureData["keepProgressOnOtherClick"] = keepProgressOnOtherClick;
                     // Passer le script de reset si configuré
                     if (useResetScript && resetScript != null)
                     {
@@ -427,6 +428,7 @@ namespace WiseTwin
                             if (contentType == ContentType.Procedure)
                             {
                                 contentData["enableHighlight"] = enableYellowHighlight;
+                                contentData["keepProgressOnOtherClick"] = keepProgressOnOtherClick;
                                 // Passer le script de reset si configuré
                                 if (useResetScript && resetScript != null)
                                 {
@@ -513,6 +515,7 @@ namespace WiseTwin
             {
                 // Ajouter l'option de highlight aux données
                 procedureData["enableHighlight"] = enableYellowHighlight;
+                procedureData["keepProgressOnOtherClick"] = keepProgressOnOtherClick;
                 // Ajouter le script de reset si configuré
                 if (useResetScript && resetScript != null)
                 {

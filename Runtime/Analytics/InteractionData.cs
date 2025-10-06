@@ -112,8 +112,8 @@ namespace WiseTwin.Analytics
                 LogDebug($"First attempt check - Answer: {string.Join(",", attempt)}, Correct: {string.Join(",", correctAnswers)}, Result: {firstAttemptCorrect}");
             }
 
-            // Mettre à jour le score si c'est correct
-            if (CheckIfCorrect(attempt))
+            // Mettre à jour le score seulement si correct du premier coup
+            if (CheckIfCorrect(attempt) && userAnswers.Count == 1)
             {
                 finalScore = 100f;
             }

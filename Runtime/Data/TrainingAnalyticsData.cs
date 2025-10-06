@@ -63,6 +63,7 @@ namespace WiseTwin.Data
         public int totalAttempts;
         public int totalFailedAttempts;
         public float successRate; // Pourcentage
+        public float score; // Score final basé sur les performances (0-100%)
     }
 
     /// <summary>
@@ -194,6 +195,9 @@ interface InteractionRecord {
     instruction?: string;
     hintsUsed?: number;
     wrongClicks?: number;
+    totalWrongClicks?: number;
+    perfectCompletion?: boolean;
+    finalScore?: number;
 
     // For text
     textContent?: string;
@@ -211,6 +215,7 @@ interface AnalyticsSummary {
   totalAttempts: number;
   totalFailedAttempts: number;
   successRate: number; // percentage
+  score: number; // final score based on performance (0-100%)
 }
 ";
     }

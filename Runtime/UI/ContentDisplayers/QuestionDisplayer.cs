@@ -815,14 +815,16 @@ namespace WiseTwin.UI
                 // Terminer le tracking de cette question avec succès
                 if (currentQuestionData != null)
                 {
-                    currentQuestionData.finalScore = 100f;
+                    // Score = 100 seulement si correct du premier coup, sinon 0
+                    currentQuestionData.finalScore = currentQuestionData.firstAttemptCorrect ? 100f : 0f;
                     // Mettre à jour les données avant de terminer
                     if (TrainingAnalytics.Instance != null)
                     {
-                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", 100f);
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", currentQuestionData.finalScore);
                         TrainingAnalytics.Instance.AddDataToCurrentInteraction("userAnswers", currentQuestionData.userAnswers);
                         TrainingAnalytics.Instance.AddDataToCurrentInteraction("firstAttemptCorrect", currentQuestionData.firstAttemptCorrect);
-                        TrainingAnalytics.Instance.EndCurrentInteraction(true);
+                        // Success = true seulement si correct du premier coup
+                        TrainingAnalytics.Instance.EndCurrentInteraction(currentQuestionData.firstAttemptCorrect);
                     }
                 }
                 feedbackContainer.style.backgroundColor = new Color(0.1f, 0.6f, 0.3f, 0.3f);

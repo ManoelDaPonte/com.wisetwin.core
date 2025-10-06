@@ -533,6 +533,9 @@ namespace WiseTwin.UI
                     {
                         TrainingAnalytics.Instance.AddDataToCurrentInteraction(kvp.Key, kvp.Value);
                     }
+
+                    // Les textes donnent toujours 100 points (pas d'échec possible)
+                    TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", 100f);
                 }
 
                 // Le texte est considéré comme "réussi" s'il a été affiché

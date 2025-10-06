@@ -37,6 +37,7 @@ namespace WiseTwin.UI
         private Dictionary<GameObject, Material> originalMaterials;
         private GameObject currentHighlightedObject;
         private bool shouldHighlight = true; // Contrôle si on doit surligner ou non
+        private bool keepProgressOnOtherClick = false; // Ne pas réinitialiser à 0 si on clique ailleurs
         private IProcedureReset resetScript; // Script de reset personnalisé
 
         // UI Elements
@@ -44,6 +45,7 @@ namespace WiseTwin.UI
         private Label descriptionLabel;
         private Label stepLabel;
         private Label progressLabel;
+        private Label errorFeedbackLabel;
         private VisualElement progressBar;
         private VisualElement progressFill;
         private bool isMonitoringClicks = false;
@@ -53,6 +55,7 @@ namespace WiseTwin.UI
         private float stepStartTime;
         private int wrongClicksCount = 0;
         private int hintsUsedCount = 0;
+        private int totalWrongClicksInProcedure = 0; // Compteur global d'erreurs pour toute la procédure
 
         public class ProcedureStep
         {
@@ -69,6 +72,7 @@ namespace WiseTwin.UI
             currentObjectId = objectId;
             rootElement = root;
             currentStepIndex = 0;
+            totalWrongClicksInProcedure = 0; // Réinitialiser le compteur d'erreurs
 
             // Vérifier si on doit activer le highlight
             if (contentData.ContainsKey("enableHighlight"))
@@ -79,6 +83,17 @@ namespace WiseTwin.UI
             else
             {
                 shouldHighlight = true; // Par défaut, on active le highlight
+            }
+
+            // Vérifier si on doit garder la progression lors d'un clic ailleurs
+            if (contentData.ContainsKey("keepProgressOnOtherClick"))
+            {
+                keepProgressOnOtherClick = contentData["keepProgressOnOtherClick"] is bool keepProgress ? keepProgress : false;
+                Debug.Log($"[ProcedureDisplayer] Keep progress on other click: {keepProgressOnOtherClick}");
+            }
+            else
+            {
+                keepProgressOnOtherClick = false; // Par défaut, on reset
             }
 
             // Récupérer le script de reset si fourni
@@ -281,6 +296,24 @@ namespace WiseTwin.UI
             stepLabel.style.whiteSpace = WhiteSpace.Normal;
             mainSection.Add(stepLabel);
 
+            // Label de feedback d'erreur (caché par défaut)
+            errorFeedbackLabel = new Label();
+            errorFeedbackLabel.style.fontSize = 16;
+            errorFeedbackLabel.style.color = new Color(1f, 0.3f, 0.3f, 1f);
+            errorFeedbackLabel.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.2f);
+            errorFeedbackLabel.style.paddingTop = 10;
+            errorFeedbackLabel.style.paddingBottom = 10;
+            errorFeedbackLabel.style.paddingLeft = 15;
+            errorFeedbackLabel.style.paddingRight = 15;
+            errorFeedbackLabel.style.marginTop = 15;
+            errorFeedbackLabel.style.borderTopLeftRadius = 8;
+            errorFeedbackLabel.style.borderTopRightRadius = 8;
+            errorFeedbackLabel.style.borderBottomLeftRadius = 8;
+            errorFeedbackLabel.style.borderBottomRightRadius = 8;
+            errorFeedbackLabel.style.whiteSpace = WhiteSpace.Normal;
+            errorFeedbackLabel.style.display = DisplayStyle.None; // Caché par défaut
+            mainSection.Add(errorFeedbackLabel);
+
             instructionPanel.Add(mainSection);
 
             // Section des boutons en bas
@@ -331,6 +364,12 @@ namespace WiseTwin.UI
             stepStartTime = Time.time;
             wrongClicksCount = 0;
             hintsUsedCount = 0;
+
+            // Cacher le feedback d'erreur de l'étape précédente
+            if (errorFeedbackLabel != null)
+            {
+                errorFeedbackLabel.style.display = DisplayStyle.None;
+            }
 
             // Initialiser le tracking analytics pour cette étape
             if (TrainingAnalytics.Instance != null)
@@ -467,6 +506,33 @@ namespace WiseTwin.UI
             }
         }
 
+        void ShowErrorFeedback()
+        {
+            if (errorFeedbackLabel == null || currentStepIndex >= steps.Count) return;
+
+            var currentStep = steps[currentStepIndex];
+            string expectedObjectName = currentStep.targetObject != null ? currentStep.targetObject.name : "l'objet suivant";
+
+            string message = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                ? $"❌ Mauvais objet ! Cliquez sur : {expectedObjectName}"
+                : $"❌ Wrong object! Click on: {expectedObjectName}";
+
+            errorFeedbackLabel.text = message;
+            errorFeedbackLabel.style.display = DisplayStyle.Flex;
+
+            // Cacher le message après 3 secondes
+            StartCoroutine(HideErrorFeedbackAfterDelay(3f));
+        }
+
+        System.Collections.IEnumerator HideErrorFeedbackAfterDelay(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            if (errorFeedbackLabel != null)
+            {
+                errorFeedbackLabel.style.display = DisplayStyle.None;
+            }
+        }
+
         public void ValidateCurrentStep()
         {
             if (currentStepIndex >= steps.Count) return;
@@ -475,12 +541,18 @@ namespace WiseTwin.UI
             currentStep.completed = true;
             isMonitoringClicks = false;
 
-            // Terminer le tracking de cette étape avec succès
+            // Terminer le tracking de cette étape
             if (TrainingAnalytics.Instance != null && currentStepData != null)
             {
                 currentStepData.wrongClicks = wrongClicksCount;
                 currentStepData.hintsUsed = hintsUsedCount;
-                TrainingAnalytics.Instance.EndCurrentInteraction(true);
+
+                // Success = true seulement si aucune erreur sur cette étape
+                bool stepSuccess = wrongClicksCount == 0;
+                float stepScore = stepSuccess ? 100f : 0f;
+
+                TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", stepScore);
+                TrainingAnalytics.Instance.EndCurrentInteraction(stepSuccess);
             }
 
             // Attendre un peu avant de passer à l'étape suivante
@@ -501,10 +573,14 @@ namespace WiseTwin.UI
 
             // Incrémenter le compteur de clics incorrects
             wrongClicksCount++;
+            totalWrongClicksInProcedure++;
             if (currentStepData != null)
             {
                 currentStepData.wrongClicks = wrongClicksCount;
             }
+
+            // Afficher le feedback d'erreur
+            ShowErrorFeedback();
 
             // Appeler le script de reset si configuré
             if (resetScript != null && sequenceObjects.Count > 0)
@@ -589,7 +665,25 @@ namespace WiseTwin.UI
                     // Vérifier que ce n'est pas l'objet actuellement surligné
                     if (clickedObject != currentHighlightedObject)
                     {
-                        ResetProcedure();
+                        if (keepProgressOnOtherClick)
+                        {
+                            // Juste incrémenter le compteur d'erreurs sans reset
+                            wrongClicksCount++;
+                            totalWrongClicksInProcedure++;
+                            if (currentStepData != null)
+                            {
+                                currentStepData.wrongClicks = wrongClicksCount;
+                            }
+                            Debug.Log($"[ProcedureDisplayer] Wrong click detected (progress kept) - Step wrong clicks: {wrongClicksCount}, Total: {totalWrongClicksInProcedure}");
+
+                            // Afficher le feedback d'erreur
+                            ShowErrorFeedback();
+                        }
+                        else
+                        {
+                            // Comportement normal : reset complet
+                            ResetProcedure();
+                        }
                     }
                 }
             }
@@ -615,11 +709,9 @@ namespace WiseTwin.UI
                 }
             }
 
-            // Terminer le tracking si une interaction est en cours
-            if (TrainingAnalytics.Instance != null && TrainingAnalytics.Instance.GetCurrentInteraction() != null)
-            {
-                TrainingAnalytics.Instance.EndCurrentInteraction(true);
-            }
+            // Les étapes individuelles gèrent déjà leur propre tracking
+            // Pas besoin de terminer une interaction ici car la dernière étape l'a déjà fait
+            Debug.Log($"[ProcedureDisplayer] Procedure completed - Total wrong clicks: {totalWrongClicksInProcedure}");
 
             // Envoyer l'événement de complétion AVANT de fermer pour que ContentDisplayManager puisse le gérer
             OnCompleted?.Invoke(currentObjectId, true);

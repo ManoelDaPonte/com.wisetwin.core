@@ -261,7 +261,8 @@ namespace WiseTwin.Analytics
                     ["averageTimePerInteraction"] = GetAverageInteractionTime(),
                     ["totalAttempts"] = totalAttempts,
                     ["totalFailedAttempts"] = totalFailedAttempts,
-                    ["successRate"] = GetSuccessRate()
+                    ["successRate"] = GetSuccessRate(),
+                    ["score"] = CalculateScore()
                 }
             };
 
@@ -290,7 +291,8 @@ namespace WiseTwin.Analytics
                     ["averageTimePerInteraction"] = GetAverageInteractionTime(),
                     ["totalAttempts"] = totalAttempts,
                     ["totalFailedAttempts"] = totalFailedAttempts,
-                    ["successRate"] = GetSuccessRate()
+                    ["successRate"] = GetSuccessRate(),
+                    ["score"] = CalculateScore()
                 }
             };
         }
@@ -319,6 +321,59 @@ namespace WiseTwin.Analytics
         {
             if (totalInteractions == 0) return 0;
             return (float)successfulInteractions / totalInteractions * 100f;
+        }
+
+        /// <summary>
+        /// Calcule un score basé sur le nombre d'interactions réussies du premier coup
+        /// Chaque interaction vaut 1 point si réussie du premier coup, 0 sinon
+        /// Score = (nombre de points / nombre total d'interactions) × 100
+        /// </summary>
+        public float CalculateScore()
+        {
+            if (interactions.Count == 0) return 100f;
+
+            int totalPoints = 0;
+
+            foreach (var interaction in interactions)
+            {
+                // Par défaut, une interaction vaut 1 point (succès)
+                int points = 1;
+
+                // Vérifier si l'interaction a un finalScore dans ses données
+                if (interaction.data != null && interaction.data.ContainsKey("finalScore"))
+                {
+                    float finalScore = 0f;
+
+                    if (interaction.data["finalScore"] is float score)
+                    {
+                        finalScore = score;
+                    }
+                    else if (interaction.data["finalScore"] is double scoreDouble)
+                    {
+                        finalScore = (float)scoreDouble;
+                    }
+                    else if (interaction.data["finalScore"] is int scoreInt)
+                    {
+                        finalScore = scoreInt;
+                    }
+
+                    // Si finalScore = 100 → 1 point, sinon → 0 point
+                    points = finalScore >= 100f ? 1 : 0;
+                }
+
+                totalPoints += points;
+            }
+
+            // Score = (points obtenus / interactions totales) × 100
+            return (float)totalPoints / interactions.Count * 100f;
+        }
+
+        /// <summary>
+        /// Obtient le nombre total d'erreurs (tentatives échouées)
+        /// </summary>
+        public int GetTotalErrors()
+        {
+            return totalFailedAttempts;
         }
 
         /// <summary>

@@ -14,6 +14,7 @@ namespace WiseTwin.EditorExtensions
         SerializedProperty contentType;
         SerializedProperty useDragDropSequence;
         SerializedProperty enableYellowHighlight;
+        SerializedProperty keepProgressOnOtherClick;
         SerializedProperty procedureSequence;
         SerializedProperty specificContentKey;
         SerializedProperty debugMode;
@@ -32,10 +33,15 @@ namespace WiseTwin.EditorExtensions
 
         void OnEnable()
         {
+            // Protection contre les objets null (peut arriver lors de la suppression)
+            if (target == null || serializedObject == null)
+                return;
+
             // Content properties
             contentType = serializedObject.FindProperty("contentType");
             useDragDropSequence = serializedObject.FindProperty("useDragDropSequence");
             enableYellowHighlight = serializedObject.FindProperty("enableYellowHighlight");
+            keepProgressOnOtherClick = serializedObject.FindProperty("keepProgressOnOtherClick");
             procedureSequence = serializedObject.FindProperty("procedureSequence");
             specificContentKey = serializedObject.FindProperty("specificContentKey");
             debugMode = serializedObject.FindProperty("debugMode");
@@ -133,6 +139,11 @@ namespace WiseTwin.EditorExtensions
             EditorGUILayout.PropertyField(enableYellowHighlight,
                 new GUIContent("Enable Yellow Highlight",
                 "Enable to highlight procedure objects in yellow. When disabled, objects won't be highlighted."));
+
+            // Toggle pour garder la progression
+            EditorGUILayout.PropertyField(keepProgressOnOtherClick,
+                new GUIContent("Keep Progress On Other Click",
+                "When enabled, clicking on other objects won't reset the procedure progress to step 0."));
 
             // Toggle pour utiliser le drag & drop
             EditorGUILayout.PropertyField(useDragDropSequence,
