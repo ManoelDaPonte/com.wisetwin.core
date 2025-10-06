@@ -26,15 +26,17 @@ public class WiseTwinEditor : EditorWindow
     
     // Metadata fields (integrated from MetadataManager)
     [Header("Project Settings")]
-    public string projectTitle = "Training Test";
-    public string projectDescription = "Training description";
+    public string projectTitleEN = "Training Test";
+    public string projectTitleFR = "Formation Test";
+    public string projectDescriptionEN = "Training description";
+    public string projectDescriptionFR = "Description de la formation";
     public string projectVersion = "1.0.0";
     public int durationMinutes = 30;
     public int difficultyIndex = 1;
     public string imageUrl = "";
-    
-    // Constantes pour les options de difficulté
-    private readonly string[] difficultyOptions = { "Easy", "Intermediate", "Hard", "Very Hard" };
+
+    // Constantes pour les options de difficulté (en français)
+    private readonly string[] difficultyOptions = { "Facile", "Intermédiaire", "Avancé", "Expert" };
     
     [Header("Advanced Settings")]
     public List<string> tags = new List<string> { "training", "interactive" };
@@ -214,10 +216,18 @@ public class WiseTwinEditor : EditorWindow
         try
         {
             var metadata = JsonConvert.DeserializeObject<FormationMetadataComplete>(jsonContent);
-            
-            // Load basic data
-            if (!string.IsNullOrEmpty(metadata.title)) projectTitle = metadata.title;
-            if (!string.IsNullOrEmpty(metadata.description)) projectDescription = metadata.description;
+
+            // Load basic data - gérer les objets multilingues
+            if (metadata.title != null)
+            {
+                projectTitleEN = metadata.title.en ?? "Training Test";
+                projectTitleFR = metadata.title.fr ?? "Formation Test";
+            }
+            if (metadata.description != null)
+            {
+                projectDescriptionEN = metadata.description.en ?? "Training description";
+                projectDescriptionFR = metadata.description.fr ?? "Description de la formation";
+            }
             if (!string.IsNullOrEmpty(metadata.version)) projectVersion = metadata.version;
             if (!string.IsNullOrEmpty(metadata.imageUrl)) imageUrl = metadata.imageUrl;
             
@@ -523,11 +533,20 @@ public class WiseTwinEditor : EditorWindow
         EditorGUILayout.TextField("Scene Name", sceneId);
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.HelpBox($"Metadata will be saved as: {sceneId}-metadata.json", MessageType.Info);
-        
-        projectTitle = EditorGUILayout.TextField("Title", projectTitle);
-        
-        EditorGUILayout.LabelField("Description");
-        projectDescription = EditorGUILayout.TextArea(projectDescription, GUILayout.Height(60));
+
+        // Titre multilingue
+        EditorGUILayout.Space(5);
+        EditorGUILayout.LabelField("📝 Title (Multilingual)", EditorStyles.boldLabel);
+        projectTitleEN = EditorGUILayout.TextField("🇬🇧 English", projectTitleEN);
+        projectTitleFR = EditorGUILayout.TextField("🇫🇷 Français", projectTitleFR);
+
+        // Description multilingue
+        EditorGUILayout.Space(5);
+        EditorGUILayout.LabelField("📄 Description (Multilingual)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("🇬🇧 English", EditorStyles.miniLabel);
+        projectDescriptionEN = EditorGUILayout.TextArea(projectDescriptionEN, GUILayout.Height(60));
+        EditorGUILayout.LabelField("🇫🇷 Français", EditorStyles.miniLabel);
+        projectDescriptionFR = EditorGUILayout.TextArea(projectDescriptionFR, GUILayout.Height(60));
         
         projectVersion = EditorGUILayout.TextField("Version", projectVersion);
         
@@ -735,11 +754,11 @@ public class WiseTwinEditor : EditorWindow
         var metadata = new FormationMetadataComplete
         {
             id = sceneId,
-            title = projectTitle,
-            description = projectDescription,
+            title = new LocalizedString(projectTitleEN, projectTitleFR),
+            description = new LocalizedString(projectDescriptionEN, projectDescriptionFR),
             version = projectVersion,
             duration = $"{durationMinutes} minutes", // Auto formatting
-            difficulty = difficultyOptions[difficultyIndex], // Get from dropdown
+            difficulty = difficultyOptions[difficultyIndex], // Get from dropdown (déjà en français)
             tags = new List<string>(tags),
             imageUrl = imageUrl,
             modules = new List<object>(),

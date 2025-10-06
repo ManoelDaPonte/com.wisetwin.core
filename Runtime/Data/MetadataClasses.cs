@@ -1,12 +1,43 @@
 using System.Collections.Generic;
+using Newtonsoft.Json;
+
+// Classe pour les textes multilingues
+[System.Serializable]
+public class LocalizedString
+{
+    public string en;
+    public string fr;
+
+    // Constructeur par défaut
+    public LocalizedString() { }
+
+    // Constructeur avec valeurs
+    public LocalizedString(string english, string french)
+    {
+        en = english;
+        fr = french;
+    }
+
+    // Méthode helper pour obtenir le texte dans une langue
+    public string Get(string language)
+    {
+        return language == "fr" ? fr : en;
+    }
+
+    // Conversion implicite depuis string (pour compatibilité)
+    public static implicit operator LocalizedString(string value)
+    {
+        return new LocalizedString(value, value);
+    }
+}
 
 // Classes partagées entre Editor et Runtime
 [System.Serializable]
 public class FormationMetadataComplete
 {
     public string id;
-    public string title;
-    public string description;
+    public LocalizedString title;
+    public LocalizedString description;
     public string version;
     public string duration;
     public string difficulty;

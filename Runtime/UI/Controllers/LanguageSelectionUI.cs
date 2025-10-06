@@ -103,6 +103,9 @@ namespace WiseTwin
 
         IEnumerator LoadMetadataWhenReady()
         {
+            // Désactiver les boutons de langue pendant le chargement
+            SetLanguageButtonsEnabled(false);
+
             // Attendre que WiseTwinManager soit prêt
             while (wiseTwinManager == null || !wiseTwinManager.IsMetadataLoaded)
             {
@@ -111,6 +114,15 @@ namespace WiseTwin
                 {
                     wiseTwinManager = WiseTwinManager.Instance;
                 }
+
+                // Vérifier si le chargement est en cours
+                if (wiseTwinManager != null && wiseTwinManager.MetadataLoader != null)
+                {
+                    if (wiseTwinManager.MetadataLoader.IsLoading)
+                    {
+                        if (debugMode) Debug.Log("[LanguageSelectionUI] Metadata loading...");
+                    }
+                }
             }
 
             // Récupérer les métadonnées
@@ -118,6 +130,26 @@ namespace WiseTwin
             if (debugMode && trainingMetadata != null)
             {
                 Debug.Log($"[LanguageSelectionUI] Metadata loaded with {trainingMetadata.Count} entries");
+            }
+
+            // Réactiver les boutons de langue
+            SetLanguageButtonsEnabled(true);
+        }
+
+        void SetLanguageButtonsEnabled(bool enabled)
+        {
+            if (languageSelectionPanel == null) return;
+
+            var englishButton = languageSelectionPanel.Q<Button>("lang-button-en");
+            var frenchButton = languageSelectionPanel.Q<Button>("lang-button-fr");
+
+            if (englishButton != null)
+            {
+                englishButton.SetEnabled(enabled);
+            }
+            if (frenchButton != null)
+            {
+                frenchButton.SetEnabled(enabled);
             }
         }
 
@@ -290,6 +322,7 @@ namespace WiseTwin
         Button CreateLanguageButton(string label, string flag, string langCode)
         {
             var button = new Button(() => OnLanguageButtonClicked(langCode));
+            button.name = $"lang-button-{langCode}"; // Ajouter un nom pour pouvoir le récupérer
             button.style.width = 250;
             button.style.height = 150;
             // Fond avec gradient simulé (plus sombre en bas)
@@ -570,17 +603,20 @@ namespace WiseTwin
         {
             string lang = selectedLanguage;
 
-            // Si pas de métadonnées, utiliser des valeurs par défaut
-            string title = "Formation Test";
-            string description = "Formation interactive de test";
+            // Valeurs par défaut
+            string title = lang == "fr" ? "Formation Test" : "Training Test";
+            string description = lang == "fr" ? "Formation interactive de test" : "Interactive test training";
             string duration = "30 minutes";
-            string difficulty = "Débutant";
+            string difficulty = lang == "fr" ? "Débutant" : "Beginner";
 
             // Essayer de charger depuis les métadonnées si disponibles
             if (trainingMetadata != null)
             {
-                title = GetMetadataValue<string>(trainingMetadata, "title", title);
-                description = GetMetadataValue<string>(trainingMetadata, "description", description);
+                // Extraire titre multilingue
+                title = GetLocalizedMetadataValue(trainingMetadata, "title", lang, title);
+                // Extraire description multilingue
+                description = GetLocalizedMetadataValue(trainingMetadata, "description", lang, description);
+                // Durée et difficulté ne sont pas multilingues
                 duration = GetMetadataValue<string>(trainingMetadata, "duration", duration);
                 difficulty = GetMetadataValue<string>(trainingMetadata, "difficulty", difficulty);
             }
@@ -607,23 +643,12 @@ namespace WiseTwin
                 durationLabel.text = durationText;
             }
 
-            // Difficulté
+            // Difficulté (traduire si nécessaire)
             var difficultyLabel = disclaimerPanel.Q<Label>("training-difficulty");
             if (difficultyLabel != null)
             {
-                // Traduire la difficulté si nécessaire
-                string localizedDifficulty = difficulty;
-                if (lang == "fr")
-                {
-                    switch(difficulty.ToLower())
-                    {
-                        case "easy": localizedDifficulty = "Facile"; break;
-                        case "intermediate": localizedDifficulty = "Intermédiaire"; break;
-                        case "hard": localizedDifficulty = "Avancé"; break;
-                        case "very hard": localizedDifficulty = "Expert"; break;
-                    }
-                }
-                string diffText = lang == "fr" ? $"📊 Difficulté : {localizedDifficulty}" : $"📊 Difficulty: {difficulty}";
+                string displayDifficulty = TranslateDifficulty(difficulty, lang);
+                string diffText = lang == "fr" ? $"📊 Difficulté : {displayDifficulty}" : $"📊 Difficulty: {displayDifficulty}";
                 difficultyLabel.text = diffText;
             }
 
@@ -693,6 +718,72 @@ namespace WiseTwin
                 }
             }
             return defaultValue;
+        }
+
+        string GetLocalizedMetadataValue(Dictionary<string, object> data, string key, string language, string defaultValue)
+        {
+            if (data == null || !data.ContainsKey(key))
+                return defaultValue;
+
+            var value = data[key];
+
+            // Si c'est déjà une string simple (ancien format), la retourner
+            if (value is string simpleString)
+                return simpleString;
+
+            // Si c'est un objet avec des langues {en: "...", fr: "..."}
+            if (value is Dictionary<string, object> localizedDict)
+            {
+                // Essayer de récupérer la langue demandée
+                if (localizedDict.ContainsKey(language) && localizedDict[language] != null)
+                    return localizedDict[language].ToString();
+
+                // Fallback sur l'anglais
+                if (localizedDict.ContainsKey("en") && localizedDict["en"] != null)
+                    return localizedDict["en"].ToString();
+            }
+            // Newtonsoft peut retourner un JObject
+            else if (value != null && value.GetType().FullName.Contains("JObject"))
+            {
+                try
+                {
+                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(value);
+                    var localizedObj = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+                    if (localizedObj != null)
+                    {
+                        if (localizedObj.ContainsKey(language))
+                            return localizedObj[language];
+                        if (localizedObj.ContainsKey("en"))
+                            return localizedObj["en"];
+                    }
+                }
+                catch { }
+            }
+
+            return defaultValue;
+        }
+
+        string TranslateDifficulty(string difficulty, string language)
+        {
+            // Si la langue est le français, retourner tel quel
+            if (language == "fr")
+                return difficulty;
+
+            // Traduire du français vers l'anglais
+            switch (difficulty.ToLower())
+            {
+                case "facile":
+                    return "Easy";
+                case "intermédiaire":
+                    return "Intermediate";
+                case "avancé":
+                    return "Advanced";
+                case "expert":
+                    return "Expert";
+                default:
+                    // Si c'est déjà en anglais ou inconnu, retourner tel quel
+                    return difficulty;
+            }
         }
 
         void OnBackToLanguageSelection()
