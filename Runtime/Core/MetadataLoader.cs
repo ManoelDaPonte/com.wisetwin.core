@@ -37,18 +37,21 @@ public class MetadataLoader : MonoBehaviour
     private string sceneName;
     
     // Events simples
+    public System.Action OnLoadStarted;
     public System.Action<Dictionary<string, object>> OnMetadataLoaded;
     public System.Action<string> OnLoadError;
-    
+
     // Données chargées
     private Dictionary<string, object> loadedMetadata;
     private Dictionary<string, object> unityData;
+    private bool isLoading = false;
     
     // Singleton
     public static MetadataLoader Instance { get; private set; }
-    
+
     // Propriétés publiques
     public bool IsLoaded => loadedMetadata != null;
+    public bool IsLoading => isLoading;
     public string SceneName => sceneName;
     public Dictionary<string, object> GetMetadata() => loadedMetadata;
     public Dictionary<string, object> GetUnityData() => unityData;
@@ -109,7 +112,10 @@ public class MetadataLoader : MonoBehaviour
     {
         bool useLocalMode = GetUseLocalMode();
         DebugLog($"🔄 Starting metadata load - Mode: {(useLocalMode ? "Local" : "Production")}");
-        
+
+        isLoading = true;
+        OnLoadStarted?.Invoke();
+
         if (useLocalMode)
         {
             StartCoroutine(LoadLocalMetadata());
@@ -154,6 +160,7 @@ public class MetadataLoader : MonoBehaviour
             {
                 string error = $"❌ Erreur lecture fichier local: {e.Message}";
                 DebugLog(error);
+                isLoading = false;
                 OnLoadError?.Invoke(error);
             }
         }
@@ -161,9 +168,11 @@ public class MetadataLoader : MonoBehaviour
         {
             string error = $"❌ Aucun fichier trouvé pour '{sceneName}'";
             DebugLog(error);
+            isLoading = false;
             OnLoadError?.Invoke(error);
         }
-        
+
+        isLoading = false;
         yield return null;
     }
     
@@ -209,6 +218,7 @@ public class MetadataLoader : MonoBehaviour
                         // Les données d'Azure Storage sont directement le JSON
                         ProcessJSON(request.downloadHandler.text);
                         DebugLog("✅ Métadonnées Azure Storage chargées avec succès");
+                        isLoading = false;
                         yield break;
                     }
                     catch (System.Exception e)
@@ -235,6 +245,7 @@ public class MetadataLoader : MonoBehaviour
                             {
                                 ProcessJSON(altRequest.downloadHandler.text);
                                 DebugLog("✅ Métadonnées trouvées avec URL alternative");
+                                isLoading = false;
                                 yield break;
                             }
                         }
@@ -251,6 +262,7 @@ public class MetadataLoader : MonoBehaviour
 
         string error = "❌ Impossible de charger depuis Azure Storage";
         DebugLog(error);
+        isLoading = false;
         OnLoadError?.Invoke(error);
     }
 
@@ -288,6 +300,7 @@ public class MetadataLoader : MonoBehaviour
                                 string metadataJson = JsonConvert.SerializeObject(apiResponse["data"]);
                                 ProcessJSON(metadataJson);
                                 DebugLog("✅ Métadonnées Azure chargées avec succès");
+                                isLoading = false;
                                 yield break; // Succès, on sort
                             }
                         }
@@ -300,6 +313,7 @@ public class MetadataLoader : MonoBehaviour
                             // Peut-être que la réponse est directement les métadonnées
                             ProcessJSON(request.downloadHandler.text);
                             DebugLog("✅ Métadonnées Azure chargées avec succès (format direct)");
+                            isLoading = false;
                             yield break;
                         }
                     }
@@ -326,6 +340,7 @@ public class MetadataLoader : MonoBehaviour
         // Toutes les tentatives ont échoué
         string finalError = "❌ Impossible de charger depuis Azure après toutes les tentatives";
         DebugLog(finalError);
+        isLoading = false;
         OnLoadError?.Invoke(finalError);
     }
     
@@ -439,6 +454,7 @@ public class MetadataLoader : MonoBehaviour
         DebugLog("🔄 Rechargement des métadonnées...");
         loadedMetadata = null;
         unityData = null;
+        isLoading = false;
         LoadMetadata();
     }
     
