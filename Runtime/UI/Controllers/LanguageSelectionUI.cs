@@ -267,20 +267,20 @@ namespace WiseTwin
             // IMPORTANT : Bloquer les raycasts pour ne pas cliquer à travers
             languageSelectionPanel.pickingMode = PickingMode.Position;
 
-            // Container pour le contenu avec style carte moderne - plus compact sans titre
+            // Container pour le contenu avec style épuré
             var contentContainer = new VisualElement();
-            contentContainer.style.width = 700;
+            contentContainer.style.width = 500;
             contentContainer.style.maxWidth = Length.Percent(90);
-            contentContainer.style.paddingTop = 50;
-            contentContainer.style.paddingBottom = 50;
-            contentContainer.style.paddingLeft = 50;
-            contentContainer.style.paddingRight = 50;
+            contentContainer.style.paddingTop = 40;
+            contentContainer.style.paddingBottom = 40;
+            contentContainer.style.paddingLeft = 40;
+            contentContainer.style.paddingRight = 40;
             // Fond gris foncé avec légère transparence
             contentContainer.style.backgroundColor = new Color(0.12f, 0.12f, 0.15f, 0.98f);
-            contentContainer.style.borderTopLeftRadius = 25;
-            contentContainer.style.borderTopRightRadius = 25;
-            contentContainer.style.borderBottomLeftRadius = 25;
-            contentContainer.style.borderBottomRightRadius = 25;
+            contentContainer.style.borderTopLeftRadius = 15;
+            contentContainer.style.borderTopRightRadius = 15;
+            contentContainer.style.borderBottomLeftRadius = 15;
+            contentContainer.style.borderBottomRightRadius = 15;
             // Bordure subtile
             contentContainer.style.borderTopWidth = 1;
             contentContainer.style.borderBottomWidth = 1;
@@ -291,26 +291,33 @@ namespace WiseTwin
             contentContainer.style.borderLeftColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
             contentContainer.style.borderRightColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
 
-            // Pas de titre, les drapeaux sont suffisamment explicites
+            // Titre pour la sélection de langue
+            var titleLabel = new Label("Choisissez votre langue / Choose your language");
+            titleLabel.style.fontSize = 20;
+            titleLabel.style.color = new Color(0.95f, 0.95f, 0.95f, 1f);
+            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            titleLabel.style.marginBottom = 30;
+            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            titleLabel.style.whiteSpace = WhiteSpace.Normal;
+            contentContainer.Add(titleLabel);
 
-            // Container pour les boutons de langue
+            // Container pour les boutons de langue - en colonne
             var languageButtons = new VisualElement();
-            languageButtons.style.flexDirection = FlexDirection.Row;
-            languageButtons.style.justifyContent = Justify.SpaceAround;
+            languageButtons.style.flexDirection = FlexDirection.Column;
             languageButtons.style.width = Length.Percent(100);
-
-            // Bouton Anglais - Utiliser des images au lieu d'emoji
-            var englishButton = CreateLanguageButton("English", "GB", "en");
-            languageButtons.Add(englishButton);
-
-            // Espacement entre les boutons
-            var spacer = new VisualElement();
-            spacer.style.width = 40;
-            languageButtons.Add(spacer);
 
             // Bouton Français
             var frenchButton = CreateLanguageButton("Français", "FR", "fr");
             languageButtons.Add(frenchButton);
+
+            // Espacement entre les boutons
+            var spacer = new VisualElement();
+            spacer.style.height = 15;
+            languageButtons.Add(spacer);
+
+            // Bouton Anglais
+            var englishButton = CreateLanguageButton("English", "GB", "en");
+            languageButtons.Add(englishButton);
 
             contentContainer.Add(languageButtons);
             languageSelectionPanel.Add(contentContainer);
@@ -322,78 +329,41 @@ namespace WiseTwin
         Button CreateLanguageButton(string label, string flag, string langCode)
         {
             var button = new Button(() => OnLanguageButtonClicked(langCode));
-            button.name = $"lang-button-{langCode}"; // Ajouter un nom pour pouvoir le récupérer
-            button.style.width = 250;
-            button.style.height = 150;
-            // Fond avec gradient simulé (plus sombre en bas)
+            button.name = $"lang-button-{langCode}";
+
+            // Style liste conventionnel - pleine largeur
+            button.style.width = Length.Percent(100);
+            button.style.height = 60;
             button.style.backgroundColor = new Color(0.18f, 0.18f, 0.22f, 1f);
-            button.style.borderTopLeftRadius = 15;
-            button.style.borderTopRightRadius = 15;
-            button.style.borderBottomLeftRadius = 15;
-            button.style.borderBottomRightRadius = 15;
-            button.style.borderTopWidth = 3;
-            button.style.borderBottomWidth = 3;
-            button.style.borderLeftWidth = 3;
-            button.style.borderRightWidth = 3;
-            // Bordure avec couleur accent
-            button.style.borderTopColor = new Color(0.3f, 0.5f, 0.9f, 1f);
-            button.style.borderBottomColor = new Color(0.3f, 0.5f, 0.9f, 1f);
-            button.style.borderLeftColor = new Color(0.3f, 0.5f, 0.9f, 1f);
-            button.style.borderRightColor = new Color(0.3f, 0.5f, 0.9f, 1f);
-            button.style.flexDirection = FlexDirection.Column;
+            button.style.borderTopLeftRadius = 8;
+            button.style.borderTopRightRadius = 8;
+            button.style.borderBottomLeftRadius = 8;
+            button.style.borderBottomRightRadius = 8;
+            button.style.borderTopWidth = 2;
+            button.style.borderBottomWidth = 2;
+            button.style.borderLeftWidth = 2;
+            button.style.borderRightWidth = 2;
+            button.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            button.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            button.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            button.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            button.style.flexDirection = FlexDirection.Row;
             button.style.alignItems = Align.Center;
-            button.style.justifyContent = Justify.Center;
-            // Ombre portée
-            button.style.paddingTop = 20;
-            button.style.paddingBottom = 20;
             button.style.paddingLeft = 20;
             button.style.paddingRight = 20;
 
-            // Container pour centrer le contenu
-            var contentContainer = new VisualElement();
-            contentContainer.style.flexGrow = 1;
-            contentContainer.style.alignItems = Align.Center;
-            contentContainer.style.justifyContent = Justify.Center;
-
-            // Utiliser du texte stylisé au lieu d'emoji pour le drapeau
-            var flagContainer = new VisualElement();
-            flagContainer.style.width = 80;
-            flagContainer.style.height = 60;
-            flagContainer.style.backgroundColor = GetFlagColor(flag);
-            flagContainer.style.borderTopLeftRadius = 8;
-            flagContainer.style.borderTopRightRadius = 8;
-            flagContainer.style.borderBottomLeftRadius = 8;
-            flagContainer.style.borderBottomRightRadius = 8;
-            flagContainer.style.marginBottom = 15;
-            flagContainer.style.alignItems = Align.Center;
-            flagContainer.style.justifyContent = Justify.Center;
-
-            // Texte du code pays
-            var flagText = new Label(flag);
-            flagText.style.fontSize = 24;
-            flagText.style.color = Color.white;
-            flagText.style.unityFontStyleAndWeight = FontStyle.Bold;
-            flagText.style.unityTextAlign = TextAnchor.MiddleCenter;
-            flagContainer.Add(flagText);
-
-            contentContainer.Add(flagContainer);
-
-            // Language name - Centré
+            // Language name - aligné à gauche
             var langLabel = new Label(label);
-            langLabel.style.fontSize = 22;
+            langLabel.style.fontSize = 20;
             langLabel.style.color = new Color(0.95f, 0.95f, 0.95f, 1f);
-            langLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            langLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            langLabel.style.width = Length.Percent(100);
-            contentContainer.Add(langLabel);
+            langLabel.style.unityFontStyleAndWeight = FontStyle.Normal;
+            langLabel.style.flexGrow = 1;
+            button.Add(langLabel);
 
-            button.Add(contentContainer);
-
-            // Hover effect - plus visible
+            // Hover effect - subtil
             button.RegisterCallback<MouseEnterEvent>((evt) =>
             {
                 button.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
-                button.style.scale = new Scale(new Vector3(1.08f, 1.08f, 1f));
                 button.style.borderTopColor = accentColor;
                 button.style.borderBottomColor = accentColor;
                 button.style.borderLeftColor = accentColor;
@@ -403,27 +373,13 @@ namespace WiseTwin
             button.RegisterCallback<MouseLeaveEvent>((evt) =>
             {
                 button.style.backgroundColor = new Color(0.18f, 0.18f, 0.22f, 1f);
-                button.style.scale = new Scale(Vector3.one);
-                button.style.borderTopColor = new Color(0.3f, 0.5f, 0.9f, 1f);
-                button.style.borderBottomColor = new Color(0.3f, 0.5f, 0.9f, 1f);
-                button.style.borderLeftColor = new Color(0.3f, 0.5f, 0.9f, 1f);
-                button.style.borderRightColor = new Color(0.3f, 0.5f, 0.9f, 1f);
+                button.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+                button.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+                button.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+                button.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
             });
 
             return button;
-        }
-
-        Color GetFlagColor(string countryCode)
-        {
-            switch(countryCode)
-            {
-                case "GB":
-                    return new Color(0.0f, 0.14f, 0.49f, 1f); // Bleu britannique
-                case "FR":
-                    return new Color(0.0f, 0.14f, 0.58f, 1f); // Bleu français
-                default:
-                    return new Color(0.3f, 0.3f, 0.3f, 1f); // Gris par défaut
-            }
         }
 
         void CreateDisclaimerPanel()
@@ -456,9 +412,11 @@ namespace WiseTwin
             contentContainer.style.borderBottomLeftRadius = 20;
             contentContainer.style.borderBottomRightRadius = 20;
 
-            // ScrollView pour le contenu
-            var scrollView = new ScrollView();
+            // ScrollView pour le contenu - masquer la scrollbar
+            var scrollView = new ScrollView(ScrollViewMode.Vertical);
             scrollView.style.flexGrow = 1;
+            scrollView.verticalScrollerVisibility = ScrollerVisibility.Hidden; // Masquer la scrollbar mais garder le scroll
+            scrollView.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
 
             // Titre de la formation (sera mis à jour dynamiquement)
             var titleLabel = new Label("Formation Title");
@@ -468,6 +426,10 @@ namespace WiseTwin
             titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             titleLabel.style.marginBottom = 20;
             titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            // Gérer le débordement du texte
+            titleLabel.style.whiteSpace = WhiteSpace.Normal; // Permet au texte de passer à la ligne
+            titleLabel.style.width = Length.Percent(100); // Utilise toute la largeur disponible
+            titleLabel.style.overflow = Overflow.Hidden; // Cache le débordement si nécessaire
             scrollView.Add(titleLabel);
 
             // Description
