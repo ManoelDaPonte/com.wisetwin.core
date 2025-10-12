@@ -1080,8 +1080,9 @@ namespace WiseTwin.UI
             // Créer les données de la question
             currentQuestionData = new QuestionInteractionData();
             currentQuestionData.questionText = currentQuestionText;
-            currentQuestionData.options = currentOptionTexts ?? new List<string>();
-            currentQuestionData.correctAnswers = isMultipleChoice ? correctAnswerIndexes : new List<int> { correctAnswerIndex };
+            currentQuestionData.options = currentOptionTexts != null ? new List<string>(currentOptionTexts) : new List<string>();
+            // IMPORTANT : Créer une COPIE de la liste pour éviter que les Clear() ultérieurs ne vident les données
+            currentQuestionData.correctAnswers = isMultipleChoice ? new List<int>(correctAnswerIndexes) : new List<int> { correctAnswerIndex };
 
             // Démarrer l'interaction
             string questionId = currentQuestionIndex >= 0 && questionKeys != null
