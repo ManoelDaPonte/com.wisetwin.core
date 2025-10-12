@@ -142,43 +142,59 @@ namespace WiseTwin.UI
                 if (contentData.ContainsKey("correctAnswers"))
                 {
                     var correctAnswers = contentData["correctAnswers"];
-                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
-                    {
-                        LogDebug($"correctAnswers type: {correctAnswers?.GetType()?.Name ?? "null"}");
-                    }
+                    LogDebug($"[MULTIPLE CHOICE] correctAnswers type: {correctAnswers?.GetType()?.FullName ?? "null"}");
 
                     if (correctAnswers is Newtonsoft.Json.Linq.JArray jarray)
                     {
-                        correctAnswerIndexes = jarray.Select(x => (int)x).ToList();
+                        correctAnswerIndexes = jarray.Select(x => (int)(long)x).ToList();
+                        LogDebug($"Parsed as JArray: {string.Join(", ", correctAnswerIndexes)}");
                     }
                     else if (correctAnswers is List<object> list)
                     {
                         correctAnswerIndexes = list.Select(x => Convert.ToInt32(x)).ToList();
+                        LogDebug($"Parsed as List<object>: {string.Join(", ", correctAnswerIndexes)}");
+                    }
+                    else if (correctAnswers is object[] objArray)
+                    {
+                        correctAnswerIndexes = objArray.Select(x => Convert.ToInt32(x)).ToList();
+                        LogDebug($"Parsed as object[]: {string.Join(", ", correctAnswerIndexes)}");
                     }
                     else if (correctAnswers is string str)
                     {
                         correctAnswerIndexes = str.Split(',').Select(x => int.Parse(x.Trim())).ToList();
+                        LogDebug($"Parsed as string: {string.Join(", ", correctAnswerIndexes)}");
                     }
                     else if (correctAnswers is int[] intArray)
                     {
                         correctAnswerIndexes = intArray.ToList();
+                        LogDebug($"Parsed as int[]: {string.Join(", ", correctAnswerIndexes)}");
                     }
                     else if (correctAnswers is long[] longArray)
                     {
                         correctAnswerIndexes = longArray.Select(x => (int)x).ToList();
+                        LogDebug($"Parsed as long[]: {string.Join(", ", correctAnswerIndexes)}");
+                    }
+                    else
+                    {
+                        // Fallback : essayer de sérialiser/désérialiser
+                        LogWarning($"Unhandled correctAnswers type: {correctAnswers?.GetType()?.FullName}, attempting JSON conversion");
+                        try
+                        {
+                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(correctAnswers);
+                            correctAnswerIndexes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>>(json);
+                            LogDebug($"Parsed via JSON fallback: {string.Join(", ", correctAnswerIndexes)}");
+                        }
+                        catch (System.Exception e)
+                        {
+                            LogError($"Failed to parse correctAnswers: {e.Message}");
+                        }
                     }
 
-                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
-                    {
-                        LogDebug($"Loaded correct answers for multiple choice: {string.Join(", ", correctAnswerIndexes)}");
-                    }
+                    LogDebug($"Final correctAnswers for multiple choice: {string.Join(", ", correctAnswerIndexes)}");
                 }
                 else
                 {
-                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
-                    {
-                        LogWarning("No correctAnswers field found for multiple choice question!");
-                    }
+                    LogWarning("No correctAnswers field found for multiple choice question!");
                 }
             }
             else
@@ -400,27 +416,55 @@ namespace WiseTwin.UI
                         if (questionDict.ContainsKey("correctAnswers"))
                         {
                             var correctAnswers = questionDict["correctAnswers"];
+                            LogDebug($"[SEQ MULTIPLE CHOICE] correctAnswers type: {correctAnswers?.GetType()?.FullName ?? "null"}");
 
                             if (correctAnswers is Newtonsoft.Json.Linq.JArray jarray)
                             {
-                                correctAnswerIndexes = jarray.Select(x => (int)x).ToList();
+                                correctAnswerIndexes = jarray.Select(x => (int)(long)x).ToList();
+                                LogDebug($"Parsed as JArray: {string.Join(", ", correctAnswerIndexes)}");
                             }
                             else if (correctAnswers is List<object> list)
                             {
                                 correctAnswerIndexes = list.Select(x => Convert.ToInt32(x)).ToList();
+                                LogDebug($"Parsed as List<object>: {string.Join(", ", correctAnswerIndexes)}");
+                            }
+                            else if (correctAnswers is object[] objArray)
+                            {
+                                correctAnswerIndexes = objArray.Select(x => Convert.ToInt32(x)).ToList();
+                                LogDebug($"Parsed as object[]: {string.Join(", ", correctAnswerIndexes)}");
                             }
                             else if (correctAnswers is string str)
                             {
                                 correctAnswerIndexes = str.Split(',').Select(x => int.Parse(x.Trim())).ToList();
+                                LogDebug($"Parsed as string: {string.Join(", ", correctAnswerIndexes)}");
                             }
                             else if (correctAnswers is int[] intArray)
                             {
                                 correctAnswerIndexes = intArray.ToList();
+                                LogDebug($"Parsed as int[]: {string.Join(", ", correctAnswerIndexes)}");
                             }
                             else if (correctAnswers is long[] longArray)
                             {
                                 correctAnswerIndexes = longArray.Select(x => (int)x).ToList();
+                                LogDebug($"Parsed as long[]: {string.Join(", ", correctAnswerIndexes)}");
                             }
+                            else
+                            {
+                                // Fallback : essayer de sérialiser/désérialiser
+                                LogWarning($"Unhandled correctAnswers type: {correctAnswers?.GetType()?.FullName}, attempting JSON conversion");
+                                try
+                                {
+                                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(correctAnswers);
+                                    correctAnswerIndexes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>>(json);
+                                    LogDebug($"Parsed via JSON fallback: {string.Join(", ", correctAnswerIndexes)}");
+                                }
+                                catch (System.Exception e)
+                                {
+                                    LogError($"Failed to parse correctAnswers: {e.Message}");
+                                }
+                            }
+
+                            LogDebug($"Final correctAnswers for seq multiple choice: {string.Join(", ", correctAnswerIndexes)}");
                         }
                     }
                     else
