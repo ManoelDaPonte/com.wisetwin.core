@@ -60,6 +60,7 @@ namespace WiseTwin.UI
         public class ProcedureStep
         {
             public string objectId;
+            public string title;
             public string instruction;
             public string validation;
             public string hint;
@@ -378,6 +379,7 @@ namespace WiseTwin.UI
                 {
                     stepNumber = currentStepIndex + 1,
                     totalSteps = steps.Count,
+                    title = currentStep.title,
                     instruction = currentStep.instruction,
                     hintsUsed = 0,
                     wrongClicks = 0
@@ -392,7 +394,15 @@ namespace WiseTwin.UI
                 ? $"Étape {currentStepIndex + 1} / {steps.Count}"
                 : $"Step {currentStepIndex + 1} / {steps.Count}";
 
-            stepLabel.text = currentStep.instruction;
+            // Afficher le titre de l'étape si présent, suivi de l'instruction
+            if (!string.IsNullOrEmpty(currentStep.title))
+            {
+                stepLabel.text = $"<b><size=22>{currentStep.title}</size></b>\n\n{currentStep.instruction}";
+            }
+            else
+            {
+                stepLabel.text = currentStep.instruction;
+            }
 
             // Ajouter le hint si présent
             if (!string.IsNullOrEmpty(currentStep.hint))
@@ -798,6 +808,7 @@ namespace WiseTwin.UI
                     var step = new ProcedureStep
                     {
                         objectId = ExtractString(stepData, "objectId"),
+                        title = ExtractLocalizedText(stepData, "title", language),
                         instruction = ExtractLocalizedText(stepData, "instruction", language),
                         validation = ExtractLocalizedText(stepData, "validation", language),
                         hint = ExtractLocalizedText(stepData, "hint", language)

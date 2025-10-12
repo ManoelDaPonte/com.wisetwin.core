@@ -166,6 +166,7 @@ namespace WiseTwin.Analytics
     {
         public int stepNumber;
         public int totalSteps;
+        public string title;
         public string instruction;
         public int hintsUsed;
         public int wrongClicks;
@@ -176,6 +177,7 @@ namespace WiseTwin.Analytics
             {
                 ["stepNumber"] = stepNumber,
                 ["totalSteps"] = totalSteps,
+                ["title"] = title,
                 ["instruction"] = instruction,
                 ["hintsUsed"] = hintsUsed,
                 ["wrongClicks"] = wrongClicks
