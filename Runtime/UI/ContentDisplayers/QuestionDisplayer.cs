@@ -199,8 +199,23 @@ namespace WiseTwin.UI
             }
             else
             {
-                // Pour réponse unique
-                correctAnswerIndex = ExtractInt(contentData, "correctAnswer");
+                // Pour réponse unique - lire depuis correctAnswers[0]
+                if (contentData.ContainsKey("correctAnswers"))
+                {
+                    var correctAnswers = contentData["correctAnswers"];
+                    if (correctAnswers is Newtonsoft.Json.Linq.JArray jarray && jarray.Count > 0)
+                    {
+                        correctAnswerIndex = (int)(long)jarray[0];
+                    }
+                    else if (correctAnswers is List<object> list && list.Count > 0)
+                    {
+                        correctAnswerIndex = Convert.ToInt32(list[0]);
+                    }
+                    else if (correctAnswers is int[] intArray && intArray.Length > 0)
+                    {
+                        correctAnswerIndex = intArray[0];
+                    }
+                }
             }
 
             string feedback = ExtractLocalizedText(contentData, "feedback", lang);
@@ -469,7 +484,23 @@ namespace WiseTwin.UI
                     }
                     else
                     {
-                        correctAnswerIndex = ExtractInt(questionDict, "correctAnswer");
+                        // Pour réponse unique - lire depuis correctAnswers[0]
+                        if (questionDict.ContainsKey("correctAnswers"))
+                        {
+                            var correctAnswers = questionDict["correctAnswers"];
+                            if (correctAnswers is Newtonsoft.Json.Linq.JArray jarray && jarray.Count > 0)
+                            {
+                                correctAnswerIndex = (int)(long)jarray[0];
+                            }
+                            else if (correctAnswers is List<object> list && list.Count > 0)
+                            {
+                                correctAnswerIndex = Convert.ToInt32(list[0]);
+                            }
+                            else if (correctAnswers is int[] intArray && intArray.Length > 0)
+                            {
+                                correctAnswerIndex = intArray[0];
+                            }
+                        }
                     }
 
                     currentFeedback = ExtractLocalizedText(questionDict, "feedback", lang);
