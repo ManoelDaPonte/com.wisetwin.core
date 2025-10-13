@@ -244,10 +244,18 @@ namespace WiseTwin.Analytics
         /// </summary>
         public string ExportAnalytics()
         {
+            // Récupérer la version depuis les métadonnées
+            string version = null;
+            if (MetadataLoader.Instance != null && MetadataLoader.Instance.IsLoaded)
+            {
+                version = MetadataLoader.Instance.GetProjectInfo("version");
+            }
+
             var analyticsData = new Dictionary<string, object>
             {
                 ["sessionId"] = sessionId,
                 ["trainingId"] = trainingId,
+                ["version"] = version ?? "unknown",
                 ["startTime"] = startTime,
                 ["endTime"] = endTime ?? DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 ["totalDuration"] = totalDuration,
@@ -274,10 +282,18 @@ namespace WiseTwin.Analytics
         /// </summary>
         public Dictionary<string, object> GetAnalyticsDictionary()
         {
+            // Récupérer la version depuis les métadonnées
+            string version = null;
+            if (MetadataLoader.Instance != null && MetadataLoader.Instance.IsLoaded)
+            {
+                version = MetadataLoader.Instance.GetProjectInfo("version");
+            }
+
             return new Dictionary<string, object>
             {
                 ["sessionId"] = sessionId,
                 ["trainingId"] = trainingId,
+                ["version"] = version ?? "unknown",
                 ["startTime"] = startTime,
                 ["endTime"] = endTime ?? DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 ["totalDuration"] = totalDuration,

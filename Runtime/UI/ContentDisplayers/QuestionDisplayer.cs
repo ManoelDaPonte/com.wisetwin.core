@@ -867,8 +867,9 @@ namespace WiseTwin.UI
                         TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", currentQuestionData.finalScore);
                         TrainingAnalytics.Instance.AddDataToCurrentInteraction("userAnswers", currentQuestionData.userAnswers);
                         TrainingAnalytics.Instance.AddDataToCurrentInteraction("firstAttemptCorrect", currentQuestionData.firstAttemptCorrect);
-                        // Success = true seulement si correct du premier coup
-                        TrainingAnalytics.Instance.EndCurrentInteraction(currentQuestionData.firstAttemptCorrect);
+                        // FIX: Success = true car la réponse finale est correcte (même si pas du premier coup)
+                        // Le score reste à 0 si firstAttemptCorrect = false, mais on compte l'interaction comme réussie
+                        TrainingAnalytics.Instance.EndCurrentInteraction(true);
                     }
                 }
                 feedbackContainer.style.backgroundColor = new Color(0.1f, 0.6f, 0.3f, 0.3f);
