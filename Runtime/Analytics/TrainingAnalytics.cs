@@ -250,14 +250,43 @@ namespace WiseTwin.Analytics
             currentInteraction.AddData("totalWrongClicks", totalWrongClicks);
             currentInteraction.AddData("totalDuration", totalDuration);
 
-            // Calculer le score final : 100 si parfait, 0 sinon
-            float finalScore = perfectCompletion ? 100f : 0f;
+            // Calculer le nombre d'étapes parfaites (sans erreurs)
+            int perfectStepsCount = 0;
+            int totalSteps = 0;
+
+            if (currentInteraction.data.ContainsKey("steps") &&
+                currentInteraction.data["steps"] is List<Dictionary<string, object>> stepsList)
+            {
+                totalSteps = stepsList.Count;
+                foreach (var step in stepsList)
+                {
+                    if (step.ContainsKey("wrongClicksOnThisStep"))
+                    {
+                        int wrongClicks = 0;
+                        if (step["wrongClicksOnThisStep"] is int wrongClicksInt)
+                            wrongClicks = wrongClicksInt;
+                        else if (step["wrongClicksOnThisStep"] is long wrongClicksLong)
+                            wrongClicks = (int)wrongClicksLong;
+
+                        if (wrongClicks == 0)
+                            perfectStepsCount++;
+                    }
+                }
+            }
+
+            // Stocker le nombre d'étapes parfaites pour les statistiques
+            currentInteraction.AddData("perfectStepsCount", perfectStepsCount);
+            currentInteraction.AddData("totalSteps", totalSteps);
+
+            // Le finalScore représente maintenant le pourcentage d'étapes parfaites
+            // Chaque étape parfaite vaut 100 points
+            float finalScore = totalSteps > 0 ? (perfectStepsCount * 100f) : 100f;
             currentInteraction.AddData("finalScore", finalScore);
 
-            LogDebug($"Completing procedure - Perfect: {perfectCompletion}, Wrong clicks: {totalWrongClicks}, Duration: {totalDuration}s");
+            LogDebug($"Completing procedure - Perfect steps: {perfectStepsCount}/{totalSteps}, Wrong clicks: {totalWrongClicks}, Duration: {totalDuration}s");
 
-            // Terminer l'interaction (succès si parfait)
-            EndCurrentInteraction(perfectCompletion);
+            // Terminer l'interaction (succès si au moins une étape complétée)
+            EndCurrentInteraction(totalSteps > 0);
         }
 
         /// <summary>
@@ -294,7 +323,7 @@ namespace WiseTwin.Analytics
             if (debugMode)
             {
                 LogDebug($"Training completed: {status}");
-                LogDebug($"Total interactions: {totalInteractions}, Success rate: {GetSuccessRate():F2}%");
+                LogDebug($"Total interactions: {GetTotalInteractions()}, Success rate: {GetSuccessRate():F2}%");
             }
 
             if (autoExportOnCompletion)
@@ -331,9 +360,9 @@ namespace WiseTwin.Analytics
                 ["interactions"] = interactions.Select(i => i.ToDictionary()).ToList(),
                 ["summary"] = new Dictionary<string, object>
                 {
-                    ["totalInteractions"] = totalInteractions,
-                    ["successfulInteractions"] = successfulInteractions,
-                    ["failedInteractions"] = failedInteractions,
+                    ["totalInteractions"] = GetTotalInteractions(),
+                    ["successfulInteractions"] = GetSuccessfulInteractions(),
+                    ["failedInteractions"] = GetFailedInteractions(),
                     ["averageTimePerInteraction"] = GetAverageInteractionTime(),
                     ["totalAttempts"] = totalAttempts,
                     ["totalFailedAttempts"] = totalFailedAttempts,
@@ -369,9 +398,9 @@ namespace WiseTwin.Analytics
                 ["interactions"] = interactions.Select(i => i.ToDictionary()).ToList(),
                 ["summary"] = new Dictionary<string, object>
                 {
-                    ["totalInteractions"] = totalInteractions,
-                    ["successfulInteractions"] = successfulInteractions,
-                    ["failedInteractions"] = failedInteractions,
+                    ["totalInteractions"] = GetTotalInteractions(),
+                    ["successfulInteractions"] = GetSuccessfulInteractions(),
+                    ["failedInteractions"] = GetFailedInteractions(),
                     ["averageTimePerInteraction"] = GetAverageInteractionTime(),
                     ["totalAttempts"] = totalAttempts,
                     ["totalFailedAttempts"] = totalFailedAttempts,
@@ -403,13 +432,14 @@ namespace WiseTwin.Analytics
 
         private float GetSuccessRate()
         {
-            if (totalInteractions == 0) return 0;
-            return (float)successfulInteractions / totalInteractions * 100f;
+            int total = GetTotalInteractions();
+            if (total == 0) return 0;
+            return (float)GetSuccessfulInteractions() / total * 100f;
         }
 
         /// <summary>
         /// Calcule un score basé sur le nombre d'interactions réussies du premier coup
-        /// Chaque interaction vaut 1 point si réussie du premier coup, 0 sinon
+        /// Pour les procédures, chaque étape compte individuellement
         /// Score = (nombre de points / nombre total d'interactions) × 100
         /// </summary>
         public float CalculateScore()
@@ -417,39 +447,40 @@ namespace WiseTwin.Analytics
             if (interactions.Count == 0) return 100f;
 
             int totalPoints = 0;
+            int totalInteractionWeight = 0;
 
             foreach (var interaction in interactions)
             {
-                // Par défaut, une interaction vaut 1 point (succès)
-                int points = 1;
-
-                // Vérifier si l'interaction a un finalScore dans ses données
-                if (interaction.data != null && interaction.data.ContainsKey("finalScore"))
+                if (interaction.type == "procedure")
                 {
-                    float finalScore = 0f;
+                    // Pour les procédures, chaque étape compte
+                    int totalSteps = GetIntValue(interaction.data, "totalSteps", 0);
+                    int perfectSteps = GetIntValue(interaction.data, "perfectStepsCount", 0);
 
-                    if (interaction.data["finalScore"] is float score)
-                    {
-                        finalScore = score;
-                    }
-                    else if (interaction.data["finalScore"] is double scoreDouble)
-                    {
-                        finalScore = (float)scoreDouble;
-                    }
-                    else if (interaction.data["finalScore"] is int scoreInt)
-                    {
-                        finalScore = scoreInt;
-                    }
-
-                    // Si finalScore = 100 → 1 point, sinon → 0 point
-                    points = finalScore >= 100f ? 1 : 0;
+                    totalInteractionWeight += totalSteps;
+                    totalPoints += perfectSteps;
                 }
+                else
+                {
+                    // Pour les autres interactions (question, text), 1 point si parfait
+                    totalInteractionWeight += 1;
 
-                totalPoints += points;
+                    if (interaction.data != null && interaction.data.ContainsKey("finalScore"))
+                    {
+                        float finalScore = GetFloatValue(interaction.data, "finalScore", 0f);
+                        totalPoints += finalScore >= 100f ? 1 : 0;
+                    }
+                    else
+                    {
+                        totalPoints += 1; // Par défaut parfait
+                    }
+                }
             }
 
-            // Score = (points obtenus / interactions totales) × 100
-            return (float)totalPoints / interactions.Count * 100f;
+            if (totalInteractionWeight == 0) return 100f;
+
+            // Score = (points obtenus / poids total) × 100
+            return (float)totalPoints / totalInteractionWeight * 100f;
         }
 
         /// <summary>
@@ -458,6 +489,95 @@ namespace WiseTwin.Analytics
         public int GetTotalErrors()
         {
             return totalFailedAttempts;
+        }
+
+        /// <summary>
+        /// Obtient le nombre total d'interactions (en comptant chaque étape de procédure)
+        /// </summary>
+        public int GetTotalInteractions()
+        {
+            int total = 0;
+
+            foreach (var interaction in interactions)
+            {
+                if (interaction.type == "procedure")
+                {
+                    // Pour les procédures, compter le nombre d'étapes
+                    total += GetIntValue(interaction.data, "totalSteps", 0);
+                }
+                else
+                {
+                    // Pour les autres interactions, compter 1
+                    total += 1;
+                }
+            }
+
+            return total;
+        }
+
+        /// <summary>
+        /// Obtient le nombre d'interactions réussies du premier coup (parfaites)
+        /// Pour les procédures, compte chaque étape parfaite
+        /// successfulInteractions + failedInteractions = totalInteractions
+        /// </summary>
+        public int GetSuccessfulInteractions()
+        {
+            int perfectCount = 0;
+
+            foreach (var interaction in interactions)
+            {
+                if (interaction.type == "procedure")
+                {
+                    // Pour les procédures, compter les étapes parfaites
+                    perfectCount += GetIntValue(interaction.data, "perfectStepsCount", 0);
+                }
+                else
+                {
+                    // Pour les autres interactions, vérifier le finalScore
+                    if (interaction.data != null && interaction.data.ContainsKey("finalScore"))
+                    {
+                        float finalScore = GetFloatValue(interaction.data, "finalScore", 0f);
+                        if (finalScore >= 100f)
+                            perfectCount++;
+                    }
+                    else
+                    {
+                        perfectCount++; // Par défaut parfait
+                    }
+                }
+            }
+
+            return perfectCount;
+        }
+
+        /// <summary>
+        /// Obtient le nombre d'interactions ratées (avec erreurs)
+        /// Pour les procédures, compte chaque étape avec erreurs
+        /// successfulInteractions + failedInteractions = totalInteractions
+        /// </summary>
+        public int GetFailedInteractions()
+        {
+            return GetTotalInteractions() - GetSuccessfulInteractions();
+        }
+
+        /// <summary>
+        /// [DEPRECATED] Utiliser GetSuccessfulInteractions() à la place
+        /// Obtient le nombre d'interactions parfaites (sans erreur, du premier coup)
+        /// Pour les procédures, compte le nombre d'étapes parfaites
+        /// </summary>
+        public int GetPerfectInteractions()
+        {
+            return GetSuccessfulInteractions();
+        }
+
+        /// <summary>
+        /// [DEPRECATED] Utiliser GetFailedInteractions() à la place
+        /// Obtient le nombre d'interactions avec erreurs (réussies mais après des tentatives ratées)
+        /// Pour les procédures, compte les étapes avec erreurs
+        /// </summary>
+        public int GetInteractionsWithErrors()
+        {
+            return GetFailedInteractions();
         }
 
         /// <summary>
@@ -488,16 +608,16 @@ namespace WiseTwin.Analytics
         [ContextMenu("Test Export Analytics")]
         public void TestExport()
         {
-            // Ajouter quelques interactions de test
+            // Ajouter quelques interactions de test avec la nouvelle API (clés uniquement)
             var questionData = new QuestionInteractionData
             {
-                questionText = "Test question?",
-                options = new List<string> { "A", "B", "C" },
+                questionKey = "test_question_1",
+                objectId = "test_object",
                 correctAnswers = new List<int> { 0, 2 }
             };
             questionData.AddUserAttempt(new List<int> { 0 });
             questionData.AddUserAttempt(new List<int> { 0, 2 });
-            TrackQuestionInteraction("test_object", "q1", questionData);
+            TrackQuestionInteraction("test_object", "test_object_test_question_1", questionData);
             EndCurrentInteraction(true);
 
             CompleteTraining();
@@ -517,6 +637,39 @@ namespace WiseTwin.Analytics
         private void LogError(string message)
         {
             Debug.LogError($"[TrainingAnalytics] {message}");
+        }
+
+        // Helper methods pour extraire des valeurs des dictionnaires
+        private int GetIntValue(Dictionary<string, object> dict, string key, int defaultValue)
+        {
+            if (dict == null || !dict.ContainsKey(key)) return defaultValue;
+
+            if (dict[key] is int intValue)
+                return intValue;
+            else if (dict[key] is long longValue)
+                return (int)longValue;
+            else if (dict[key] is float floatValue)
+                return (int)floatValue;
+            else if (dict[key] is double doubleValue)
+                return (int)doubleValue;
+
+            return defaultValue;
+        }
+
+        private float GetFloatValue(Dictionary<string, object> dict, string key, float defaultValue)
+        {
+            if (dict == null || !dict.ContainsKey(key)) return defaultValue;
+
+            if (dict[key] is float floatValue)
+                return floatValue;
+            else if (dict[key] is double doubleValue)
+                return (float)doubleValue;
+            else if (dict[key] is int intValue)
+                return intValue;
+            else if (dict[key] is long longValue)
+                return longValue;
+
+            return defaultValue;
         }
     }
 }

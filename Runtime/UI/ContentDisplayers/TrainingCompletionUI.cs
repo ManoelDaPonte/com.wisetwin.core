@@ -202,12 +202,77 @@ namespace WiseTwin.UI
 
             // Score ou performance
             float finalScore = 100f;
-            int totalErrors = 0;
+            int analyticsInteractions = 0;
+            int successfulInteractionsCount = 0;
+            int failedInteractionsCount = 0;
 
             if (Analytics.TrainingAnalytics.Instance != null)
             {
                 finalScore = Analytics.TrainingAnalytics.Instance.CalculateScore();
-                totalErrors = Analytics.TrainingAnalytics.Instance.GetTotalErrors();
+                analyticsInteractions = Analytics.TrainingAnalytics.Instance.GetTotalInteractions();
+                successfulInteractionsCount = Analytics.TrainingAnalytics.Instance.GetSuccessfulInteractions();
+                failedInteractionsCount = Analytics.TrainingAnalytics.Instance.GetFailedInteractions();
+            }
+
+            // Section détails des interactions (juste avant le score)
+            if (analyticsInteractions > 0)
+            {
+                var interactionsDetailContainer = new VisualElement();
+                interactionsDetailContainer.style.backgroundColor = new Color(0.12f, 0.12f, 0.16f, 0.4f);
+                interactionsDetailContainer.style.borderTopLeftRadius = 10;
+                interactionsDetailContainer.style.borderTopRightRadius = 10;
+                interactionsDetailContainer.style.borderBottomLeftRadius = 10;
+                interactionsDetailContainer.style.borderBottomRightRadius = 10;
+                interactionsDetailContainer.style.paddingTop = 15;
+                interactionsDetailContainer.style.paddingBottom = 15;
+                interactionsDetailContainer.style.paddingLeft = 20;
+                interactionsDetailContainer.style.paddingRight = 20;
+                interactionsDetailContainer.style.marginBottom = 20;
+
+                // Titre de la section
+                var detailTitle = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Détails des interactions"
+                    : "Interaction details");
+                detailTitle.style.fontSize = 16;
+                detailTitle.style.color = new Color(0.6f, 0.6f, 0.65f, 1f);
+                detailTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+                detailTitle.style.marginBottom = 10;
+                detailTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+                interactionsDetailContainer.Add(detailTitle);
+
+                // Total interactions
+                var totalInteractionsLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? $"📊 Total : {analyticsInteractions}"
+                    : $"📊 Total: {analyticsInteractions}");
+                totalInteractionsLabel.style.fontSize = 16;
+                totalInteractionsLabel.style.color = new Color(0.75f, 0.75f, 0.8f, 1f);
+                totalInteractionsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                totalInteractionsLabel.style.marginBottom = 5;
+                interactionsDetailContainer.Add(totalInteractionsLabel);
+
+                // Interactions réussies (du premier coup, sans erreur)
+                var successfulLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? $"✅ Réussies : {successfulInteractionsCount}"
+                    : $"✅ Successful: {successfulInteractionsCount}");
+                successfulLabel.style.fontSize = 16;
+                successfulLabel.style.color = new Color(0.1f, 0.85f, 0.45f, 1f);
+                successfulLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                successfulLabel.style.marginBottom = 5;
+                interactionsDetailContainer.Add(successfulLabel);
+
+                // Interactions ratées (si > 0)
+                if (failedInteractionsCount > 0)
+                {
+                    var failedLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
+                        ? $"❌ Ratées : {failedInteractionsCount}"
+                        : $"❌ Failed: {failedInteractionsCount}");
+                    failedLabel.style.fontSize = 16;
+                    failedLabel.style.color = new Color(0.9f, 0.4f, 0.3f, 1f);
+                    failedLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                    interactionsDetailContainer.Add(failedLabel);
+                }
+
+                successBox.Add(interactionsDetailContainer);
             }
 
             var scoreContainer = new VisualElement();
@@ -266,19 +331,6 @@ namespace WiseTwin.UI
             scoreText.style.color = new Color(0.8f, 0.8f, 0.85f, 1f);
             scoreText.style.unityTextAlign = TextAnchor.MiddleCenter;
             scoreContainer.Add(scoreText);
-
-            // Afficher le nombre d'erreurs si > 0
-            if (totalErrors > 0)
-            {
-                var errorsLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"❌ {totalErrors} erreur(s)"
-                    : $"❌ {totalErrors} error(s)");
-                errorsLabel.style.fontSize = 14;
-                errorsLabel.style.color = new Color(0.7f, 0.5f, 0.5f, 1f);
-                errorsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-                errorsLabel.style.marginTop = 10;
-                scoreContainer.Add(errorsLabel);
-            }
 
             successBox.Add(scoreContainer);
 
