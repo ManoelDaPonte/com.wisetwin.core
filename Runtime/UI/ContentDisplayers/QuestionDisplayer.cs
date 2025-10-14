@@ -47,8 +47,7 @@ namespace WiseTwin.UI
 
         // Analytics tracking
         private QuestionInteractionData currentQuestionData;
-        private List<string> currentOptionTexts;
-        private string currentQuestionText;
+        private string currentQuestionKey; // Clé de la question pour tracking
 
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
         {
@@ -125,8 +124,7 @@ namespace WiseTwin.UI
             // Extraire les données de la question
             string questionText = ExtractLocalizedText(contentData, "text", lang);
             var options = ExtractLocalizedList(contentData, "options", lang);
-            currentQuestionText = questionText;
-            currentOptionTexts = options;
+            currentQuestionKey = "question"; // Clé unique pour question simple
 
             // Vérifier le mode de sélection (single ou multiple)
             string selectionMode = contentData.ContainsKey("selectionMode")
@@ -508,8 +506,7 @@ namespace WiseTwin.UI
 
                     // Mettre à jour l'UI
                     questionLabel.text = questionText;
-                    currentQuestionText = questionText;
-                    currentOptionTexts = options;
+                    currentQuestionKey = currentKey; // Stocker la clé pour le tracking
 
                     // Clear options container et recréer les options
                     optionsContainer.Clear();
@@ -1109,21 +1106,19 @@ namespace WiseTwin.UI
                 analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
             }
 
-            // Créer les données de la question
+            // Créer les données de la question avec clés uniquement (pas de texte)
             currentQuestionData = new QuestionInteractionData();
-            currentQuestionData.questionText = currentQuestionText;
-            currentQuestionData.options = currentOptionTexts != null ? new List<string>(currentOptionTexts) : new List<string>();
+            currentQuestionData.questionKey = currentQuestionKey; // Clé pour jointure avec metadata
+            currentQuestionData.objectId = currentObjectId; // ObjectId pour retrouver dans metadata
             // IMPORTANT : Créer une COPIE de la liste pour éviter que les Clear() ultérieurs ne vident les données
             currentQuestionData.correctAnswers = isMultipleChoice ? new List<int>(correctAnswerIndexes) : new List<int> { correctAnswerIndex };
 
             // Démarrer l'interaction
-            string questionId = currentQuestionIndex >= 0 && questionKeys != null
-                ? $"{currentObjectId}_{questionKeys[currentQuestionIndex]}"
-                : $"{currentObjectId}_question";
+            string questionId = $"{currentObjectId}_{currentQuestionKey}";
 
             var subtype = isMultipleChoice ? "multiple_choice" : "single_choice";
 
-            LogDebug($"Initializing tracking for question: {questionId}");
+            LogDebug($"Initializing tracking for question: {questionId} (key: {currentQuestionKey})");
             TrainingAnalytics.Instance.TrackQuestionInteraction(currentObjectId, questionId, currentQuestionData);
         }
 

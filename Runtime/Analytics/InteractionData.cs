@@ -78,6 +78,7 @@ namespace WiseTwin.Analytics
 
     /// <summary>
     /// Données spécifiques pour les questions
+    /// Utilise des clés au lieu de texte pour permettre la jointure avec les métadonnées
     /// </summary>
     [Serializable]
     public class QuestionInteractionData
@@ -85,8 +86,8 @@ namespace WiseTwin.Analytics
         // Configuration statique pour les logs
         public static bool EnableDebugLogs { get; set; } = false;
 
-        public string questionText;
-        public List<string> options;
+        public string questionKey;          // Ex: "question_2" - clé pour jointure avec metadata
+        public string objectId;             // Ex: "red_cube" - pour retrouver dans metadata.unity[objectId][questionKey]
         public List<int> correctAnswers;
         public List<List<int>> userAnswers; // Historique de toutes les tentatives
         public bool firstAttemptCorrect;
@@ -94,7 +95,6 @@ namespace WiseTwin.Analytics
 
         public QuestionInteractionData()
         {
-            options = new List<string>();
             correctAnswers = new List<int>();
             userAnswers = new List<List<int>>();
             firstAttemptCorrect = false;
@@ -140,8 +140,8 @@ namespace WiseTwin.Analytics
         {
             return new Dictionary<string, object>
             {
-                ["questionText"] = questionText,
-                ["options"] = options,
+                ["questionKey"] = questionKey,
+                ["objectId"] = objectId,
                 ["correctAnswers"] = correctAnswers,
                 ["userAnswers"] = userAnswers,
                 ["firstAttemptCorrect"] = firstAttemptCorrect,
@@ -159,39 +159,79 @@ namespace WiseTwin.Analytics
     }
 
     /// <summary>
-    /// Données spécifiques pour les procédures
+    /// Données spécifiques pour les procédures (procédure complète avec toutes ses étapes)
+    /// Utilise des clés au lieu de texte pour permettre la jointure avec les métadonnées
     /// </summary>
     [Serializable]
     public class ProcedureInteractionData
     {
-        public int stepNumber;
-        public int totalSteps;
-        public string title;
-        public string instruction;
-        public int hintsUsed;
-        public int wrongClicks;
+        public string procedureKey;         // Ex: "procedure_startup" - clé pour jointure avec metadata
+        public string objectId;             // Ex: "yellow_capsule" - pour retrouver dans metadata.unity[objectId][procedureKey]
+        public int totalSteps;              // Nombre total d'étapes
+        public List<ProcedureStepData> steps; // Toutes les étapes de la procédure
+        public int totalWrongClicks;        // Nombre total d'erreurs sur toute la procédure
+        public float totalDuration;         // Durée totale de la procédure
+        public bool perfectCompletion;      // true si aucune erreur
+
+        public ProcedureInteractionData()
+        {
+            steps = new List<ProcedureStepData>();
+            totalWrongClicks = 0;
+            totalDuration = 0f;
+            perfectCompletion = false;
+        }
+
+        public Dictionary<string, object> ToDictionary()
+        {
+            return new Dictionary<string, object>
+            {
+                ["procedureKey"] = procedureKey,
+                ["objectId"] = objectId,
+                ["totalSteps"] = totalSteps,
+                ["steps"] = steps.ConvertAll(s => s.ToDictionary()),
+                ["totalWrongClicks"] = totalWrongClicks,
+                ["totalDuration"] = totalDuration,
+                ["perfectCompletion"] = perfectCompletion
+            };
+        }
+    }
+
+    /// <summary>
+    /// Données pour une étape individuelle d'une procédure
+    /// </summary>
+    [Serializable]
+    public class ProcedureStepData
+    {
+        public int stepNumber;              // Numéro de l'étape (1, 2, 3, 4...)
+        public string stepKey;              // Ex: "step_1" - clé pour jointure avec metadata
+        public string targetObjectId;       // Ex: "red_cube" - objet à cliquer pour cette étape
+        public bool completed;              // true si l'étape a été complétée
+        public float duration;              // Durée de cette étape en secondes
+        public int wrongClicksOnThisStep;   // Nombre d'erreurs sur cette étape uniquement
 
         public Dictionary<string, object> ToDictionary()
         {
             return new Dictionary<string, object>
             {
                 ["stepNumber"] = stepNumber,
-                ["totalSteps"] = totalSteps,
-                ["title"] = title,
-                ["instruction"] = instruction,
-                ["hintsUsed"] = hintsUsed,
-                ["wrongClicks"] = wrongClicks
+                ["stepKey"] = stepKey,
+                ["targetObjectId"] = targetObjectId,
+                ["completed"] = completed,
+                ["duration"] = duration,
+                ["wrongClicksOnThisStep"] = wrongClicksOnThisStep
             };
         }
     }
 
     /// <summary>
     /// Données spécifiques pour l'affichage de texte
+    /// Utilise des clés au lieu de texte pour permettre la jointure avec les métadonnées
     /// </summary>
     [Serializable]
     public class TextInteractionData
     {
-        public string textContent;
+        public string contentKey;           // Ex: "text_content" - clé pour jointure avec metadata
+        public string objectId;             // Ex: "green_cylinder" - pour retrouver dans metadata.unity[objectId][contentKey]
         public float timeDisplayed;
         public bool readComplete;
         public float scrollPercentage;
@@ -200,7 +240,8 @@ namespace WiseTwin.Analytics
         {
             return new Dictionary<string, object>
             {
-                ["textContent"] = textContent?.Substring(0, Math.Min(100, textContent?.Length ?? 0)) + "...",
+                ["contentKey"] = contentKey,
+                ["objectId"] = objectId,
                 ["timeDisplayed"] = timeDisplayed,
                 ["readComplete"] = readComplete,
                 ["scrollPercentage"] = scrollPercentage

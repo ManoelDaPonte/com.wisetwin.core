@@ -174,28 +174,96 @@ namespace WiseTwin.Analytics
         }
 
         /// <summary>
-        /// Track une étape de procédure
+        /// Démarre le tracking d'une procédure complète (toutes les étapes seront accumulées)
         /// </summary>
-        public void TrackProcedureStep(string objectId, ProcedureInteractionData procedureData)
+        public void StartProcedureInteraction(string objectId, string procedureKey, int totalSteps)
         {
-            var interaction = StartInteraction(objectId, "procedure", "sequential");
+            // Terminer l'interaction précédente si elle existe
+            if (currentInteraction != null)
+            {
+                EndCurrentInteraction(false);
+            }
 
+            string interactionId = $"{objectId}_{procedureKey}_{DateTime.UtcNow.Ticks}";
+            currentInteraction = new InteractionData(interactionId, "procedure", "sequential", objectId);
+
+            // Initialiser les données de la procédure
+            var procedureData = new ProcedureInteractionData
+            {
+                procedureKey = procedureKey,
+                objectId = objectId,
+                totalSteps = totalSteps,
+                steps = new List<ProcedureStepData>()
+            };
+
+            // Stocker les données initiales
             var dataDict = procedureData.ToDictionary();
             foreach (var kvp in dataDict)
             {
-                interaction.AddData(kvp.Key, kvp.Value);
+                currentInteraction.AddData(kvp.Key, kvp.Value);
             }
 
-            // Une procédure compte comme une tentative
-            interaction.attempts = 1;
+            currentInteraction.attempts = 1;
 
-            // Les procédures sont généralement terminées immédiatement après chaque étape
+            LogDebug($"Started procedure interaction: {interactionId} (key: {procedureKey}, steps: {totalSteps})");
+        }
+
+        /// <summary>
+        /// Ajoute une étape complétée à la procédure en cours
+        /// </summary>
+        public void AddProcedureStepData(ProcedureStepData stepData)
+        {
+            if (currentInteraction == null || currentInteraction.type != "procedure")
+            {
+                LogError("Cannot add procedure step: no procedure interaction in progress");
+                return;
+            }
+
+            // Récupérer la liste des étapes existantes
+            if (currentInteraction.data.ContainsKey("steps") && currentInteraction.data["steps"] is List<Dictionary<string, object>> stepsList)
+            {
+                stepsList.Add(stepData.ToDictionary());
+            }
+            else
+            {
+                // Créer une nouvelle liste si elle n'existe pas
+                var newStepsList = new List<Dictionary<string, object>> { stepData.ToDictionary() };
+                currentInteraction.data["steps"] = newStepsList;
+            }
+
+            LogDebug($"Added step {stepData.stepNumber} to procedure (wrong clicks: {stepData.wrongClicksOnThisStep})");
+        }
+
+        /// <summary>
+        /// Termine le tracking de la procédure en cours avec les statistiques finales
+        /// </summary>
+        public void CompleteProcedureInteraction(bool perfectCompletion, int totalWrongClicks, float totalDuration)
+        {
+            if (currentInteraction == null || currentInteraction.type != "procedure")
+            {
+                LogError("Cannot complete procedure: no procedure interaction in progress");
+                return;
+            }
+
+            // Mettre à jour les données finales
+            currentInteraction.AddData("perfectCompletion", perfectCompletion);
+            currentInteraction.AddData("totalWrongClicks", totalWrongClicks);
+            currentInteraction.AddData("totalDuration", totalDuration);
+
+            // Calculer le score final : 100 si parfait, 0 sinon
+            float finalScore = perfectCompletion ? 100f : 0f;
+            currentInteraction.AddData("finalScore", finalScore);
+
+            LogDebug($"Completing procedure - Perfect: {perfectCompletion}, Wrong clicks: {totalWrongClicks}, Duration: {totalDuration}s");
+
+            // Terminer l'interaction (succès si parfait)
+            EndCurrentInteraction(perfectCompletion);
         }
 
         /// <summary>
         /// Track l'affichage d'un texte
         /// </summary>
-        public void TrackTextDisplay(string objectId, TextInteractionData textData)
+        public void TrackTextDisplay(string objectId, string contentKey, TextInteractionData textData)
         {
             var interaction = StartInteraction(objectId, "text", "informative");
 

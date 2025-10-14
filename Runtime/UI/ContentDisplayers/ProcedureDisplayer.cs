@@ -27,10 +27,12 @@ namespace WiseTwin.UI
         private VisualElement modalContainer;
 
         // Données de la procédure
+        private string procedureKey;        // Clé de la procédure pour tracking
         private string procedureTitle;
         private string procedureDescription;
         private List<ProcedureStep> steps;
         private int currentStepIndex = 0;
+        private float procedureStartTime;   // Temps de début de la procédure
 
         // GameObjects de la séquence
         private List<GameObject> sequenceObjects;
@@ -51,11 +53,10 @@ namespace WiseTwin.UI
         private bool isMonitoringClicks = false;
 
         // Analytics tracking
-        private ProcedureInteractionData currentStepData;
         private float stepStartTime;
-        private int wrongClicksCount = 0;
-        private int hintsUsedCount = 0;
+        private int wrongClicksCount = 0; // Erreurs sur l'étape en cours
         private int totalWrongClicksInProcedure = 0; // Compteur global d'erreurs pour toute la procédure
+        private List<ProcedureStepData> completedSteps; // Liste des étapes complétées pour tracking
 
         public class ProcedureStep
         {
@@ -74,6 +75,8 @@ namespace WiseTwin.UI
             rootElement = root;
             currentStepIndex = 0;
             totalWrongClicksInProcedure = 0; // Réinitialiser le compteur d'erreurs
+            procedureStartTime = Time.time; // Enregistrer le temps de début
+            completedSteps = new List<ProcedureStepData>(); // Initialiser la liste des étapes
 
             // Vérifier si on doit activer le highlight
             if (contentData.ContainsKey("enableHighlight"))
@@ -109,6 +112,15 @@ namespace WiseTwin.UI
 
             // Obtenir la langue actuelle
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+
+            // Trouver la clé de la procédure (la première clé qui commence par "procedure_")
+            procedureKey = contentData.Keys.FirstOrDefault(k => k.StartsWith("procedure_"));
+            if (string.IsNullOrEmpty(procedureKey))
+            {
+                // Fallback : chercher n'importe quelle clé de procédure
+                procedureKey = "procedure";
+                Debug.LogWarning($"[ProcedureDisplayer] No procedure_ key found in contentData, using fallback 'procedure'");
+            }
 
             // Extraire les données de la procédure
             procedureTitle = ExtractLocalizedText(contentData, "title", lang);
@@ -158,6 +170,13 @@ namespace WiseTwin.UI
                         Debug.LogWarning($"[ProcedureDisplayer] Could not find GameObject with metadata ID: {step.objectId}");
                     }
                 }
+            }
+
+            // Démarrer le tracking de la procédure globale
+            if (TrainingAnalytics.Instance != null)
+            {
+                TrainingAnalytics.Instance.StartProcedureInteraction(currentObjectId, procedureKey, steps.Count);
+                Debug.Log($"[ProcedureDisplayer] Started procedure tracking: {procedureKey} with {steps.Count} steps");
             }
 
             // Créer l'UI
@@ -364,29 +383,11 @@ namespace WiseTwin.UI
             isMonitoringClicks = true;
             stepStartTime = Time.time;
             wrongClicksCount = 0;
-            hintsUsedCount = 0;
 
             // Cacher le feedback d'erreur de l'étape précédente
             if (errorFeedbackLabel != null)
             {
                 errorFeedbackLabel.style.display = DisplayStyle.None;
-            }
-
-            // Initialiser le tracking analytics pour cette étape
-            if (TrainingAnalytics.Instance != null)
-            {
-                currentStepData = new ProcedureInteractionData
-                {
-                    stepNumber = currentStepIndex + 1,
-                    totalSteps = steps.Count,
-                    title = currentStep.title,
-                    instruction = currentStep.instruction,
-                    hintsUsed = 0,
-                    wrongClicks = 0
-                };
-
-                // TrackProcedureStep appelle déjà StartInteraction, pas besoin de le faire ici
-                TrainingAnalytics.Instance.TrackProcedureStep(currentStep.objectId ?? currentObjectId, currentStepData);
             }
 
             // Mettre à jour l'UI
@@ -408,11 +409,6 @@ namespace WiseTwin.UI
             if (!string.IsNullOrEmpty(currentStep.hint))
             {
                 stepLabel.text += $"\n\n💡 {currentStep.hint}";
-                hintsUsedCount = 1;
-                if (currentStepData != null)
-                {
-                    currentStepData.hintsUsed = 1;
-                }
             }
 
             // Mettre à jour la barre de progression
@@ -551,19 +547,30 @@ namespace WiseTwin.UI
             currentStep.completed = true;
             isMonitoringClicks = false;
 
-            // Terminer le tracking de cette étape
-            if (TrainingAnalytics.Instance != null && currentStepData != null)
+            // Calculer la durée de cette étape
+            float stepDuration = Time.time - stepStartTime;
+
+            // Créer les données de cette étape pour le tracking
+            var stepData = new ProcedureStepData
             {
-                currentStepData.wrongClicks = wrongClicksCount;
-                currentStepData.hintsUsed = hintsUsedCount;
+                stepNumber = currentStepIndex + 1,
+                stepKey = $"step_{currentStepIndex + 1}",
+                targetObjectId = currentStep.objectId,
+                completed = true,
+                duration = stepDuration,
+                wrongClicksOnThisStep = wrongClicksCount
+            };
 
-                // Success = true seulement si aucune erreur sur cette étape
-                bool stepSuccess = wrongClicksCount == 0;
-                float stepScore = stepSuccess ? 100f : 0f;
+            // Ajouter l'étape à la liste
+            completedSteps.Add(stepData);
 
-                TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", stepScore);
-                TrainingAnalytics.Instance.EndCurrentInteraction(stepSuccess);
+            // Ajouter l'étape au tracking global de la procédure
+            if (TrainingAnalytics.Instance != null)
+            {
+                TrainingAnalytics.Instance.AddProcedureStepData(stepData);
             }
+
+            Debug.Log($"[ProcedureDisplayer] Step {stepData.stepNumber} completed - Duration: {stepDuration}s, Wrong clicks: {wrongClicksCount}");
 
             // Attendre un peu avant de passer à l'étape suivante
             StartCoroutine(NextStepAfterDelay(0.5f));
@@ -584,10 +591,6 @@ namespace WiseTwin.UI
             // Incrémenter le compteur de clics incorrects
             wrongClicksCount++;
             totalWrongClicksInProcedure++;
-            if (currentStepData != null)
-            {
-                currentStepData.wrongClicks = wrongClicksCount;
-            }
 
             // Afficher le feedback d'erreur
             ShowErrorFeedback();
@@ -680,10 +683,6 @@ namespace WiseTwin.UI
                             // Juste incrémenter le compteur d'erreurs sans reset
                             wrongClicksCount++;
                             totalWrongClicksInProcedure++;
-                            if (currentStepData != null)
-                            {
-                                currentStepData.wrongClicks = wrongClicksCount;
-                            }
                             Debug.Log($"[ProcedureDisplayer] Wrong click detected (progress kept) - Step wrong clicks: {wrongClicksCount}, Total: {totalWrongClicksInProcedure}");
 
                             // Afficher le feedback d'erreur
@@ -719,9 +718,17 @@ namespace WiseTwin.UI
                 }
             }
 
-            // Les étapes individuelles gèrent déjà leur propre tracking
-            // Pas besoin de terminer une interaction ici car la dernière étape l'a déjà fait
-            Debug.Log($"[ProcedureDisplayer] Procedure completed - Total wrong clicks: {totalWrongClicksInProcedure}");
+            // Calculer la durée totale de la procédure
+            float totalDuration = Time.time - procedureStartTime;
+            bool perfectCompletion = totalWrongClicksInProcedure == 0;
+
+            // Terminer le tracking de la procédure globale
+            if (TrainingAnalytics.Instance != null)
+            {
+                TrainingAnalytics.Instance.CompleteProcedureInteraction(perfectCompletion, totalWrongClicksInProcedure, totalDuration);
+            }
+
+            Debug.Log($"[ProcedureDisplayer] Procedure completed - Duration: {totalDuration}s, Total wrong clicks: {totalWrongClicksInProcedure}, Perfect: {perfectCompletion}");
 
             // Envoyer l'événement de complétion AVANT de fermer pour que ContentDisplayManager puisse le gérer
             OnCompleted?.Invoke(currentObjectId, true);

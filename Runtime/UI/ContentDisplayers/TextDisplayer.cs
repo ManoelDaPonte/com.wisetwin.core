@@ -46,9 +46,19 @@ namespace WiseTwin.UI
             if (TrainingAnalytics.Instance != null)
             {
                 displayStartTime = Time.time;
+
+                // Trouver la clé du contenu texte (chercher "text_" dans les clés)
+                string contentKey = contentData.Keys.FirstOrDefault(k => k.StartsWith("text_"));
+                if (string.IsNullOrEmpty(contentKey))
+                {
+                    // Fallback : utiliser "text_content" si aucune clé trouvée
+                    contentKey = "text_content";
+                }
+
                 currentTextData = new TextInteractionData
                 {
-                    textContent = !string.IsNullOrEmpty(title) ? title : "Text Display",
+                    contentKey = contentKey,
+                    objectId = objectId,
                     timeDisplayed = 0f,
                     readComplete = false,
                     scrollPercentage = 0f
@@ -56,7 +66,7 @@ namespace WiseTwin.UI
 
                 // Ne pas appeler TrackTextDisplay ici car il termine immédiatement l'interaction
                 // On va juste démarrer l'interaction et la terminer quand on ferme
-                var textId = $"{objectId}_text";
+                var textId = $"{objectId}_{contentKey}";
                 var interaction = TrainingAnalytics.Instance.StartInteraction(objectId, "text", "informative");
                 if (interaction != null)
                 {
