@@ -56,6 +56,12 @@ namespace WiseTwin
         private bool isHovered = false;
         private bool isInteractionEnabled = true;
 
+        // Progression state
+        private bool isInProgressionMode = false;
+        private bool isActiveInProgression = false;
+        private ProgressionVisibilityMode currentVisibilityMode = ProgressionVisibilityMode.Visible;
+        private float originalAlpha = 1f;
+
         // Cache des métadonnées
         private Dictionary<string, object> cachedObjectData;
 
@@ -787,5 +793,274 @@ namespace WiseTwin
         {
             HandleInteraction();
         }
+
+        #region Progression System
+
+        /// <summary>
+        /// Active ou désactive cet objet dans un système de progression guidée
+        /// </summary>
+        /// <param name="isActive">Si true, l'objet est l'étape actuelle</param>
+        /// <param name="mode">Mode de visibilité pour les objets non actifs</param>
+        public void SetProgressionState(bool isActive, ProgressionVisibilityMode mode)
+        {
+            isInProgressionMode = true;
+            isActiveInProgression = isActive;
+            currentVisibilityMode = mode;
+
+            if (isActive)
+            {
+                // Objet actif : le rendre complètement interactable
+                RestoreVisibility();
+                SetInteractionEnabled(true);
+
+                if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} is now ACTIVE in progression");
+            }
+            else
+            {
+                // Objet non actif : appliquer le mode de visibilité
+                ApplyVisibilityMode(mode);
+                SetInteractionEnabled(false);
+
+                if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} is now INACTIVE with mode {mode}");
+            }
+        }
+
+        /// <summary>
+        /// Désactive le mode progression et restaure l'état normal
+        /// </summary>
+        public void ExitProgressionMode()
+        {
+            isInProgressionMode = false;
+            isActiveInProgression = false;
+            RestoreVisibility();
+            SetInteractionEnabled(true);
+
+            if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} exited progression mode");
+        }
+
+        /// <summary>
+        /// Indique si cet objet est en mode progression
+        /// </summary>
+        public bool IsInProgressionMode => isInProgressionMode;
+
+        /// <summary>
+        /// Indique si cet objet est l'étape active dans la progression
+        /// </summary>
+        public bool IsActiveInProgression => isActiveInProgression;
+
+        /// <summary>
+        /// Applique le mode de visibilité aux objets non actifs
+        /// </summary>
+        private void ApplyVisibilityMode(ProgressionVisibilityMode mode)
+        {
+            if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Applying visibility mode: {mode}");
+
+            switch (mode)
+            {
+                case ProgressionVisibilityMode.Visible:
+                    // Reste visible et interactable (juste désactiver l'interaction)
+                    RestoreVisibility();
+                    break;
+
+                case ProgressionVisibilityMode.Transparent:
+                    // Rendre semi-transparent
+                    if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Applying transparency 0.3f");
+                    ApplyTransparency(0.3f);
+                    break;
+
+                case ProgressionVisibilityMode.Hidden:
+                    // Rendre complètement invisible en désactivant le renderer et le collider
+                    if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Disabling renderer and collider (hidden)");
+                    if (objectRenderer != null)
+                    {
+                        objectRenderer.enabled = false;
+                    }
+                    // Désactiver aussi le collider pour ne pas intercepter les clics
+                    Collider col = GetComponent<Collider>();
+                    if (col != null)
+                    {
+                        col.enabled = false;
+                        if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Collider disabled");
+                    }
+                    break;
+
+                case ProgressionVisibilityMode.Disabled:
+                    // Désactiver le GameObject complètement (pas recommandé pour la progression)
+                    if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Disabling GameObject");
+                    gameObject.SetActive(false);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Applique une transparence au matériau
+        /// </summary>
+        private void ApplyTransparency(float alpha)
+        {
+            if (objectRenderer == null || instanceMaterial == null)
+            {
+                if (debugMode) Debug.LogWarning($"[InteractableObject] {gameObject.name} - Cannot apply transparency: objectRenderer={objectRenderer}, instanceMaterial={instanceMaterial}");
+                return;
+            }
+
+            if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - ApplyTransparency({alpha}) - Material: {instanceMaterial.name}, Shader: {instanceMaterial.shader.name}");
+
+            // Sauvegarder l'alpha original si ce n'est pas déjà fait
+            if (originalAlpha == 1f && alpha < 1f)
+            {
+                if (instanceMaterial.HasProperty("_Color"))
+                {
+                    originalAlpha = instanceMaterial.GetColor("_Color").a;
+                }
+                else if (instanceMaterial.HasProperty("_BaseColor"))
+                {
+                    originalAlpha = instanceMaterial.GetColor("_BaseColor").a;
+                }
+            }
+
+            // Activer le mode transparent si nécessaire
+            if (alpha < 1f)
+            {
+                // Pour Standard shader (Built-in)
+                if (instanceMaterial.HasProperty("_Mode"))
+                {
+                    instanceMaterial.SetFloat("_Mode", 3); // Transparent mode
+                    instanceMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    instanceMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    instanceMaterial.SetInt("_ZWrite", 0);
+                    instanceMaterial.DisableKeyword("_ALPHATEST_ON");
+                    instanceMaterial.EnableKeyword("_ALPHABLEND_ON");
+                    instanceMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                    instanceMaterial.renderQueue = 3000;
+                }
+                // Pour URP shader (Universal Render Pipeline)
+                else if (instanceMaterial.HasProperty("_Surface"))
+                {
+                    if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Configuring URP Transparent mode");
+
+                    // Set Surface Type to Transparent
+                    instanceMaterial.SetFloat("_Surface", 1); // 0 = Opaque, 1 = Transparent
+
+                    // Set Blend Mode to Alpha
+                    instanceMaterial.SetFloat("_Blend", 0); // 0 = Alpha, 1 = Premultiply, 2 = Additive, 3 = Multiply
+
+                    // Configure blend operations
+                    instanceMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    instanceMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    instanceMaterial.SetInt("_ZWrite", 0);
+
+                    // Enable alpha clipping if available
+                    if (instanceMaterial.HasProperty("_AlphaClip"))
+                    {
+                        instanceMaterial.SetFloat("_AlphaClip", 0);
+                    }
+
+                    // Set render queue for transparency
+                    instanceMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+                    // Enable/disable keywords for URP
+                    instanceMaterial.DisableKeyword("_ALPHATEST_ON");
+                    instanceMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                    instanceMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                    instanceMaterial.EnableKeyword("_BLENDMODE_ALPHA");
+
+                    if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - URP Transparent mode configured");
+                }
+            }
+
+            // Appliquer l'alpha
+            if (instanceMaterial.HasProperty("_Color"))
+            {
+                Color color = instanceMaterial.GetColor("_Color");
+                color.a = alpha;
+                instanceMaterial.SetColor("_Color", color);
+            }
+            else if (instanceMaterial.HasProperty("_BaseColor"))
+            {
+                Color color = instanceMaterial.GetColor("_BaseColor");
+                color.a = alpha;
+                instanceMaterial.SetColor("_BaseColor", color);
+            }
+        }
+
+        /// <summary>
+        /// Restaure la visibilité complète de l'objet
+        /// </summary>
+        private void RestoreVisibility()
+        {
+            // S'assurer que le renderer est actif
+            if (objectRenderer != null && !objectRenderer.enabled)
+            {
+                objectRenderer.enabled = true;
+                if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Renderer re-enabled");
+            }
+
+            if (currentVisibilityMode == ProgressionVisibilityMode.Disabled)
+            {
+                if (!gameObject.activeSelf)
+                {
+                    gameObject.SetActive(true);
+                }
+            }
+            else if (currentVisibilityMode == ProgressionVisibilityMode.Hidden)
+            {
+                // Réactiver aussi le collider
+                Collider col = GetComponent<Collider>();
+                if (col != null)
+                {
+                    col.enabled = true;
+                    if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Collider re-enabled");
+                }
+                if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Restored from Hidden mode");
+            }
+            else if (currentVisibilityMode == ProgressionVisibilityMode.Transparent)
+            {
+                // Restaurer l'opacité complète
+                ApplyTransparency(originalAlpha);
+
+                // Restaurer le mode opaque si nécessaire
+                if (instanceMaterial != null)
+                {
+                    // Pour Standard shader (Built-in)
+                    if (instanceMaterial.HasProperty("_Mode"))
+                    {
+                        instanceMaterial.SetFloat("_Mode", 0); // Opaque mode
+                        instanceMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                        instanceMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
+                        instanceMaterial.SetInt("_ZWrite", 1);
+                        instanceMaterial.DisableKeyword("_ALPHATEST_ON");
+                        instanceMaterial.DisableKeyword("_ALPHABLEND_ON");
+                        instanceMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                        instanceMaterial.renderQueue = -1;
+                    }
+                    // Pour URP shader (Universal Render Pipeline)
+                    else if (instanceMaterial.HasProperty("_Surface"))
+                    {
+                        if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - Restoring URP Opaque mode");
+
+                        // Set Surface Type to Opaque
+                        instanceMaterial.SetFloat("_Surface", 0); // 0 = Opaque, 1 = Transparent
+
+                        // Configure blend operations for opaque
+                        instanceMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                        instanceMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
+                        instanceMaterial.SetInt("_ZWrite", 1);
+
+                        // Set render queue back to default
+                        instanceMaterial.renderQueue = -1;
+
+                        // Disable transparency keywords
+                        instanceMaterial.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                        instanceMaterial.DisableKeyword("_BLENDMODE_ALPHA");
+                        instanceMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                        instanceMaterial.DisableKeyword("_ALPHATEST_ON");
+
+                        if (debugMode) Debug.Log($"[InteractableObject] {gameObject.name} - URP Opaque mode restored");
+                    }
+                }
+            }
+        }
+
+        #endregion
     }
 }
