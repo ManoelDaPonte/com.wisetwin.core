@@ -41,7 +41,10 @@ namespace WiseTwin
         [Tooltip("Liste ordonnée des objets interactables à afficher progressivement (remplie automatiquement si autoDetect activé)")]
         [SerializeField] private List<InteractableObject> progressionSequence = new List<InteractableObject>();
 
-        [Tooltip("Mode de visibilité pour les objets pas encore actifs")]
+        [Tooltip("Exiger un ordre séquentiel (un à la fois) ou permettre l'interaction libre (tous visibles)")]
+        [SerializeField] private bool requireSequentialOrder = true;
+
+        [Tooltip("Mode de visibilité pour les objets pas encore actifs (seulement si requireSequentialOrder = true)")]
         [SerializeField] private ProgressionVisibilityMode visibilityMode = ProgressionVisibilityMode.Transparent;
 
         [Tooltip("Afficher les objets déjà complétés normalement ou les cacher")]
@@ -267,44 +270,87 @@ namespace WiseTwin
         /// </summary>
         private void UpdateAllObjectsVisibility()
         {
-            for (int i = 0; i < progressionSequence.Count; i++)
+            if (!requireSequentialOrder)
             {
-                var interactable = progressionSequence[i];
-                if (interactable == null) continue;
-
-                var mapper = interactable.GetComponent<ObjectMetadataMapper>();
-                if (mapper == null) continue;
-
-                string objectId = mapper.MetadataId;
-                bool isCompleted = completedObjectIds.Contains(objectId);
-
-                if (i < currentStepIndex)
+                // Mode ordre libre : tous les objets non-complétés sont visibles et interactables
+                for (int i = 0; i < progressionSequence.Count; i++)
                 {
-                    // Objet déjà passé
-                    if (hideCompletedObjects)
+                    var interactable = progressionSequence[i];
+                    if (interactable == null) continue;
+
+                    var mapper = interactable.GetComponent<ObjectMetadataMapper>();
+                    if (mapper == null) continue;
+
+                    string objectId = mapper.MetadataId;
+                    bool isCompleted = completedObjectIds.Contains(objectId);
+
+                    if (isCompleted)
                     {
-                        // Cacher les objets complétés (un seul objet visible à la fois)
-                        interactable.SetProgressionState(false, visibilityMode);
-                    }
-                    else if (showCompletedObjects && isCompleted)
-                    {
-                        // Garder les objets complétés visibles
-                        interactable.ExitProgressionMode();
+                        // Objet complété
+                        if (hideCompletedObjects)
+                        {
+                            // Cacher les objets complétés
+                            interactable.SetProgressionState(false, visibilityMode);
+                        }
+                        else if (showCompletedObjects)
+                        {
+                            // Garder les objets complétés visibles
+                            interactable.ExitProgressionMode();
+                        }
+                        else
+                        {
+                            interactable.SetProgressionState(false, visibilityMode);
+                        }
                     }
                     else
                     {
-                        interactable.SetProgressionState(false, visibilityMode);
+                        // Objet non complété - le rendre interactable
+                        interactable.SetProgressionState(true, visibilityMode);
                     }
                 }
-                else if (i == currentStepIndex)
+            }
+            else
+            {
+                // Mode séquentiel : un seul objet actif à la fois
+                for (int i = 0; i < progressionSequence.Count; i++)
                 {
-                    // Objet actuel - le rendre interactable
-                    interactable.SetProgressionState(true, visibilityMode);
-                }
-                else
-                {
-                    // Objet futur - le cacher selon le mode
-                    interactable.SetProgressionState(false, visibilityMode);
+                    var interactable = progressionSequence[i];
+                    if (interactable == null) continue;
+
+                    var mapper = interactable.GetComponent<ObjectMetadataMapper>();
+                    if (mapper == null) continue;
+
+                    string objectId = mapper.MetadataId;
+                    bool isCompleted = completedObjectIds.Contains(objectId);
+
+                    if (i < currentStepIndex)
+                    {
+                        // Objet déjà passé
+                        if (hideCompletedObjects)
+                        {
+                            // Cacher les objets complétés (un seul objet visible à la fois)
+                            interactable.SetProgressionState(false, visibilityMode);
+                        }
+                        else if (showCompletedObjects && isCompleted)
+                        {
+                            // Garder les objets complétés visibles
+                            interactable.ExitProgressionMode();
+                        }
+                        else
+                        {
+                            interactable.SetProgressionState(false, visibilityMode);
+                        }
+                    }
+                    else if (i == currentStepIndex)
+                    {
+                        // Objet actuel - le rendre interactable
+                        interactable.SetProgressionState(true, visibilityMode);
+                    }
+                    else
+                    {
+                        // Objet futur - le cacher selon le mode
+                        interactable.SetProgressionState(false, visibilityMode);
+                    }
                 }
             }
         }
@@ -322,6 +368,93 @@ namespace WiseTwin
                 return;
             }
 
+            if (!requireSequentialOrder)
+            {
+                // Mode ordre libre : accepter la complétion de n'importe quel objet
+                HandleFreeOrderCompletion(objectId, success);
+            }
+            else
+            {
+                // Mode séquentiel : vérifier que c'est bien l'objet actuel
+                HandleSequentialCompletion(objectId, success);
+            }
+        }
+
+        /// <summary>
+        /// Gère la complétion en mode ordre libre
+        /// </summary>
+        private void HandleFreeOrderCompletion(string objectId, bool success)
+        {
+            // Trouver l'objet interactable correspondant
+            if (!objectIdToInteractable.TryGetValue(objectId, out InteractableObject completedObject))
+            {
+                if (debugMode) Debug.Log($"[ProgressionManager] Object {objectId} not found in progression sequence");
+                return;
+            }
+
+            // Trouver l'index de l'objet
+            int objectIndex = progressionSequence.IndexOf(completedObject);
+            if (objectIndex < 0)
+            {
+                if (debugMode) Debug.Log($"[ProgressionManager] Object {objectId} not in progression sequence");
+                return;
+            }
+
+            // Incrémenter le compteur d'essais
+            if (!attemptCounts.ContainsKey(objectId))
+            {
+                attemptCounts[objectId] = 0;
+            }
+            attemptCounts[objectId]++;
+
+            if (debugMode) Debug.Log($"[ProgressionManager] Object {objectId} completed with success={success}, attempt {attemptCounts[objectId]}");
+
+            // Vérifier le nombre d'essais max
+            if (maxAttemptsPerObject > 0 && attemptCounts[objectId] >= maxAttemptsPerObject && !success)
+            {
+                OnMaxAttemptsReached?.Invoke(completedObject, attemptCounts[objectId]);
+
+                if (debugMode) Debug.LogWarning($"[ProgressionManager] Max attempts reached for {objectId}");
+
+                // Décider si on marque comme complété quand même
+                if (!requireSuccessForAll)
+                {
+                    completedObjectIds.Add(objectId);
+                    OnStepCompleted?.Invoke(objectIndex, completedObject, false);
+                    UpdateAllObjectsVisibility();
+                    CheckAllCompleted();
+                }
+                return;
+            }
+
+            // Si succès, marquer comme complété
+            if (success)
+            {
+                completedObjectIds.Add(objectId);
+                OnStepCompleted?.Invoke(objectIndex, completedObject, true);
+                UpdateAllObjectsVisibility();
+                CheckAllCompleted();
+            }
+            else
+            {
+                // Échec - permettre de réessayer
+                OnStepCompleted?.Invoke(objectIndex, completedObject, false);
+
+                if (!requireSuccessForAll)
+                {
+                    // Si on n'exige pas le succès, marquer quand même comme complété
+                    completedObjectIds.Add(objectId);
+                    UpdateAllObjectsVisibility();
+                    CheckAllCompleted();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gère la complétion en mode séquentiel
+        /// </summary>
+        private void HandleSequentialCompletion(string objectId, bool success)
+        {
             // Vérifier que c'est bien l'objet actuel
             if (currentStepIndex >= progressionSequence.Count) return;
 
@@ -380,6 +513,21 @@ namespace WiseTwin
                     completedObjectIds.Add(objectId);
                     MoveToNextStep();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Vérifie si tous les objets ont été complétés (mode ordre libre)
+        /// </summary>
+        private void CheckAllCompleted()
+        {
+            if (completedObjectIds.Count >= progressionSequence.Count)
+            {
+                CompleteProgression();
+            }
+            else if (debugMode)
+            {
+                Debug.Log($"[ProgressionManager] {completedObjectIds.Count}/{progressionSequence.Count} objects completed");
             }
         }
 

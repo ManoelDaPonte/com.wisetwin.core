@@ -37,7 +37,7 @@ namespace WiseTwin
         [SerializeField] private bool useDragDropSequence = false;
         [SerializeField] private bool enableYellowHighlight = true; // Option pour activer/désactiver le clignotement jaune
         [SerializeField] private bool keepProgressOnOtherClick = false; // Ne pas réinitialiser la progression en mode procédure
-        [SerializeField] private List<GameObject> procedureSequence = new List<GameObject>();
+        [SerializeField] private List<ProcedureStepOptions> procedureStepsWithOptions = new List<ProcedureStepOptions>();
 
         [Header("Reset Settings (Only for Procedure type)")]
         [SerializeField] private bool useResetScript = false;
@@ -294,7 +294,7 @@ namespace WiseTwin
             }
 
             // Pour les procédures avec drag & drop, créer les données dynamiquement
-            if (contentType == ContentType.Procedure && useDragDropSequence && procedureSequence.Count > 0)
+            if (contentType == ContentType.Procedure && useDragDropSequence && procedureStepsWithOptions.Count > 0)
             {
                 if (ContentDisplayManager.Instance != null)
                 {
@@ -308,7 +308,7 @@ namespace WiseTwin
                     // Créer les données de procédure dynamiquement
                     var procedureData = CreateDynamicProcedureData();
 
-                    if (debugMode) Debug.Log($"[InteractableObject] Displaying drag & drop procedure with {procedureSequence.Count} steps");
+                    if (debugMode) Debug.Log($"[InteractableObject] Displaying drag & drop procedure with {procedureStepsWithOptions.Count} steps");
                     // Passer l'option de highlight avec les données
                     procedureData["enableHighlight"] = enableYellowHighlight;
                     procedureData["keepProgressOnOtherClick"] = keepProgressOnOtherClick;
@@ -469,7 +469,7 @@ namespace WiseTwin
         }
 
         /// <summary>
-        /// Crée les données de procédure en combinant les métadatas et les GameObjects drag & drop
+        /// Crée les données de procédure avec système de choix multiples (correct + distracteurs)
         /// </summary>
         Dictionary<string, object> CreateDynamicProcedureData()
         {
@@ -516,169 +516,171 @@ namespace WiseTwin
                 }
             }
 
-            // Si on a trouvé des métadatas de procédure, les utiliser pour titre et description
+            // Copier le titre et la description depuis les métadatas ou utiliser des valeurs par défaut
             if (metadataProcedure != null)
             {
-                // Ajouter l'option de highlight aux données
-                procedureData["enableHighlight"] = enableYellowHighlight;
-                procedureData["keepProgressOnOtherClick"] = keepProgressOnOtherClick;
-                // Ajouter le script de reset si configuré
-                if (useResetScript && resetScript != null)
-                {
-                    var resetInterface = resetScript as IProcedureReset;
-                    if (resetInterface != null)
-                    {
-                        procedureData["resetScript"] = resetInterface;
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[InteractableObject] Reset script {resetScript.name} does not implement IProcedureReset interface");
-                    }
-                }
-
-                // Copier le titre et la description depuis les métadatas
                 if (metadataProcedure.ContainsKey("title"))
                     procedureData["title"] = metadataProcedure["title"];
                 else
-                    procedureData["title"] = new Dictionary<string, object> { ["en"] = "Procedure", ["fr"] = "Procédure" };
+                    procedureData["title"] = new Dictionary<string, object> { ["en"] = "Evaluation Procedure", ["fr"] = "Procédure d'évaluation" };
 
                 if (metadataProcedure.ContainsKey("description"))
                     procedureData["description"] = metadataProcedure["description"];
                 else
-                    procedureData["description"] = new Dictionary<string, object> { ["en"] = "Follow the steps", ["fr"] = "Suivez les étapes" };
-
-                // Créer les étapes en combinant métadatas et GameObjects
-                for (int i = 0; i < procedureSequence.Count; i++)
-                {
-                    var stepObj = procedureSequence[i];
-                    if (stepObj == null) continue;
-
-                    string stepKey = $"step_{i + 1}";
-
-                    // Récupérer l'ID metadata de l'objet
-                    string objectId = "";
-                    var mapper = stepObj.GetComponent<ObjectMetadataMapper>();
-                    if (mapper != null)
+                    procedureData["description"] = new Dictionary<string, object>
                     {
-                        objectId = mapper.MetadataId;
-                    }
-                    else
-                    {
-                        objectId = stepObj.name.ToLower().Replace(" ", "_");
-                    }
-
-                    // Vérifier si on a des données pour cette étape dans les métadatas
-                    if (metadataProcedure.ContainsKey(stepKey))
-                    {
-                        // Utiliser les données des métadatas mais remplacer l'objectId par celui du GameObject
-                        var stepData = metadataProcedure[stepKey];
-                        if (stepData is Dictionary<string, object> stepDict)
-                        {
-                            var modifiedStep = new Dictionary<string, object>(stepDict);
-                            modifiedStep["objectId"] = objectId;
-                            procedureData[stepKey] = modifiedStep;
-                        }
-                        else if (stepData != null)
-                        {
-                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(stepData);
-                            var convertedStepDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
-                            convertedStepDict["objectId"] = objectId;
-                            procedureData[stepKey] = convertedStepDict;
-                        }
-                    }
-                    else
-                    {
-                        // Si pas de métadatas pour cette étape, créer des données par défaut
-                        procedureData[stepKey] = new Dictionary<string, object>
-                        {
-                            ["objectId"] = objectId,
-                            ["instruction"] = new Dictionary<string, object>
-                            {
-                                ["en"] = $"Step {i + 1}: Interact with the highlighted object",
-                                ["fr"] = $"Étape {i + 1}: Interagissez avec l'objet surligné"
-                            },
-                            ["validation"] = new Dictionary<string, object>
-                            {
-                                ["en"] = "Object interaction validated",
-                                ["fr"] = "Interaction avec l'objet validée"
-                            },
-                            ["hint"] = new Dictionary<string, object>
-                            {
-                                ["en"] = "Click on the yellow highlighted object",
-                                ["fr"] = "Cliquez sur l'objet surligné en jaune"
-                            }
-                        };
-                    }
-
-                    // S'assurer que l'objet a un ObjectMetadataMapper
-                    if (mapper == null)
-                    {
-                        mapper = stepObj.AddComponent<ObjectMetadataMapper>();
-                        mapper.MetadataId = objectId;
-                        if (debugMode) Debug.Log($"[InteractableObject] Added ObjectMetadataMapper to {stepObj.name} with ID: {objectId}");
-                    }
-                }
+                        ["en"] = "Select the correct object at each step",
+                        ["fr"] = "Sélectionnez le bon objet à chaque étape"
+                    };
             }
             else
             {
-                // Si pas de métadatas, utiliser les valeurs par défaut
-                if (debugMode) Debug.LogWarning("[InteractableObject] No procedure metadata found, using default values");
-
-                procedureData["title"] = new Dictionary<string, object>
-                {
-                    ["en"] = "Procedure",
-                    ["fr"] = "Procédure"
-                };
-
+                procedureData["title"] = new Dictionary<string, object> { ["en"] = "Evaluation Procedure", ["fr"] = "Procédure d'évaluation" };
                 procedureData["description"] = new Dictionary<string, object>
                 {
-                    ["en"] = "Follow the steps in order",
-                    ["fr"] = "Suivez les étapes dans l'ordre"
+                    ["en"] = "Select the correct object at each step",
+                    ["fr"] = "Sélectionnez le bon objet à chaque étape"
                 };
+            }
 
-                // Créer les étapes par défaut
-                for (int i = 0; i < procedureSequence.Count; i++)
+            // Créer les étapes avec options multiples
+            for (int i = 0; i < procedureStepsWithOptions.Count; i++)
+            {
+                var stepOptions = procedureStepsWithOptions[i];
+                if (stepOptions.correctObject == null) continue;
+
+                string stepKey = $"step_{i + 1}";
+
+                // Récupérer l'ID du bon objet
+                string correctObjectId = GetOrCreateObjectId(stepOptions.correctObject);
+
+                // Récupérer les IDs des mauvais objets
+                var wrongObjectIds = new List<string>();
+                foreach (var wrongObj in stepOptions.wrongObjects)
                 {
-                    var stepObj = procedureSequence[i];
-                    if (stepObj == null) continue;
-
-                    string stepKey = $"step_{i + 1}";
-                    string objectId = "";
-                    var mapper = stepObj.GetComponent<ObjectMetadataMapper>();
-                    if (mapper != null)
+                    if (wrongObj != null)
                     {
-                        objectId = mapper.MetadataId;
+                        wrongObjectIds.Add(GetOrCreateObjectId(wrongObj));
                     }
-                    else
-                    {
-                        objectId = stepObj.name.ToLower().Replace(" ", "_");
-                        mapper = stepObj.AddComponent<ObjectMetadataMapper>();
-                        mapper.MetadataId = objectId;
-                    }
-
-                    procedureData[stepKey] = new Dictionary<string, object>
-                    {
-                        ["objectId"] = objectId,
-                        ["instruction"] = new Dictionary<string, object>
-                        {
-                            ["en"] = $"Step {i + 1}: Click on {stepObj.name}",
-                            ["fr"] = $"Étape {i + 1}: Cliquez sur {stepObj.name}"
-                        },
-                        ["validation"] = new Dictionary<string, object>
-                        {
-                            ["en"] = "Step completed",
-                            ["fr"] = "Étape terminée"
-                        },
-                        ["hint"] = new Dictionary<string, object>
-                        {
-                            ["en"] = "Look for the highlighted object",
-                            ["fr"] = "Cherchez l'objet surligné"
-                        }
-                    };
                 }
+
+                // Déterminer l'instruction pour cette étape
+                string instructionEn, instructionFr;
+                if (!string.IsNullOrEmpty(stepOptions.customInstruction))
+                {
+                    // Utiliser l'instruction personnalisée
+                    instructionEn = stepOptions.customInstruction;
+                    instructionFr = stepOptions.customInstruction;
+                }
+                else if (metadataProcedure != null && metadataProcedure.ContainsKey(stepKey))
+                {
+                    // Utiliser l'instruction des métadonnées si disponible
+                    var stepData = metadataProcedure[stepKey];
+                    Dictionary<string, object> stepDict = null;
+                    if (stepData is Dictionary<string, object> dict)
+                    {
+                        stepDict = dict;
+                    }
+                    else if (stepData != null)
+                    {
+                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(stepData);
+                        stepDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                    }
+
+                    instructionEn = ExtractLocalizedTextFromDict(stepDict, "instruction", "en");
+                    instructionFr = ExtractLocalizedTextFromDict(stepDict, "instruction", "fr");
+
+                    if (string.IsNullOrEmpty(instructionEn))
+                        instructionEn = $"Step {i + 1}: Select the correct object";
+                    if (string.IsNullOrEmpty(instructionFr))
+                        instructionFr = $"Étape {i + 1}: Sélectionnez le bon objet";
+                }
+                else
+                {
+                    // Instruction par défaut
+                    instructionEn = $"Step {i + 1}: Select the correct object";
+                    instructionFr = $"Étape {i + 1}: Sélectionnez le bon objet";
+                }
+
+                // Créer les données de l'étape avec le nouveau format (correctObjectId + wrongObjectIds)
+                procedureData[stepKey] = new Dictionary<string, object>
+                {
+                    ["correctObjectId"] = correctObjectId,
+                    ["wrongObjectIds"] = wrongObjectIds,
+                    ["instruction"] = new Dictionary<string, object>
+                    {
+                        ["en"] = instructionEn,
+                        ["fr"] = instructionFr
+                    },
+                    ["validation"] = new Dictionary<string, object>
+                    {
+                        ["en"] = "Correct!",
+                        ["fr"] = "Correct !"
+                    },
+                    ["hint"] = new Dictionary<string, object>
+                    {
+                        ["en"] = "Choose the correct object among the highlighted ones",
+                        ["fr"] = "Choisissez le bon objet parmi ceux surlignés"
+                    }
+                };
             }
 
             return procedureData;
+        }
+
+        /// <summary>
+        /// Récupère l'ID d'un objet ou le crée si nécessaire
+        /// </summary>
+        string GetOrCreateObjectId(GameObject obj)
+        {
+            var mapper = obj.GetComponent<ObjectMetadataMapper>();
+            if (mapper != null)
+            {
+                return mapper.MetadataId;
+            }
+            else
+            {
+                // Créer un mapper et un ID
+                string objectId = obj.name.ToLower().Replace(" ", "_");
+                mapper = obj.AddComponent<ObjectMetadataMapper>();
+                mapper.MetadataId = objectId;
+                if (debugMode) Debug.Log($"[InteractableObject] Added ObjectMetadataMapper to {obj.name} with ID: {objectId}");
+                return objectId;
+            }
+        }
+
+        /// <summary>
+        /// Extrait un texte localisé depuis un dictionnaire
+        /// </summary>
+        string ExtractLocalizedTextFromDict(Dictionary<string, object> data, string key, string language)
+        {
+            if (data == null || !data.ContainsKey(key)) return "";
+
+            var textData = data[key];
+
+            if (textData is string simpleText) return simpleText;
+
+            if (textData is Dictionary<string, object> localizedText)
+            {
+                if (localizedText.ContainsKey(language))
+                    return localizedText[language]?.ToString() ?? "";
+                if (localizedText.ContainsKey("en"))
+                    return localizedText["en"]?.ToString() ?? "";
+            }
+            else if (textData != null && textData.GetType().FullName.Contains("JObject"))
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(textData);
+                var localizedJObject = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+                if (localizedJObject != null)
+                {
+                    if (localizedJObject.ContainsKey(language))
+                        return localizedJObject[language];
+                    if (localizedJObject.ContainsKey("en"))
+                        return localizedJObject["en"];
+                }
+            }
+
+            return "";
         }
 
         /// <summary>
@@ -1062,5 +1064,22 @@ namespace WiseTwin
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Définit les options pour une étape de procédure (objet correct + distracteurs)
+    /// </summary>
+    [System.Serializable]
+    public class ProcedureStepOptions
+    {
+        [Tooltip("L'objet correct à cliquer pour cette étape")]
+        public GameObject correctObject;
+
+        [Tooltip("Les objets incorrects (distracteurs) qui seront aussi surlignés")]
+        public List<GameObject> wrongObjects = new List<GameObject>();
+
+        [Tooltip("Instruction personnalisée pour cette étape (optionnel, override les métadonnées)")]
+        [TextArea(2, 4)]
+        public string customInstruction;
     }
 }

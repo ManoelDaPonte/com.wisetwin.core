@@ -12,6 +12,7 @@ namespace WiseTwin
     {
         private ProcedureDisplayer procedureDisplayer;
         private int stepIndex;
+        private GameObject associatedObject; // L'objet GameObject lié à ce handler
         private bool isActive = false;
         private Renderer objectRenderer;
         private Color originalEmissionColor;
@@ -22,10 +23,11 @@ namespace WiseTwin
         private float hoverScale = 1.05f;
         private Vector3 originalScale;
 
-        public void Initialize(ProcedureDisplayer displayer, int index)
+        public void Initialize(ProcedureDisplayer displayer, int index, GameObject obj)
         {
             procedureDisplayer = displayer;
             stepIndex = index;
+            associatedObject = obj;
             isActive = true;
             originalScale = transform.localScale;
 
@@ -129,11 +131,8 @@ namespace WiseTwin
                 Debug.Log($"[ProcedureStepClickHandler] Object {gameObject.name} clicked for step {stepIndex + 1}");
             }
 
-            // Désactiver ce handler pour éviter les clics multiples
-            isActive = false;
-
-            // Valider l'étape dans le ProcedureDisplayer
-            if (procedureDisplayer != null)
+            // Valider l'étape dans le ProcedureDisplayer en passant l'objet cliqué
+            if (procedureDisplayer != null && associatedObject != null)
             {
                 // Feedback visuel rapide
                 if (objectRenderer != null && objectRenderer.material != null)
@@ -143,7 +142,12 @@ namespace WiseTwin
                     StartCoroutine(RestoreColorAfterDelay(originalColor, 0.1f));
                 }
 
-                procedureDisplayer.ValidateCurrentStep();
+                // Passer l'objet associé au displayer pour vérification
+                procedureDisplayer.ValidateCurrentStep(associatedObject);
+
+                // Ne désactiver ce handler que si c'était la bonne réponse
+                // Si mauvaise réponse, ValidateCurrentStep retournera sans passer à l'étape suivante
+                // et le handler restera actif pour permettre de réessayer
             }
         }
 

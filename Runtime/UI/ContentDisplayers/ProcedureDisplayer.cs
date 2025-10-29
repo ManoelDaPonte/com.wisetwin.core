@@ -35,9 +35,10 @@ namespace WiseTwin.UI
         private float procedureStartTime;   // Temps de début de la procédure
 
         // GameObjects de la séquence
-        private List<GameObject> sequenceObjects;
+        private List<GameObject> allSequenceObjects; // Tous les objets (correct + wrong) de toutes les étapes
         private Dictionary<GameObject, Material> originalMaterials;
-        private GameObject currentHighlightedObject;
+        private List<GameObject> currentHighlightedObjects = new List<GameObject>(); // Objets surlignés à l'étape actuelle
+        private GameObject currentCorrectObject; // L'objet correct de l'étape actuelle
         private bool shouldHighlight = true; // Contrôle si on doit surligner ou non
         private bool keepProgressOnOtherClick = false; // Ne pas réinitialiser à 0 si on clique ailleurs
         private IProcedureReset resetScript; // Script de reset personnalisé
@@ -50,7 +51,6 @@ namespace WiseTwin.UI
         private Label errorFeedbackLabel;
         private VisualElement progressBar;
         private VisualElement progressFill;
-        private bool isMonitoringClicks = false;
 
         // Analytics tracking
         private float stepStartTime;
@@ -60,12 +60,14 @@ namespace WiseTwin.UI
 
         public class ProcedureStep
         {
-            public string objectId;
+            public string correctObjectId;
+            public List<string> wrongObjectIds = new List<string>();
             public string title;
             public string instruction;
             public string validation;
             public string hint;
-            public GameObject targetObject;
+            public GameObject correctObject;
+            public List<GameObject> wrongObjects = new List<GameObject>();
             public bool completed = false;
         }
 
@@ -137,21 +139,23 @@ namespace WiseTwin.UI
 
             // Initialiser les matériaux originaux
             originalMaterials = new Dictionary<GameObject, Material>();
-            sequenceObjects = new List<GameObject>();
+            allSequenceObjects = new List<GameObject>();
 
-            // Trouver les GameObjects pour chaque étape
+            // Récupérer tous les mappers une seule fois
+            var allMappers = FindObjectsByType<ObjectMetadataMapper>(FindObjectsSortMode.None);
+
+            // Trouver les GameObjects pour chaque étape (correct + wrong)
             foreach (var step in steps)
             {
-                if (!string.IsNullOrEmpty(step.objectId))
+                // Chercher l'objet correct
+                if (!string.IsNullOrEmpty(step.correctObjectId))
                 {
-                    // Chercher l'objet par son metadata ID
-                    var allMappers = FindObjectsByType<ObjectMetadataMapper>(FindObjectsSortMode.None);
                     foreach (var mapper in allMappers)
                     {
-                        if (mapper.MetadataId == step.objectId)
+                        if (mapper.MetadataId == step.correctObjectId)
                         {
-                            step.targetObject = mapper.gameObject;
-                            sequenceObjects.Add(mapper.gameObject);
+                            step.correctObject = mapper.gameObject;
+                            allSequenceObjects.Add(mapper.gameObject);
 
                             // Stocker le matériau original
                             var renderer = mapper.GetComponent<Renderer>();
@@ -160,14 +164,39 @@ namespace WiseTwin.UI
                                 originalMaterials[mapper.gameObject] = renderer.material;
                             }
 
-                            Debug.Log($"[ProcedureDisplayer] Found object for step: {step.objectId} -> {mapper.gameObject.name}");
+                            Debug.Log($"[ProcedureDisplayer] Found correct object for step: {step.correctObjectId} -> {mapper.gameObject.name}");
                             break;
                         }
                     }
 
-                    if (step.targetObject == null)
+                    if (step.correctObject == null)
                     {
-                        Debug.LogWarning($"[ProcedureDisplayer] Could not find GameObject with metadata ID: {step.objectId}");
+                        Debug.LogWarning($"[ProcedureDisplayer] Could not find correct GameObject with metadata ID: {step.correctObjectId}");
+                    }
+                }
+
+                // Chercher les objets incorrects
+                foreach (var wrongId in step.wrongObjectIds)
+                {
+                    if (string.IsNullOrEmpty(wrongId)) continue;
+
+                    foreach (var mapper in allMappers)
+                    {
+                        if (mapper.MetadataId == wrongId)
+                        {
+                            step.wrongObjects.Add(mapper.gameObject);
+                            allSequenceObjects.Add(mapper.gameObject);
+
+                            // Stocker le matériau original
+                            var renderer = mapper.GetComponent<Renderer>();
+                            if (renderer != null && !originalMaterials.ContainsKey(mapper.gameObject))
+                            {
+                                originalMaterials[mapper.gameObject] = renderer.material;
+                            }
+
+                            Debug.Log($"[ProcedureDisplayer] Found wrong object for step: {wrongId} -> {mapper.gameObject.name}");
+                            break;
+                        }
                     }
                 }
             }
@@ -380,7 +409,6 @@ namespace WiseTwin.UI
             }
 
             var currentStep = steps[currentStepIndex];
-            isMonitoringClicks = true;
             stepStartTime = Time.time;
             wrongClicksCount = 0;
 
@@ -415,44 +443,59 @@ namespace WiseTwin.UI
             float progress = (float)currentStepIndex / steps.Count * 100f;
             progressFill.style.width = Length.Percent(progress);
 
-            // Retirer la surbrillance de l'objet précédent si elle était active
-            if (currentHighlightedObject != null && shouldHighlight)
+            // IMPORTANT : Nettoyer TOUS les objets de la séquence avant de démarrer la nouvelle étape
+            // Cela évite qu'un objet garde un handler ou une surbrillance de l'étape précédente
+            foreach (var obj in allSequenceObjects)
             {
-                RemoveHighlight(currentHighlightedObject);
-
-                // Retirer le composant de clic temporaire
-                var oldClickHandler = currentHighlightedObject.GetComponent<ProcedureStepClickHandler>();
-                if (oldClickHandler != null)
+                if (obj != null)
                 {
-                    Destroy(oldClickHandler);
+                    // Retirer le handler
+                    var oldHandler = obj.GetComponent<ProcedureStepClickHandler>();
+                    if (oldHandler != null)
+                    {
+                        Destroy(oldHandler);
+                    }
+
+                    // Retirer la surbrillance
+                    if (shouldHighlight)
+                    {
+                        RemoveHighlight(obj);
+                    }
                 }
             }
 
-            // Ajouter la surbrillance au nouvel objet si l'option est activée
-            if (currentStep.targetObject != null)
+            currentHighlightedObjects.Clear();
+            currentCorrectObject = null;
+
+            // Surligner TOUS les objets de l'étape actuelle (correct + wrong)
+            if (currentStep.correctObject != null)
             {
-                if (shouldHighlight)
-                {
-                    HighlightObject(currentStep.targetObject);
-                }
-                currentHighlightedObject = currentStep.targetObject;
+                currentCorrectObject = currentStep.correctObject;
 
-                // Ajouter un composant temporaire pour gérer le clic
-                var clickHandler = currentStep.targetObject.GetComponent<ProcedureStepClickHandler>();
-                if (clickHandler == null)
-                {
-                    clickHandler = currentStep.targetObject.AddComponent<ProcedureStepClickHandler>();
-                }
-                clickHandler.Initialize(this, currentStepIndex);
+                // Créer une liste de tous les objets à surligner
+                var objectsToHighlight = new List<GameObject> { currentStep.correctObject };
+                objectsToHighlight.AddRange(currentStep.wrongObjects);
 
-                // Désactiver les interactions normales sur les autres objets
-                foreach (var obj in sequenceObjects)
+                foreach (var obj in objectsToHighlight)
                 {
-                    if (obj != currentStep.targetObject)
+                    if (obj == null) continue;
+
+                    // Surligner l'objet si l'option est activée
+                    if (shouldHighlight)
                     {
-                        EnableObjectInteraction(obj, false);
+                        HighlightObject(obj);
                     }
+
+                    currentHighlightedObjects.Add(obj);
+
+                    // Ajouter un nouveau composant pour gérer le clic
+                    // (on vient de détruire tous les anciens handlers ci-dessus)
+                    var clickHandler = obj.AddComponent<ProcedureStepClickHandler>();
+                    clickHandler.Initialize(this, currentStepIndex, obj);
                 }
+
+                // NE PAS désactiver les autres objets car ils pourraient être nécessaires pour les étapes suivantes
+                // Le système de ProcedureStepClickHandler s'occupe déjà de gérer les clics sur les bons objets
             }
         }
 
@@ -475,8 +518,16 @@ namespace WiseTwin.UI
             renderer.material = highlightMaterial;
 
             // Ajouter un composant pour l'animation de pulsation si activé
-            if (pulseHighlight && obj.GetComponent<PulseEffect>() == null)
+            if (pulseHighlight)
             {
+                // Détruire l'ancien PulseEffect s'il existe (peut rester d'une étape précédente)
+                var oldPulse = obj.GetComponent<PulseEffect>();
+                if (oldPulse != null)
+                {
+                    DestroyImmediate(oldPulse);
+                }
+
+                // Ajouter un nouveau PulseEffect
                 var pulse = obj.AddComponent<PulseEffect>();
                 pulse.Initialize(highlightColor, highlightIntensity, pulseSpeed);
             }
@@ -516,12 +567,10 @@ namespace WiseTwin.UI
         {
             if (errorFeedbackLabel == null || currentStepIndex >= steps.Count) return;
 
-            var currentStep = steps[currentStepIndex];
-            string expectedObjectName = currentStep.targetObject != null ? currentStep.targetObject.name : "l'objet suivant";
-
+            // Message d'erreur sans révéler la bonne réponse
             string message = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? $"❌ Mauvais objet ! Cliquez sur : {expectedObjectName}"
-                : $"❌ Wrong object! Click on: {expectedObjectName}";
+                ? $"❌ Mauvaise réponse ! Réessayez. (Erreurs: {wrongClicksCount})"
+                : $"❌ Wrong answer! Try again. (Errors: {wrongClicksCount})";
 
             errorFeedbackLabel.text = message;
             errorFeedbackLabel.style.display = DisplayStyle.Flex;
@@ -539,13 +588,30 @@ namespace WiseTwin.UI
             }
         }
 
-        public void ValidateCurrentStep()
+        public void ValidateCurrentStep(GameObject clickedObject)
         {
             if (currentStepIndex >= steps.Count) return;
 
             var currentStep = steps[currentStepIndex];
+
+            // Vérifier si l'objet cliqué est le bon
+            if (clickedObject != currentCorrectObject)
+            {
+                // Mauvaise réponse ! Incrémenter les erreurs
+                wrongClicksCount++;
+                totalWrongClicksInProcedure++;
+
+                Debug.Log($"[ProcedureDisplayer] Wrong object clicked! Expected: {currentCorrectObject?.name}, Got: {clickedObject?.name}. Wrong clicks: {wrongClicksCount}");
+
+                // Afficher le feedback d'erreur
+                ShowErrorFeedback();
+
+                // Ne PAS passer à l'étape suivante, laisser l'utilisateur réessayer
+                return;
+            }
+
+            // Bonne réponse !
             currentStep.completed = true;
-            isMonitoringClicks = false;
 
             // Calculer la durée de cette étape
             float stepDuration = Time.time - stepStartTime;
@@ -555,7 +621,7 @@ namespace WiseTwin.UI
             {
                 stepNumber = currentStepIndex + 1,
                 stepKey = $"step_{currentStepIndex + 1}",
-                targetObjectId = currentStep.objectId,
+                targetObjectId = currentStep.correctObjectId,
                 completed = true,
                 duration = stepDuration,
                 wrongClicksOnThisStep = wrongClicksCount
@@ -570,7 +636,7 @@ namespace WiseTwin.UI
                 TrainingAnalytics.Instance.AddProcedureStepData(stepData);
             }
 
-            Debug.Log($"[ProcedureDisplayer] Step {stepData.stepNumber} completed - Duration: {stepDuration}s, Wrong clicks: {wrongClicksCount}");
+            Debug.Log($"[ProcedureDisplayer] Step {stepData.stepNumber} completed CORRECTLY - Duration: {stepDuration}s, Wrong clicks on this step: {wrongClicksCount}");
 
             // Attendre un peu avant de passer à l'étape suivante
             StartCoroutine(NextStepAfterDelay(0.5f));
@@ -584,23 +650,20 @@ namespace WiseTwin.UI
             StartCurrentStep();
         }
 
+        /// <summary>
+        /// Réinitialise la procédure (utilisé uniquement par le script de reset personnalisé si configuré)
+        /// Note: Cette méthode n'est plus appelée automatiquement pour les clics hors séquence
+        /// </summary>
         public void ResetProcedure()
         {
-            Debug.Log("[ProcedureDisplayer] Resetting procedure - clicked outside sequence");
-
-            // Incrémenter le compteur de clics incorrects
-            wrongClicksCount++;
-            totalWrongClicksInProcedure++;
-
-            // Afficher le feedback d'erreur
-            ShowErrorFeedback();
+            Debug.Log("[ProcedureDisplayer] Resetting procedure manually");
 
             // Appeler le script de reset si configuré
-            if (resetScript != null && sequenceObjects.Count > 0)
+            if (resetScript != null && allSequenceObjects.Count > 0)
             {
                 try
                 {
-                    resetScript.ResetProcedure(sequenceObjects.ToArray());
+                    resetScript.ResetProcedure(allSequenceObjects.ToArray());
                     Debug.Log("[ProcedureDisplayer] Custom reset script executed");
                 }
                 catch (Exception e)
@@ -610,24 +673,30 @@ namespace WiseTwin.UI
             }
 
             // Retirer les surbrillances actuelles si elles sont actives
-            if (currentHighlightedObject != null && shouldHighlight)
+            if (shouldHighlight)
             {
-                RemoveHighlight(currentHighlightedObject);
-
-                // Retirer le composant de clic temporaire
-                var clickHandler = currentHighlightedObject.GetComponent<ProcedureStepClickHandler>();
-                if (clickHandler != null)
+                foreach (var obj in currentHighlightedObjects)
                 {
-                    Destroy(clickHandler);
+                    if (obj != null)
+                    {
+                        RemoveHighlight(obj);
+
+                        // Retirer le composant de clic temporaire
+                        var clickHandler = obj.GetComponent<ProcedureStepClickHandler>();
+                        if (clickHandler != null)
+                        {
+                            Destroy(clickHandler);
+                        }
+                    }
                 }
             }
+            currentHighlightedObjects.Clear();
 
             // Réinitialiser l'index
             currentStepIndex = 0;
-            isMonitoringClicks = false;
 
             // Réactiver toutes les interactions
-            foreach (var obj in sequenceObjects)
+            foreach (var obj in allSequenceObjects)
             {
                 EnableObjectInteraction(obj, true);
             }
@@ -638,64 +707,9 @@ namespace WiseTwin.UI
 
         void Update()
         {
-            // Détecter les clics en dehors de la séquence
-            if (isMonitoringClicks && UnityEngine.InputSystem.Mouse.current != null)
-            {
-                if (UnityEngine.InputSystem.Mouse.current.leftButton.wasPressedThisFrame)
-                {
-                    CheckOutsideClick();
-                }
-            }
-        }
-
-        void CheckOutsideClick()
-        {
-            Camera mainCamera = Camera.main;
-            if (mainCamera == null) return;
-
-            Vector2 mousePos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
-            Ray ray = mainCamera.ScreenPointToRay(new Vector3(mousePos.x, mousePos.y, 0));
-
-            RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity))
-            {
-                GameObject clickedObject = hit.transform.gameObject;
-
-                // Vérifier si l'objet cliqué est dans la séquence
-                bool isInSequence = false;
-                foreach (var obj in sequenceObjects)
-                {
-                    if (clickedObject == obj || clickedObject.transform.IsChildOf(obj.transform))
-                    {
-                        isInSequence = true;
-                        break;
-                    }
-                }
-
-                // Si on a cliqué en dehors de la séquence et que ce n'est pas l'UI
-                if (!isInSequence && hit.collider != null && currentStepIndex < steps.Count)
-                {
-                    // Vérifier que ce n'est pas l'objet actuellement surligné
-                    if (clickedObject != currentHighlightedObject)
-                    {
-                        if (keepProgressOnOtherClick)
-                        {
-                            // Juste incrémenter le compteur d'erreurs sans reset
-                            wrongClicksCount++;
-                            totalWrongClicksInProcedure++;
-                            Debug.Log($"[ProcedureDisplayer] Wrong click detected (progress kept) - Step wrong clicks: {wrongClicksCount}, Total: {totalWrongClicksInProcedure}");
-
-                            // Afficher le feedback d'erreur
-                            ShowErrorFeedback();
-                        }
-                        else
-                        {
-                            // Comportement normal : reset complet
-                            ResetProcedure();
-                        }
-                    }
-                }
-            }
+            // Plus besoin de détecter les clics en dehors de la séquence
+            // On ne compte les erreurs que quand l'utilisateur clique sur un objet surligné mais mauvais
+            // Ce qui est géré directement dans ValidateCurrentStep()
         }
 
         void CompleteProcedure()
@@ -703,18 +717,24 @@ namespace WiseTwin.UI
             // Retirer toutes les surbrillances si elles étaient actives
             if (shouldHighlight)
             {
-                foreach (var obj in sequenceObjects)
+                foreach (var obj in allSequenceObjects)
                 {
-                    RemoveHighlight(obj);
-                    EnableObjectInteraction(obj, true);
+                    if (obj != null)
+                    {
+                        RemoveHighlight(obj);
+                        EnableObjectInteraction(obj, true);
+                    }
                 }
             }
             else
             {
                 // Juste réactiver les interactions si pas de highlight
-                foreach (var obj in sequenceObjects)
+                foreach (var obj in allSequenceObjects)
                 {
-                    EnableObjectInteraction(obj, true);
+                    if (obj != null)
+                    {
+                        EnableObjectInteraction(obj, true);
+                    }
                 }
             }
 
@@ -740,28 +760,32 @@ namespace WiseTwin.UI
 
         public void Close()
         {
-            // Désactiver le monitoring des clics
-            isMonitoringClicks = false;
 
-            // Nettoyer le GameObject actuellement surligné si le highlight était actif
-            if (currentHighlightedObject != null && shouldHighlight)
+            // Nettoyer tous les GameObjects actuellement surlignés si le highlight était actif
+            if (shouldHighlight)
             {
-                RemoveHighlight(currentHighlightedObject);
-
-                // Retirer le composant de clic temporaire
-                var clickHandler = currentHighlightedObject.GetComponent<ProcedureStepClickHandler>();
-                if (clickHandler != null)
+                foreach (var obj in currentHighlightedObjects)
                 {
-                    Destroy(clickHandler);
-                }
+                    if (obj != null)
+                    {
+                        RemoveHighlight(obj);
 
-                currentHighlightedObject = null;
+                        // Retirer le composant de clic temporaire
+                        var clickHandler = obj.GetComponent<ProcedureStepClickHandler>();
+                        if (clickHandler != null)
+                        {
+                            Destroy(clickHandler);
+                        }
+                    }
+                }
             }
+            currentHighlightedObjects.Clear();
+            currentCorrectObject = null;
 
             // Nettoyer toutes les surbrillances et réactiver les interactions
-            if (sequenceObjects != null)
+            if (allSequenceObjects != null)
             {
-                foreach (var obj in sequenceObjects)
+                foreach (var obj in allSequenceObjects)
                 {
                     if (obj != null)
                     {
@@ -784,7 +808,7 @@ namespace WiseTwin.UI
             // Réinitialiser l'état
             currentStepIndex = 0;
             steps = null;
-            sequenceObjects = null;
+            allSequenceObjects = null;
             originalMaterials?.Clear();
 
             rootElement?.Clear();
@@ -814,12 +838,39 @@ namespace WiseTwin.UI
                 {
                     var step = new ProcedureStep
                     {
-                        objectId = ExtractString(stepData, "objectId"),
+                        correctObjectId = ExtractString(stepData, "correctObjectId"),
                         title = ExtractLocalizedText(stepData, "title", language),
                         instruction = ExtractLocalizedText(stepData, "instruction", language),
                         validation = ExtractLocalizedText(stepData, "validation", language),
                         hint = ExtractLocalizedText(stepData, "hint", language)
                     };
+
+                    // Extraire les wrongObjectIds si présents
+                    if (stepData.ContainsKey("wrongObjectIds"))
+                    {
+                        var wrongIds = stepData["wrongObjectIds"];
+                        if (wrongIds is List<object> wrongList)
+                        {
+                            step.wrongObjectIds = wrongList.Select(id => id?.ToString() ?? "").Where(id => !string.IsNullOrEmpty(id)).ToList();
+                        }
+                        else if (wrongIds is string[] wrongArray)
+                        {
+                            step.wrongObjectIds = wrongArray.Where(id => !string.IsNullOrEmpty(id)).ToList();
+                        }
+                        else if (wrongIds != null)
+                        {
+                            // Tentative de conversion depuis JArray ou autre
+                            try
+                            {
+                                string json = Newtonsoft.Json.JsonConvert.SerializeObject(wrongIds);
+                                step.wrongObjectIds = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? new List<string>();
+                            }
+                            catch
+                            {
+                                step.wrongObjectIds = new List<string>();
+                            }
+                        }
+                    }
 
                     procedureSteps.Add(step);
                 }

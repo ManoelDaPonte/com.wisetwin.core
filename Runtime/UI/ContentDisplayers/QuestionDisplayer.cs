@@ -764,6 +764,12 @@ namespace WiseTwin.UI
         {
             if (hasAnswered) return;
 
+            // Masquer le feedback d'erreur quand l'utilisateur change sa sélection
+            if (feedbackContainer != null && feedbackContainer.style.display == DisplayStyle.Flex)
+            {
+                feedbackContainer.style.display = DisplayStyle.None;
+            }
+
             if (isMultipleChoice)
             {
                 // Mode checkbox - peut sélectionner/désélectionner plusieurs options
@@ -943,14 +949,16 @@ namespace WiseTwin.UI
                 feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
                 feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
 
-                // Permettre de réessayer - changer le texte du bouton
-                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Réessayer" : "Try Again";
-                validateButton.style.backgroundColor = new Color(0.8f, 0.4f, 0.1f, 1f);
+                // Garder le bouton "Valider" - l'utilisateur peut changer sa réponse et re-valider
+                // Pas de changement de texte ni de couleur
 
-                // Réinitialiser le flag après un court délai pour permettre une nouvelle tentative
-                validateButton.schedule.Execute(() => {
-                    isValidating = false;
-                }).ExecuteLater(300); // 300ms de délai
+                // Réinitialiser le flag immédiatement pour permettre une nouvelle tentative
+                isValidating = false;
+
+                // Masquer automatiquement le feedback après 3 secondes
+                feedbackContainer.schedule.Execute(() => {
+                    feedbackContainer.style.display = DisplayStyle.None;
+                }).ExecuteLater(3000); // 3 secondes
             }
         }
 
