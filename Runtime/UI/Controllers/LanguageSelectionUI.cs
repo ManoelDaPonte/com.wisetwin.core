@@ -313,16 +313,6 @@ namespace WiseTwin
             contentContainer.style.borderLeftColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
             contentContainer.style.borderRightColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
 
-            // Titre pour la sélection de langue
-            var titleLabel = new Label("Choisissez votre langue / Choose your language");
-            titleLabel.style.fontSize = 20;
-            titleLabel.style.color = new Color(0.95f, 0.95f, 0.95f, 1f);
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.marginBottom = 30;
-            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            titleLabel.style.whiteSpace = WhiteSpace.Normal;
-            contentContainer.Add(titleLabel);
-
             // Container pour les boutons de langue - en colonne
             var languageButtons = new VisualElement();
             languageButtons.style.flexDirection = FlexDirection.Column;
@@ -470,14 +460,14 @@ namespace WiseTwin
             infoContainer.style.justifyContent = Justify.Center;
             infoContainer.style.marginBottom = 30;
 
-            var durationLabel = new Label("⏱️ Duration: 30 min");
+            var durationLabel = new Label("Duration: 30 min");
             durationLabel.name = "training-duration";
             durationLabel.style.fontSize = 16;
             durationLabel.style.color = Color.white;
             durationLabel.style.marginRight = 30;
             infoContainer.Add(durationLabel);
 
-            var difficultyLabel = new Label("📊 Difficulty: Intermediate");
+            var difficultyLabel = new Label("Difficulty: Intermediate");
             difficultyLabel.name = "training-difficulty";
             difficultyLabel.style.fontSize = 16;
             difficultyLabel.style.color = Color.white;
@@ -623,7 +613,7 @@ namespace WiseTwin
             var durationLabel = disclaimerPanel.Q<Label>("training-duration");
             if (durationLabel != null)
             {
-                string durationText = lang == "fr" ? $"⏱️ Durée : {duration}" : $"⏱️ Duration: {duration}";
+                string durationText = lang == "fr" ? $"Durée : {duration}" : $"Duration: {duration}";
                 durationLabel.text = durationText;
             }
 
@@ -632,7 +622,7 @@ namespace WiseTwin
             if (difficultyLabel != null)
             {
                 string displayDifficulty = TranslateDifficulty(difficulty, lang);
-                string diffText = lang == "fr" ? $"📊 Difficulté : {displayDifficulty}" : $"📊 Difficulty: {displayDifficulty}";
+                string diffText = lang == "fr" ? $"Difficulté : {displayDifficulty}" : $"Difficulty: {displayDifficulty}";
                 difficultyLabel.text = diffText;
             }
 

@@ -321,7 +321,7 @@ namespace WiseTwin.UI
 
             // Bouton fermer (X)
             var closeButton = new Button(() => Close());
-            closeButton.text = "✕";
+            closeButton.text = "X";
             closeButton.style.position = Position.Absolute;
             closeButton.style.top = 15;
             closeButton.style.right = 15;
@@ -658,7 +658,7 @@ namespace WiseTwin.UI
 
             // Bouton fermer (X)
             var closeButton = new Button(() => Close());
-            closeButton.text = "✕";
+            closeButton.text = "X";
             closeButton.style.position = Position.Absolute;
             closeButton.style.top = 15;
             closeButton.style.right = 15;

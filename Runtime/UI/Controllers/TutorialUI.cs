@@ -135,19 +135,19 @@ namespace WiseTwin
             contentContainer.Add(titleLabel);
 
             // Section 1: Movement
-            CreateSection(contentContainer, "⌨️", GetText("movement_title"), GetText("movement_desc"));
+            CreateSection(contentContainer, GetText("movement_title"), GetText("movement_desc"));
 
             // Separator
             CreateSeparator(contentContainer);
 
             // Section 2: Scenario Navigation
-            CreateSection(contentContainer, "▶", GetText("navigation_title"), GetText("navigation_desc"));
+            CreateSection(contentContainer, GetText("navigation_title"), GetText("navigation_desc"));
 
             // Separator
             CreateSeparator(contentContainer);
 
             // Section 3: Interface
-            CreateSection(contentContainer, "📊", GetText("interface_title"), GetText("interface_desc"));
+            CreateSection(contentContainer, GetText("interface_title"), GetText("interface_desc"));
 
             // Start button
             var buttonContainer = new VisualElement();
@@ -156,8 +156,8 @@ namespace WiseTwin
 
             var startButton = new Button(() => OnStartButtonClicked());
             startButton.text = GetText("start_button");
-            startButton.style.width = 250;
-            startButton.style.height = 60;
+            startButton.style.width = 350;
+            startButton.style.height = 65;
             startButton.style.fontSize = 20;
             startButton.style.backgroundColor = accentColor;
             startButton.style.color = Color.white;
@@ -173,36 +173,25 @@ namespace WiseTwin
             root.Add(tutorialPanel);
         }
 
-        void CreateSection(VisualElement parent, string icon, string title, string description)
+        void CreateSection(VisualElement parent, string title, string description)
         {
             var section = new VisualElement();
             section.style.marginBottom = 25;
 
-            // Icon and title row
-            var titleRow = new VisualElement();
-            titleRow.style.flexDirection = FlexDirection.Row;
-            titleRow.style.alignItems = Align.Center;
-            titleRow.style.marginBottom = 10;
-
-            var iconLabel = new Label(icon);
-            iconLabel.style.fontSize = 24;
-            iconLabel.style.marginRight = 15;
-            titleRow.Add(iconLabel);
-
+            // Title
             var titleLabel = new Label(title);
             titleLabel.style.fontSize = 22;
             titleLabel.style.color = primaryColor;
             titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleRow.Add(titleLabel);
+            titleLabel.style.marginBottom = 10;
 
-            section.Add(titleRow);
+            section.Add(titleLabel);
 
             // Description
             var descLabel = new Label(description);
             descLabel.style.fontSize = 16;
             descLabel.style.color = new Color(0.9f, 0.9f, 0.9f);
             descLabel.style.whiteSpace = WhiteSpace.Normal;
-            descLabel.style.marginLeft = 39; // Align with title (24px icon + 15px margin)
             section.Add(descLabel);
 
             parent.Add(section);
@@ -230,7 +219,7 @@ namespace WiseTwin
                     "navigation_title" => "Navigation des scénarios",
                     "navigation_desc" => "Cliquez sur le bouton 'Scénario suivant' en haut de l'écran pour progresser dans la formation. Complétez chaque scénario avant de passer au suivant.",
                     "interface_title" => "Interface",
-                    "interface_desc" => "Le chronomètre en haut suit votre temps de formation. La barre de progression montre votre avancement. Fermez les fenêtres avec le bouton ✕ ou en cliquant en dehors.",
+                    "interface_desc" => "Le chronomètre en haut suit votre temps de formation. La barre de progression montre votre avancement.",
                     "start_button" => "Commencer la formation",
                     _ => key
                 };
@@ -245,7 +234,7 @@ namespace WiseTwin
                     "navigation_title" => "Scenario Navigation",
                     "navigation_desc" => "Click the 'Next Scenario' button at the top of the screen to progress through the training. Complete each scenario before moving to the next.",
                     "interface_title" => "Interface",
-                    "interface_desc" => "The timer at the top tracks your training time. The progress bar shows your advancement. Close windows with the ✕ button or by clicking outside.",
+                    "interface_desc" => "The timer at the top tracks your training time. The progress bar shows your advancement.",
                     "start_button" => "Start Training",
                     _ => key
                 };

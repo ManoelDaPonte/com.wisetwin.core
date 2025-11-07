@@ -280,7 +280,7 @@ namespace WiseTwin.UI
 
             // Bouton fermer (X)
             var closeButton = new Button(() => Close());
-            closeButton.text = "✕";
+            closeButton.text = "X";
             closeButton.style.position = Position.Absolute;
             closeButton.style.top = 15;
             closeButton.style.right = 15;
@@ -609,14 +609,14 @@ namespace WiseTwin.UI
             // Use custom message if provided, otherwise use generic one
             if (!string.IsNullOrEmpty(customMessage))
             {
-                message = $"❌ {customMessage} (Erreurs: {wrongClicksCount})";
+                message = $"{customMessage} (Erreurs: {wrongClicksCount})";
             }
             else
             {
                 // Message d'erreur sans révéler la bonne réponse
                 message = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"❌ Mauvaise réponse ! Réessayez. (Erreurs: {wrongClicksCount})"
-                    : $"❌ Wrong answer! Try again. (Errors: {wrongClicksCount})";
+                    ? $"Mauvaise réponse ! Réessayez. (Erreurs: {wrongClicksCount})"
+                    : $"Wrong answer! Try again. (Errors: {wrongClicksCount})";
             }
 
             errorFeedbackLabel.text = message;

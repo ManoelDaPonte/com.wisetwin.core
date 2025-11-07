@@ -534,7 +534,7 @@ namespace WiseTwin
             {
                 return key switch
                 {
-                    "next_scenario" => "Scénario suivant ▶",
+                    "next_scenario" => "Scénario suivant",
                     _ => key
                 };
             }
@@ -542,7 +542,7 @@ namespace WiseTwin
             {
                 return key switch
                 {
-                    "next_scenario" => "Next Scenario ▶",
+                    "next_scenario" => "Next Scenario",
                     _ => key
                 };
             }

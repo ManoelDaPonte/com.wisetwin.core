@@ -358,7 +358,7 @@ namespace WiseTwin
             
             // Close button
             var closeButton = new Button(() => HideQuestion());
-            closeButton.text = "✕";
+            closeButton.text = "X";
             closeButton.style.position = Position.Absolute;
             closeButton.style.top = 10;
             closeButton.style.right = 10;

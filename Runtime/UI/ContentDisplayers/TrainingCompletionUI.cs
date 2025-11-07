@@ -127,13 +127,6 @@ namespace WiseTwin.UI
             successBox.style.borderLeftColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
             successBox.style.borderRightColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
 
-            // Trophée ou icône de succès
-            var successIcon = new Label("🏆");
-            successIcon.style.fontSize = 72;
-            successIcon.style.unityTextAlign = TextAnchor.MiddleCenter;
-            successIcon.style.marginBottom = 20;
-            successBox.Add(successIcon);
-
             // Message de félicitations
             var congratsTitle = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
                 ? "Félicitations !"
@@ -230,8 +223,8 @@ namespace WiseTwin.UI
 
                 // Total interactions
                 var totalInteractionsLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"📊 Total : {analyticsInteractions}"
-                    : $"📊 Total: {analyticsInteractions}");
+                    ? $"Total : {analyticsInteractions}"
+                    : $"Total: {analyticsInteractions}");
                 totalInteractionsLabel.style.fontSize = 16;
                 totalInteractionsLabel.style.color = new Color(0.75f, 0.75f, 0.8f, 1f);
                 totalInteractionsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -240,8 +233,8 @@ namespace WiseTwin.UI
 
                 // Interactions réussies (du premier coup, sans erreur)
                 var successfulLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"✅ Réussies : {successfulInteractionsCount}"
-                    : $"✅ Successful: {successfulInteractionsCount}");
+                    ? $"Réussies : {successfulInteractionsCount}"
+                    : $"Successful: {successfulInteractionsCount}");
                 successfulLabel.style.fontSize = 16;
                 successfulLabel.style.color = new Color(0.1f, 0.85f, 0.45f, 1f);
                 successfulLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -252,8 +245,8 @@ namespace WiseTwin.UI
                 if (failedInteractionsCount > 0)
                 {
                     var failedLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                        ? $"❌ Ratées : {failedInteractionsCount}"
-                        : $"❌ Failed: {failedInteractionsCount}");
+                        ? $"Ratées : {failedInteractionsCount}"
+                        : $"Failed: {failedInteractionsCount}");
                     failedLabel.style.fontSize = 16;
                     failedLabel.style.color = new Color(0.9f, 0.4f, 0.3f, 1f);
                     failedLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
