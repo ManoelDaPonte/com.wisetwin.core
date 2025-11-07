@@ -47,28 +47,16 @@ namespace WiseTwin.UI
                 uiDocument = gameObject.AddComponent<UIDocument>();
             }
 
-            // Assigner le PanelSettings si nécessaire
+            // Assigner le PanelSettings depuis l'inspector
             if (uiDocument.panelSettings == null)
             {
-                // Priorité 1: Utiliser le PanelSettings assigné dans l'inspector
                 if (panelSettings != null)
                 {
                     uiDocument.panelSettings = panelSettings;
-                    Debug.Log("[TrainingCompletionUI] PanelSettings assigned from Inspector");
                 }
                 else
                 {
-                    // Priorité 2: Charger depuis Resources en fallback
-                    var resourcePanelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
-                    if (resourcePanelSettings != null)
-                    {
-                        uiDocument.panelSettings = resourcePanelSettings;
-                        Debug.Log("[TrainingCompletionUI] PanelSettings loaded from Resources");
-                    }
-                    else
-                    {
-                        Debug.LogError("[TrainingCompletionUI] No PanelSettings assigned and could not find WiseTwinPanelSettings in Resources folder!");
-                    }
+                    Debug.LogWarning("[TrainingCompletionUI] PanelSettings is null! Please assign it in the inspector.");
                 }
             }
 

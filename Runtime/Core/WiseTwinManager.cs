@@ -113,7 +113,9 @@ namespace WiseTwin
         
         void OnMetadataLoaded(Dictionary<string, object> metadata)
         {
-            DebugLog($"📦 Metadata loaded successfully. Available objects: {GetAvailableObjectIds().Count}");
+            var scenarios = metadataLoader?.GetScenarios();
+            int count = scenarios?.Count ?? 0;
+            DebugLog($"📦 Metadata loaded successfully. Scenarios: {count}");
             OnMetadataReady?.Invoke(metadata);
         }
         
@@ -126,10 +128,11 @@ namespace WiseTwin
         #region Public API - Easy access methods
         
         /// <summary>
-        /// Get data for a specific Unity object
+        /// Get data for a specific Unity object (Legacy - use scenario-based system instead)
         /// </summary>
         /// <param name="objectId">Unity object identifier</param>
         /// <returns>Object data dictionary or null if not found</returns>
+        [System.Obsolete("This method is for legacy InteractableObject system. Use ProgressionManager with scenario-based metadata instead.")]
         public Dictionary<string, object> GetDataForObject(string objectId)
         {
             if (metadataLoader == null)
@@ -142,12 +145,13 @@ namespace WiseTwin
         }
         
         /// <summary>
-        /// Get typed content for a specific Unity object
+        /// Get typed content for a specific Unity object (Legacy - use scenario-based system instead)
         /// </summary>
         /// <typeparam name="T">Type to deserialize to</typeparam>
         /// <param name="objectId">Unity object identifier</param>
         /// <param name="contentKey">Optional content key within object</param>
         /// <returns>Typed content or null if not found</returns>
+        [System.Obsolete("This method is for legacy InteractableObject system. Use ProgressionManager with scenario-based metadata instead.")]
         public T GetContentForObject<T>(string objectId, string contentKey = null) where T : class
         {
             if (metadataLoader == null)
@@ -160,9 +164,10 @@ namespace WiseTwin
         }
         
         /// <summary>
-        /// Get all available Unity object IDs
+        /// Get all available Unity object IDs (Legacy - use scenario-based system instead)
         /// </summary>
         /// <returns>List of object identifiers</returns>
+        [System.Obsolete("This method is for legacy InteractableObject system. Use MetadataLoader.GetScenarios() for scenario-based training instead.")]
         public List<string> GetAvailableObjectIds()
         {
             if (metadataLoader == null)
@@ -257,11 +262,18 @@ namespace WiseTwin
             
             if (IsMetadataLoaded)
             {
-                var objectIds = GetAvailableObjectIds();
-                status.AppendLine($"Available Objects: {objectIds.Count}");
-                foreach (var id in objectIds)
+                var scenarios = metadataLoader.GetScenarios();
+                if (scenarios != null && scenarios.Count > 0)
                 {
-                    status.AppendLine($"  • {id}");
+                    status.AppendLine($"Scenarios: {scenarios.Count}");
+                    foreach (var scenario in scenarios)
+                    {
+                        status.AppendLine($"  • {scenario.id} ({scenario.type})");
+                    }
+                }
+                else
+                {
+                    status.AppendLine("Scenarios: None");
                 }
             }
             
@@ -402,7 +414,9 @@ namespace WiseTwin
             
             if (IsMetadataLoaded)
             {
-                GUILayout.Label($"Objects: {GetAvailableObjectIds().Count}");
+                var scenarios = metadataLoader?.GetScenarios();
+                int count = scenarios?.Count ?? 0;
+                GUILayout.Label($"Scenarios: {count}");
                 GUILayout.Label($"Title: {GetProjectInfo("title")}");
             }
             

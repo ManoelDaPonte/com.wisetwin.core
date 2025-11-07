@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PanelSettings: {fileID: 0}
+  m_PanelSettings: {fileID: 11400000, guid: a8ddf9e0ad6884a99a525ecbcef70336, type: 2}
   m_ParentUI: {fileID: 0}
   sourceAsset: {fileID: 0}
   m_SortingOrder: 0
@@ -119,7 +119,7 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PanelSettings: {fileID: 0}
+  m_PanelSettings: {fileID: 11400000, guid: a8ddf9e0ad6884a99a525ecbcef70336, type: 2}
   m_ParentUI: {fileID: 0}
   sourceAsset: {fileID: 0}
   m_SortingOrder: 0
@@ -188,7 +188,7 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PanelSettings: {fileID: 0}
+  m_PanelSettings: {fileID: 11400000, guid: a8ddf9e0ad6884a99a525ecbcef70336, type: 2}
   m_ParentUI: {fileID: 0}
   sourceAsset: {fileID: 0}
   m_SortingOrder: 0
@@ -226,7 +226,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4226841514794562829}
-  - component: {fileID: 1987575832644046087}
+  - component: {fileID: 5778976752776885456}
   m_Layer: 0
   m_Name: ProgressionManager
   m_TagString: Untagged
@@ -249,7 +249,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 7123580581372257338}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1987575832644046087
+--- !u!114 &5778976752776885456
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -261,21 +261,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5bad4f2d1649b47d6ae0d6ac26b035eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WiseTwin.Runtime::WiseTwin.ProgressionManager
-  autoDetectOnStart: 0
-  detectionMethod: 0
-  searchParent: {fileID: 0}
-  progressionSequence:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  visibilityMode: 2
-  showCompletedObjects: 1
-  hideCompletedObjects: 1
-  allowBackTracking: 0
+  autoStartFirstScenario: 0
   resetOnStart: 1
-  requireSuccessForAll: 1
-  maxAttemptsPerObject: 0
   debugMode: 1
 --- !u!1 &7729856425478814148
 GameObject:
@@ -321,7 +308,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 480d3addf88fe49cf835b2dfccf25a31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: WiseTwin.Runtime::WiseTwin.UI.TrainingCompletionUI
-  panelSettings: {fileID: 11400000, guid: f66eb1a0ff5884bd9844d7defdc4e88a, type: 2}
+  panelSettings: {fileID: 11400000, guid: a8ddf9e0ad6884a99a525ecbcef70336, type: 2}
 --- !u!1 &8156962989298695419
 GameObject:
   m_ObjectHideFlags: 0
@@ -392,7 +379,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enableDebugLogs: 0
   logPrefix: '[WiseTwinManager]'
-  useProductionMode: 1
+  useProductionMode: 0
   metadataLoader: {fileID: 5717370407079796314}
   completionNotifier: {fileID: 798460448257152867}
 --- !u!114 &5050161787946064431
@@ -453,7 +440,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 167402a5ed19d4bc7b426b52c6454a2c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enableDebugLogs: 1
+  enableDebugLogs: 0
   logPrefix: '[TrainingCompletionNotifier]'
 --- !u!114 &5350361062929066626
 MonoBehaviour:

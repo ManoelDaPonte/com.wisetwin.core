@@ -3,6 +3,7 @@ using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
 using System.Linq;
+using Newtonsoft.Json.Linq;
 
 namespace WiseTwin.UI
 {
@@ -124,24 +125,13 @@ namespace WiseTwin.UI
                     "ContentDisplayManager should be on its own GameObject with its own UIDocument.");
             }
 
-            // Assigner le PanelSettings s'il n'est pas déjà assigné
             if (uiDocument.panelSettings == null)
             {
-                // Charger le PanelSettings depuis Resources
-                var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
-                if (panelSettings != null)
-                {
-                    uiDocument.panelSettings = panelSettings;
-                    if (debugMode) Debug.Log("[ContentDisplayManager] PanelSettings loaded from Resources");
-                }
-                else
-                {
-                    Debug.LogError("[ContentDisplayManager] Could not find WiseTwinPanelSettings in Resources folder!");
-                }
+                Debug.LogWarning("[ContentDisplayManager] PanelSettings is null! Please assign it in the inspector.");
             }
-            else
+            else if (debugMode)
             {
-                if (debugMode) Debug.Log($"[ContentDisplayManager] PanelSettings assigned: {uiDocument.panelSettings.name}");
+                Debug.Log($"[ContentDisplayManager] PanelSettings assigned: {uiDocument.panelSettings.name}");
             }
 
             root = uiDocument.rootVisualElement;
@@ -161,9 +151,56 @@ namespace WiseTwin.UI
         }
 
         /// <summary>
+        /// Display a scenario from the new scenario-based system
+        /// </summary>
+        public void DisplayScenario(WiseTwin.ScenarioData scenario)
+        {
+            if (scenario == null)
+            {
+                Debug.LogError("[ContentDisplayManager] Scenario is null!");
+                return;
+            }
+
+            // Determine ContentType from scenario type
+            ContentType contentType;
+            switch (scenario.type?.ToLower())
+            {
+                case "question":
+                    contentType = ContentType.Question;
+                    break;
+                case "procedure":
+                    contentType = ContentType.Procedure;
+                    break;
+                case "text":
+                    contentType = ContentType.Text;
+                    break;
+                default:
+                    Debug.LogError($"[ContentDisplayManager] Unknown scenario type: {scenario.type}");
+                    return;
+            }
+
+            // Get content data
+            var contentData = scenario.GetContentData();
+            if (contentData == null)
+            {
+                Debug.LogError($"[ContentDisplayManager] No content data for scenario {scenario.id}");
+                return;
+            }
+
+            // Convert JObject to Dictionary<string, object>
+            Dictionary<string, object> contentDict = contentData.ToObject<Dictionary<string, object>>();
+
+            // Check if evaluation mode is enabled for this scenario
+            bool evaluationMode = MetadataLoader.Instance?.IsEvaluationMode(scenario) ?? false;
+
+            // Display the content with evaluation mode if applicable
+            DisplayContent(scenario.id, contentType, contentDict, evaluationMode);
+        }
+
+        /// <summary>
         /// Affiche un contenu en fonction de son type
         /// </summary>
-        public void DisplayContent(string objectId, ContentType contentType, Dictionary<string, object> contentData)
+        public void DisplayContent(string objectId, ContentType contentType, Dictionary<string, object> contentData, bool evaluationMode = false)
         {
             if (isDisplaying)
             {
@@ -192,7 +229,15 @@ namespace WiseTwin.UI
             }
 
             // Afficher le contenu
-            currentDisplayer.Display(objectId, contentData, root);
+            // Special handling for QuestionDisplayer to pass evaluationMode
+            if (currentDisplayer is QuestionDisplayer questionDisplayer)
+            {
+                questionDisplayer.Display(objectId, contentData, root, evaluationMode);
+            }
+            else
+            {
+                currentDisplayer.Display(objectId, contentData, root);
+            }
 
             if (debugMode) Debug.Log($"[ContentDisplayManager] After display - Root child count: {root.childCount}");
 
@@ -289,12 +334,6 @@ namespace WiseTwin.UI
         void HandleContentCompleted(string objectId, bool success)
         {
             OnContentCompleted?.Invoke(objectId, success);
-
-            // Mettre à jour la progression dans le HUD (avec anti-triche)
-            if (success && TrainingHUD.Instance != null)
-            {
-                TrainingHUD.Instance.IncrementProgressForObject(objectId);
-            }
         }
 
         public void CloseCurrentContent()

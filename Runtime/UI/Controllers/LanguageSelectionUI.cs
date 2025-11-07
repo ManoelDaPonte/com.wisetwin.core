@@ -36,6 +36,7 @@ namespace WiseTwin
         private LocalizationManager localizationManager;
         private WiseTwinManager wiseTwinManager;
         private WiseTwinUIManager uiManager;
+        private TutorialUI tutorialUI;
 
         // Métadonnées
         private Dictionary<string, object> trainingMetadata;
@@ -58,20 +59,9 @@ namespace WiseTwin
                 uiDocument = gameObject.AddComponent<UIDocument>();
             }
 
-            // Assigner le PanelSettings s'il n'est pas déjà assigné
             if (uiDocument.panelSettings == null)
             {
-                // Charger le PanelSettings depuis Resources
-                var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
-                if (panelSettings != null)
-                {
-                    uiDocument.panelSettings = panelSettings;
-                    if (debugMode) Debug.Log("[LanguageSelectionUI] PanelSettings loaded from Resources");
-                }
-                else
-                {
-                    Debug.LogError("[LanguageSelectionUI] Could not find WiseTwinPanelSettings in Resources folder!");
-                }
+                Debug.LogWarning("[LanguageSelectionUI] PanelSettings is null! Please assign it in the inspector.");
             }
 
             // NE PAS charger le UXML - on crée tout programmatiquement
@@ -90,6 +80,29 @@ namespace WiseTwin
             wiseTwinManager = WiseTwinManager.Instance;
             uiManager = WiseTwinUIManager.Instance;
 
+            // Find or create TutorialUI
+            tutorialUI = FindAnyObjectByType<TutorialUI>();
+            if (tutorialUI == null)
+            {
+                // Create a new GameObject for TutorialUI if it doesn't exist
+                var tutorialGO = new GameObject("TutorialUI");
+                tutorialUI = tutorialGO.AddComponent<TutorialUI>();
+
+                // Pass our PanelSettings to the TutorialUI
+                if (uiDocument != null && uiDocument.panelSettings != null)
+                {
+                    tutorialUI.SetPanelSettings(uiDocument.panelSettings);
+                }
+
+                if (debugMode) Debug.Log("[LanguageSelectionUI] TutorialUI created");
+            }
+
+            // Subscribe to tutorial completion event
+            if (tutorialUI != null)
+            {
+                tutorialUI.OnTutorialCompleted += OnTutorialCompleted;
+            }
+
             if (showOnStart)
             {
                 // Initialiser et afficher immédiatement
@@ -106,30 +119,33 @@ namespace WiseTwin
             // Désactiver les boutons de langue pendant le chargement
             SetLanguageButtonsEnabled(false);
 
+            int waitFrames = 0;
+            const int maxWaitFrames = 300; // 5 seconds at 60fps
+
             // Attendre que WiseTwinManager soit prêt
             while (wiseTwinManager == null || !wiseTwinManager.IsMetadataLoaded)
             {
                 yield return null;
+                waitFrames++;
+
                 if (wiseTwinManager == null)
                 {
                     wiseTwinManager = WiseTwinManager.Instance;
                 }
 
-                // Vérifier si le chargement est en cours
-                if (wiseTwinManager != null && wiseTwinManager.MetadataLoader != null)
+                if (waitFrames >= maxWaitFrames)
                 {
-                    if (wiseTwinManager.MetadataLoader.IsLoading)
-                    {
-                        if (debugMode) Debug.Log("[LanguageSelectionUI] Metadata loading...");
-                    }
+                    Debug.LogError("[LanguageSelectionUI] Timeout waiting for metadata!");
+                    SetLanguageButtonsEnabled(true);
+                    yield break;
                 }
             }
 
             // Récupérer les métadonnées
             trainingMetadata = wiseTwinManager.MetadataLoader.GetMetadata();
-            if (debugMode && trainingMetadata != null)
+            if (trainingMetadata == null)
             {
-                Debug.Log($"[LanguageSelectionUI] Metadata loaded with {trainingMetadata.Count} entries");
+                Debug.LogError("[LanguageSelectionUI] Metadata is NULL after loading!");
             }
 
             // Réactiver les boutons de langue
@@ -176,7 +192,13 @@ namespace WiseTwin
                 return;
             }
 
-            if (debugMode) Debug.Log($"[LanguageSelectionUI] Root exists. Current children: {root.childCount}");
+            // IMPORTANT: Configurer le pickingMode pour que l'UI reçoive les événements de clic
+            root.pickingMode = PickingMode.Position;
+            root.style.flexGrow = 1;
+            root.style.width = Length.Percent(100);
+            root.style.height = Length.Percent(100);
+
+            if (debugMode) Debug.Log($"[LanguageSelectionUI] Root configured. PickingMode: {root.pickingMode}. Current children: {root.childCount}");
 
             // Clear everything first
             root.Clear();
@@ -625,21 +647,37 @@ namespace WiseTwin
             var disclaimerText = disclaimerPanel.Q<Label>("disclaimer-text");
             if (disclaimerText != null)
             {
-                if (lang == "fr")
+                // Try to load disclaimer from metadata first
+                string customDisclaimer = null;
+                if (wiseTwinManager != null && wiseTwinManager.MetadataLoader != null)
                 {
-                    disclaimerText.text =
-                        "• Cette formation collecte vos temps de réponse pour personnaliser votre expérience d'apprentissage.\n\n" +
-                        "• Assurez-vous d'avoir le temps nécessaire devant vous (environ " + duration + ").\n\n" +
-                        "• Pour une expérience optimale, évitez les interruptions pendant la formation.\n\n" +
-                        "• Vos données sont utilisées uniquement pour améliorer votre parcours de formation.";
+                    customDisclaimer = wiseTwinManager.MetadataLoader.GetDisclaimer(lang);
+                }
+
+                // Use custom disclaimer if available, otherwise use default
+                if (!string.IsNullOrEmpty(customDisclaimer))
+                {
+                    disclaimerText.text = customDisclaimer;
                 }
                 else
                 {
-                    disclaimerText.text =
-                        "• This training collects your response times to personalize your learning experience.\n\n" +
-                        "• Please ensure you have the necessary time available (approximately " + duration + ").\n\n" +
-                        "• For an optimal experience, avoid interruptions during the training.\n\n" +
-                        "• Your data is used solely to improve your training journey.";
+                    // Fallback to default disclaimer text
+                    if (lang == "fr")
+                    {
+                        disclaimerText.text =
+                            "• Cette formation collecte vos temps de réponse pour personnaliser votre expérience d'apprentissage.\n\n" +
+                            "• Assurez-vous d'avoir le temps nécessaire devant vous (environ " + duration + ").\n\n" +
+                            "• Pour une expérience optimale, évitez les interruptions pendant la formation.\n\n" +
+                            "• Vos données sont utilisées uniquement pour améliorer votre parcours de formation.";
+                    }
+                    else
+                    {
+                        disclaimerText.text =
+                            "• This training collects your response times to personalize your learning experience.\n\n" +
+                            "• Please ensure you have the necessary time available (approximately " + duration + ").\n\n" +
+                            "• For an optimal experience, avoid interruptions during the training.\n\n" +
+                            "• Your data is used solely to improve your training journey.";
+                    }
                 }
             }
 
@@ -755,7 +793,15 @@ namespace WiseTwin
 
         void OnStartTraining()
         {
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Starting training");
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Showing tutorial");
+
+            // Hide disclaimer and show tutorial
+            StartCoroutine(TransitionToTutorial());
+        }
+
+        void OnTutorialCompleted()
+        {
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Tutorial completed, starting training");
 
             // Déclencher l'événement
             OnTrainingStarted?.Invoke();
@@ -784,8 +830,8 @@ namespace WiseTwin
                 trainingHUD = hudGO.AddComponent<TrainingHUD>();
             }
 
-            // Détecter automatiquement les objets interactables
-            trainingHUD.AutoDetectInteractables();
+            // NOTE: Auto-detection is no longer needed
+            // ProgressionManager automatically initializes the total from metadata scenarios
 
             // Afficher le HUD
             trainingHUD.Show();
@@ -830,6 +876,27 @@ namespace WiseTwin
             {
                 disclaimerPanel.style.display = DisplayStyle.Flex;
                 yield return FadeIn(disclaimerPanel);
+            }
+        }
+
+        IEnumerator TransitionToTutorial()
+        {
+            // Fade out disclaimer panel
+            if (disclaimerPanel != null)
+            {
+                yield return FadeOut(disclaimerPanel);
+                disclaimerPanel.style.display = DisplayStyle.None;
+            }
+
+            // Show tutorial
+            if (tutorialUI != null)
+            {
+                tutorialUI.Show(selectedLanguage);
+            }
+            else
+            {
+                Debug.LogError("[LanguageSelectionUI] TutorialUI is null! Skipping to training start.");
+                OnTutorialCompleted();
             }
         }
 

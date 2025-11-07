@@ -31,17 +31,17 @@ namespace WiseTwin.UI
         private string procedureTitle;
         private string procedureDescription;
         private List<ProcedureStep> steps;
+        private List<FakeObjectData> fakeObjects; // NEW: Fake objects that show error messages
         private int currentStepIndex = 0;
         private float procedureStartTime;   // Temps de début de la procédure
 
         // GameObjects de la séquence
-        private List<GameObject> allSequenceObjects; // Tous les objets (correct + wrong) de toutes les étapes
+        private List<GameObject> allSequenceObjects; // Tous les objets (target + fake) de toutes les étapes
         private Dictionary<GameObject, Material> originalMaterials;
         private List<GameObject> currentHighlightedObjects = new List<GameObject>(); // Objets surlignés à l'étape actuelle
         private GameObject currentCorrectObject; // L'objet correct de l'étape actuelle
         private bool shouldHighlight = true; // Contrôle si on doit surligner ou non
         private bool keepProgressOnOtherClick = false; // Ne pas réinitialiser à 0 si on clique ailleurs
-        private IProcedureReset resetScript; // Script de reset personnalisé
 
         // UI Elements
         private Label titleLabel;
@@ -60,15 +60,23 @@ namespace WiseTwin.UI
 
         public class ProcedureStep
         {
-            public string correctObjectId;
-            public List<string> wrongObjectIds = new List<string>();
+            public string targetObjectName; // NEW: Object name instead of ID
             public string title;
             public string instruction;
             public string validation;
             public string hint;
-            public GameObject correctObject;
-            public List<GameObject> wrongObjects = new List<GameObject>();
+            public GameObject targetObject; // NEW: renamed from correctObject
             public bool completed = false;
+            public Color highlightColor = Color.yellow;
+            public bool useBlinking = true;
+            public List<FakeObjectData> fakeObjects = new List<FakeObjectData>(); // NEW: Fake objects specific to this step
+        }
+
+        public class FakeObjectData
+        {
+            public string objectName;
+            public string errorMessage;
+            public GameObject gameObject;
         }
 
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
@@ -102,16 +110,6 @@ namespace WiseTwin.UI
                 keepProgressOnOtherClick = false; // Par défaut, on reset
             }
 
-            // Récupérer le script de reset si fourni
-            if (contentData.ContainsKey("resetScript"))
-            {
-                resetScript = contentData["resetScript"] as IProcedureReset;
-                if (resetScript != null)
-                {
-                    Debug.Log($"[ProcedureDisplayer] Reset script configured");
-                }
-            }
-
             // Obtenir la langue actuelle
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
 
@@ -141,62 +139,88 @@ namespace WiseTwin.UI
             originalMaterials = new Dictionary<GameObject, Material>();
             allSequenceObjects = new List<GameObject>();
 
-            // Récupérer tous les mappers une seule fois
-            var allMappers = FindObjectsByType<ObjectMetadataMapper>(FindObjectsSortMode.None);
-
-            // Trouver les GameObjects pour chaque étape (correct + wrong)
+            // Trouver les GameObjects pour chaque étape par nom
             foreach (var step in steps)
             {
-                // Chercher l'objet correct
-                if (!string.IsNullOrEmpty(step.correctObjectId))
+                // Chercher l'objet target par nom
+                if (!string.IsNullOrEmpty(step.targetObjectName))
                 {
-                    foreach (var mapper in allMappers)
+                    step.targetObject = GameObject.Find(step.targetObjectName);
+
+                    if (step.targetObject != null)
                     {
-                        if (mapper.MetadataId == step.correctObjectId)
+                        allSequenceObjects.Add(step.targetObject);
+
+                        // Stocker le matériau original
+                        var renderer = step.targetObject.GetComponent<Renderer>();
+                        if (renderer != null)
                         {
-                            step.correctObject = mapper.gameObject;
-                            allSequenceObjects.Add(mapper.gameObject);
-
-                            // Stocker le matériau original
-                            var renderer = mapper.GetComponent<Renderer>();
-                            if (renderer != null)
-                            {
-                                originalMaterials[mapper.gameObject] = renderer.material;
-                            }
-
-                            Debug.Log($"[ProcedureDisplayer] Found correct object for step: {step.correctObjectId} -> {mapper.gameObject.name}");
-                            break;
+                            originalMaterials[step.targetObject] = renderer.material;
                         }
-                    }
 
-                    if (step.correctObject == null)
+                        Debug.Log($"[ProcedureDisplayer] Found target object for step: {step.targetObjectName}");
+                    }
+                    else
                     {
-                        Debug.LogWarning($"[ProcedureDisplayer] Could not find correct GameObject with metadata ID: {step.correctObjectId}");
+                        Debug.LogWarning($"[ProcedureDisplayer] Could not find GameObject with name: {step.targetObjectName}");
                     }
                 }
 
-                // Chercher les objets incorrects
-                foreach (var wrongId in step.wrongObjectIds)
+                // NEW: Find fake objects for this step
+                if (step.fakeObjects != null && step.fakeObjects.Count > 0)
                 {
-                    if (string.IsNullOrEmpty(wrongId)) continue;
-
-                    foreach (var mapper in allMappers)
+                    foreach (var fake in step.fakeObjects)
                     {
-                        if (mapper.MetadataId == wrongId)
+                        if (string.IsNullOrEmpty(fake.objectName)) continue;
+
+                        fake.gameObject = GameObject.Find(fake.objectName);
+
+                        if (fake.gameObject != null)
                         {
-                            step.wrongObjects.Add(mapper.gameObject);
-                            allSequenceObjects.Add(mapper.gameObject);
+                            allSequenceObjects.Add(fake.gameObject);
 
                             // Stocker le matériau original
-                            var renderer = mapper.GetComponent<Renderer>();
-                            if (renderer != null && !originalMaterials.ContainsKey(mapper.gameObject))
+                            var renderer = fake.gameObject.GetComponent<Renderer>();
+                            if (renderer != null && !originalMaterials.ContainsKey(fake.gameObject))
                             {
-                                originalMaterials[mapper.gameObject] = renderer.material;
+                                originalMaterials[fake.gameObject] = renderer.material;
                             }
 
-                            Debug.Log($"[ProcedureDisplayer] Found wrong object for step: {wrongId} -> {mapper.gameObject.name}");
-                            break;
+                            Debug.Log($"[ProcedureDisplayer] Found step-specific fake object: {fake.objectName}");
                         }
+                        else
+                        {
+                            Debug.LogWarning($"[ProcedureDisplayer] Could not find step-specific fake GameObject with name: {fake.objectName}");
+                        }
+                    }
+                }
+            }
+
+            // Trouver les fake objects par nom
+            if (fakeObjects != null)
+            {
+                foreach (var fake in fakeObjects)
+                {
+                    if (string.IsNullOrEmpty(fake.objectName)) continue;
+
+                    fake.gameObject = GameObject.Find(fake.objectName);
+
+                    if (fake.gameObject != null)
+                    {
+                        allSequenceObjects.Add(fake.gameObject);
+
+                        // Stocker le matériau original
+                        var renderer = fake.gameObject.GetComponent<Renderer>();
+                        if (renderer != null && !originalMaterials.ContainsKey(fake.gameObject))
+                        {
+                            originalMaterials[fake.gameObject] = renderer.material;
+                        }
+
+                        Debug.Log($"[ProcedureDisplayer] Found fake object: {fake.objectName}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[ProcedureDisplayer] Could not find fake GameObject with name: {fake.objectName}");
                     }
                 }
             }
@@ -467,14 +491,25 @@ namespace WiseTwin.UI
             currentHighlightedObjects.Clear();
             currentCorrectObject = null;
 
-            // Surligner TOUS les objets de l'étape actuelle (correct + wrong)
-            if (currentStep.correctObject != null)
+            // Surligner TOUS les objets de l'étape actuelle (target + fakes)
+            if (currentStep.targetObject != null)
             {
-                currentCorrectObject = currentStep.correctObject;
+                currentCorrectObject = currentStep.targetObject;
 
                 // Créer une liste de tous les objets à surligner
-                var objectsToHighlight = new List<GameObject> { currentStep.correctObject };
-                objectsToHighlight.AddRange(currentStep.wrongObjects);
+                var objectsToHighlight = new List<GameObject> { currentStep.targetObject };
+
+                // NEW: Ajouter les fake objects spécifiques à cette étape
+                if (currentStep.fakeObjects != null && currentStep.fakeObjects.Count > 0)
+                {
+                    foreach (var fake in currentStep.fakeObjects)
+                    {
+                        if (fake.gameObject != null)
+                        {
+                            objectsToHighlight.Add(fake.gameObject);
+                        }
+                    }
+                }
 
                 foreach (var obj in objectsToHighlight)
                 {
@@ -554,23 +589,35 @@ namespace WiseTwin.UI
             }
         }
 
+        /// <summary>
+        /// Enable/disable object interaction (no longer uses InteractableObject component)
+        /// Objects are now interacted with directly via raycasts in the procedure system
+        /// </summary>
         void EnableObjectInteraction(GameObject obj, bool enabled)
         {
-            var interactable = obj.GetComponent<InteractableObject>();
-            if (interactable != null)
-            {
-                interactable.SetInteractionEnabled(enabled);
-            }
+            // In the new system, we don't need to enable/disable anything
+            // Objects are clicked directly, and the procedure system handles validation
+            // This method is kept for compatibility but does nothing
         }
 
-        void ShowErrorFeedback()
+        void ShowErrorFeedback(string customMessage = null)
         {
             if (errorFeedbackLabel == null || currentStepIndex >= steps.Count) return;
 
-            // Message d'erreur sans révéler la bonne réponse
-            string message = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? $"❌ Mauvaise réponse ! Réessayez. (Erreurs: {wrongClicksCount})"
-                : $"❌ Wrong answer! Try again. (Errors: {wrongClicksCount})";
+            string message;
+
+            // Use custom message if provided, otherwise use generic one
+            if (!string.IsNullOrEmpty(customMessage))
+            {
+                message = $"❌ {customMessage} (Erreurs: {wrongClicksCount})";
+            }
+            else
+            {
+                // Message d'erreur sans révéler la bonne réponse
+                message = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? $"❌ Mauvaise réponse ! Réessayez. (Erreurs: {wrongClicksCount})"
+                    : $"❌ Wrong answer! Try again. (Errors: {wrongClicksCount})";
+            }
 
             errorFeedbackLabel.text = message;
             errorFeedbackLabel.style.display = DisplayStyle.Flex;
@@ -603,8 +650,37 @@ namespace WiseTwin.UI
 
                 Debug.Log($"[ProcedureDisplayer] Wrong object clicked! Expected: {currentCorrectObject?.name}, Got: {clickedObject?.name}. Wrong clicks: {wrongClicksCount}");
 
-                // Afficher le feedback d'erreur
-                ShowErrorFeedback();
+                // NEW: Check if the clicked object is a fake and show its specific error message
+                string customErrorMessage = null;
+
+                // First check step-specific fake objects
+                if (currentStep.fakeObjects != null)
+                {
+                    foreach (var fake in currentStep.fakeObjects)
+                    {
+                        if (fake.gameObject == clickedObject)
+                        {
+                            customErrorMessage = fake.errorMessage;
+                            break;
+                        }
+                    }
+                }
+
+                // Fallback to global fake objects if no step-specific fake found
+                if (customErrorMessage == null && fakeObjects != null)
+                {
+                    foreach (var fake in fakeObjects)
+                    {
+                        if (fake.gameObject == clickedObject)
+                        {
+                            customErrorMessage = fake.errorMessage;
+                            break;
+                        }
+                    }
+                }
+
+                // Afficher le feedback d'erreur (custom ou générique)
+                ShowErrorFeedback(customErrorMessage);
 
                 // Ne PAS passer à l'étape suivante, laisser l'utilisateur réessayer
                 return;
@@ -621,7 +697,7 @@ namespace WiseTwin.UI
             {
                 stepNumber = currentStepIndex + 1,
                 stepKey = $"step_{currentStepIndex + 1}",
-                targetObjectId = currentStep.correctObjectId,
+                targetObjectId = currentStep.targetObjectName,
                 completed = true,
                 duration = stepDuration,
                 wrongClicksOnThisStep = wrongClicksCount
@@ -651,26 +727,12 @@ namespace WiseTwin.UI
         }
 
         /// <summary>
-        /// Réinitialise la procédure (utilisé uniquement par le script de reset personnalisé si configuré)
+        /// Réinitialise la procédure
         /// Note: Cette méthode n'est plus appelée automatiquement pour les clics hors séquence
         /// </summary>
         public void ResetProcedure()
         {
             Debug.Log("[ProcedureDisplayer] Resetting procedure manually");
-
-            // Appeler le script de reset si configuré
-            if (resetScript != null && allSequenceObjects.Count > 0)
-            {
-                try
-                {
-                    resetScript.ResetProcedure(allSequenceObjects.ToArray());
-                    Debug.Log("[ProcedureDisplayer] Custom reset script executed");
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[ProcedureDisplayer] Error executing reset script: {e.Message}");
-                }
-            }
 
             // Retirer les surbrillances actuelles si elles sont actives
             if (shouldHighlight)
@@ -819,15 +881,65 @@ namespace WiseTwin.UI
         {
             var procedureSteps = new List<ProcedureStep>();
 
-            // Chercher les étapes (step_1, step_2, etc.) et les trier numériquement
+            // NEW FORMAT: Check for "steps" array (scenario-based metadata)
+            if (data.ContainsKey("steps"))
+            {
+                var stepsData = data["steps"];
+                if (TryConvertToList(stepsData, out List<Dictionary<string, object>> stepsList))
+                {
+                    foreach (var stepData in stepsList)
+                    {
+                        var step = new ProcedureStep
+                        {
+                            targetObjectName = ExtractString(stepData, "targetObjectName"),
+                            instruction = ExtractLocalizedText(stepData, "text", language),
+                            hint = ExtractLocalizedText(stepData, "hint", language),
+                            highlightColor = ParseColor(ExtractString(stepData, "highlightColor"), Color.yellow),
+                            useBlinking = ExtractBool(stepData, "useBlinking", true)
+                        };
+
+                        // NEW: Extract fake objects for this step
+                        if (stepData.ContainsKey("fakeObjects") && TryConvertToList(stepData["fakeObjects"], out List<Dictionary<string, object>> stepFakeList))
+                        {
+                            foreach (var fakeData in stepFakeList)
+                            {
+                                step.fakeObjects.Add(new FakeObjectData
+                                {
+                                    objectName = ExtractString(fakeData, "objectName"),
+                                    errorMessage = ExtractLocalizedText(fakeData, "errorMessage", language)
+                                });
+                            }
+                        }
+
+                        procedureSteps.Add(step);
+                    }
+
+                    // Extract global fake objects (for backward compatibility)
+                    if (data.ContainsKey("fakeObjects") && TryConvertToList(data["fakeObjects"], out List<Dictionary<string, object>> fakeList))
+                    {
+                        fakeObjects = new List<FakeObjectData>();
+                        foreach (var fakeData in fakeList)
+                        {
+                            fakeObjects.Add(new FakeObjectData
+                            {
+                                objectName = ExtractString(fakeData, "objectName"),
+                                errorMessage = ExtractLocalizedText(fakeData, "errorMessage", language)
+                            });
+                        }
+                    }
+
+                    return procedureSteps;
+                }
+            }
+
+            // LEGACY FORMAT: Check for step_1, step_2, etc. (old system - kept for backward compatibility)
             var stepKeys = data.Keys
                 .Where(k => k.StartsWith("step_"))
                 .OrderBy(k =>
                 {
-                    // Extraire le numéro de l'étape pour un tri numérique
                     if (int.TryParse(k.Replace("step_", ""), out int stepNumber))
                         return stepNumber;
-                    return 999; // Mettre à la fin si pas de numéro valide
+                    return 999;
                 })
                 .ToList();
 
@@ -838,45 +950,58 @@ namespace WiseTwin.UI
                 {
                     var step = new ProcedureStep
                     {
-                        correctObjectId = ExtractString(stepData, "correctObjectId"),
+                        targetObjectName = ExtractString(stepData, "correctObjectId"), // Legacy: use correctObjectId as targetObjectName
                         title = ExtractLocalizedText(stepData, "title", language),
                         instruction = ExtractLocalizedText(stepData, "instruction", language),
                         validation = ExtractLocalizedText(stepData, "validation", language),
                         hint = ExtractLocalizedText(stepData, "hint", language)
                     };
 
-                    // Extraire les wrongObjectIds si présents
-                    if (stepData.ContainsKey("wrongObjectIds"))
-                    {
-                        var wrongIds = stepData["wrongObjectIds"];
-                        if (wrongIds is List<object> wrongList)
-                        {
-                            step.wrongObjectIds = wrongList.Select(id => id?.ToString() ?? "").Where(id => !string.IsNullOrEmpty(id)).ToList();
-                        }
-                        else if (wrongIds is string[] wrongArray)
-                        {
-                            step.wrongObjectIds = wrongArray.Where(id => !string.IsNullOrEmpty(id)).ToList();
-                        }
-                        else if (wrongIds != null)
-                        {
-                            // Tentative de conversion depuis JArray ou autre
-                            try
-                            {
-                                string json = Newtonsoft.Json.JsonConvert.SerializeObject(wrongIds);
-                                step.wrongObjectIds = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? new List<string>();
-                            }
-                            catch
-                            {
-                                step.wrongObjectIds = new List<string>();
-                            }
-                        }
-                    }
-
                     procedureSteps.Add(step);
                 }
             }
 
             return procedureSteps;
+        }
+
+        bool TryConvertToList(object obj, out List<Dictionary<string, object>> list)
+        {
+            list = null;
+            if (obj == null) return false;
+
+            try
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
+                list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(json);
+                return list != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        Color ParseColor(string colorHex, Color defaultColor)
+        {
+            if (string.IsNullOrEmpty(colorHex)) return defaultColor;
+
+            if (ColorUtility.TryParseHtmlString(colorHex, out Color color))
+            {
+                return color;
+            }
+
+            return defaultColor;
+        }
+
+        bool ExtractBool(Dictionary<string, object> data, string key, bool defaultValue)
+        {
+            if (!data.ContainsKey(key)) return defaultValue;
+
+            var value = data[key];
+            if (value is bool boolValue) return boolValue;
+            if (value is string strValue && bool.TryParse(strValue, out bool parsed)) return parsed;
+
+            return defaultValue;
         }
 
         bool TryConvertToDict(object obj, out Dictionary<string, object> dict)

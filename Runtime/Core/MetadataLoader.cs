@@ -3,8 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
+using WiseTwin;
 
 public class MetadataLoader : MonoBehaviour
 {
@@ -43,7 +45,9 @@ public class MetadataLoader : MonoBehaviour
 
     // Données chargées
     private Dictionary<string, object> loadedMetadata;
-    private Dictionary<string, object> unityData;
+    private Dictionary<string, object> unityData; // Legacy format support
+    private List<ScenarioData> scenarios;
+    private TrainingSettings settings;
     private bool isLoading = false;
     
     // Singleton
@@ -54,7 +58,11 @@ public class MetadataLoader : MonoBehaviour
     public bool IsLoading => isLoading;
     public string SceneName => sceneName;
     public Dictionary<string, object> GetMetadata() => loadedMetadata;
-    public Dictionary<string, object> GetUnityData() => unityData;
+    public Dictionary<string, object> GetUnityData() => unityData; // Legacy
+    public List<ScenarioData> GetScenarios() => scenarios;
+    public TrainingSettings GetSettings() => settings;
+    public int GetScenarioCount() => scenarios?.Count ?? 0;
+    public bool HasScenarios() => scenarios != null && scenarios.Count > 0;
     
     void Awake()
     {
@@ -372,21 +380,41 @@ public class MetadataLoader : MonoBehaviour
         {
             // Parser le JSON complet
             loadedMetadata = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonContent);
-            
-            // Extraire la section Unity si elle existe
-            if (loadedMetadata.ContainsKey("unity"))
+
+            // Extract settings
+            if (loadedMetadata.ContainsKey("settings"))
             {
-                unityData = JsonConvert.DeserializeObject<Dictionary<string, object>>(
-                    JsonConvert.SerializeObject(loadedMetadata["unity"]));
-                
-                DebugLog($"📊 Section Unity trouvée avec {unityData.Count} objets");
+                string settingsJson = JsonConvert.SerializeObject(loadedMetadata["settings"]);
+                settings = JsonConvert.DeserializeObject<TrainingSettings>(settingsJson);
+                DebugLog($"⚙️ Settings loaded - Evaluation Mode: {settings.evaluationMode}");
             }
             else
             {
-                DebugLog("⚠️ Aucune section 'unity' trouvée dans les métadonnées");
-                unityData = new Dictionary<string, object>();
+                settings = new TrainingSettings();
+                DebugLog("⚙️ Using default settings");
             }
-            
+
+            // Extract scenarios (new format)
+            if (loadedMetadata.ContainsKey("scenarios"))
+            {
+                string scenariosJson = JsonConvert.SerializeObject(loadedMetadata["scenarios"]);
+                scenarios = JsonConvert.DeserializeObject<List<ScenarioData>>(scenariosJson);
+                DebugLog($"🎯 Scenarios loaded: {scenarios.Count} scenarios found");
+
+                // Log scenario types for debugging
+                foreach (var scenario in scenarios)
+                {
+                    DebugLog($"  - {scenario.id}: {scenario.type}");
+                }
+            }
+            else
+            {
+                DebugLog("⚠️ No 'scenarios' section found in metadata");
+                scenarios = new List<ScenarioData>();
+            }
+
+            unityData = new Dictionary<string, object>();
+
             // Notifier le succès
             OnMetadataLoaded?.Invoke(loadedMetadata);
         }
@@ -461,6 +489,67 @@ public class MetadataLoader : MonoBehaviour
     public List<string> GetAvailableObjectIds()
     {
         return unityData != null ? new List<string>(unityData.Keys) : new List<string>();
+    }
+
+    /// <summary>
+    /// Get a scenario by index
+    /// </summary>
+    public ScenarioData GetScenario(int index)
+    {
+        if (scenarios == null || index < 0 || index >= scenarios.Count)
+        {
+            DebugLog($"⚠️ Invalid scenario index: {index} (total: {scenarios?.Count ?? 0})");
+            return null;
+        }
+
+        return scenarios[index];
+    }
+
+    /// <summary>
+    /// Check if evaluation mode is enabled (checks scenario-specific or global setting)
+    /// </summary>
+    public bool IsEvaluationMode(ScenarioData scenario = null)
+    {
+        // Scenario-specific evaluation mode takes priority
+        if (scenario?.evaluationMode.HasValue == true)
+        {
+            return scenario.evaluationMode.Value;
+        }
+
+        // Fall back to global setting
+        return settings?.evaluationMode ?? false;
+    }
+
+    /// <summary>
+    /// Get localized disclaimer text
+    /// </summary>
+    public string GetDisclaimer(string languageCode = "en")
+    {
+        if (loadedMetadata != null && loadedMetadata.ContainsKey("disclaimer"))
+        {
+            try
+            {
+                var disclaimerObj = JsonConvert.DeserializeObject<Dictionary<string, string>>(
+                    JsonConvert.SerializeObject(loadedMetadata["disclaimer"]));
+
+                if (disclaimerObj.ContainsKey(languageCode))
+                {
+                    return disclaimerObj[languageCode];
+                }
+
+                // Fallback to English if requested language not found
+                if (disclaimerObj.ContainsKey("en"))
+                {
+                    return disclaimerObj["en"];
+                }
+            }
+            catch (System.Exception e)
+            {
+                DebugLog($"⚠️ Error parsing disclaimer: {e.Message}");
+            }
+        }
+
+        return null; // No disclaimer in metadata
     }
     
     public string GetProjectInfo(string key)

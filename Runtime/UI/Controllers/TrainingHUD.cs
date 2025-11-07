@@ -30,6 +30,7 @@ namespace WiseTwin
         private Label progressLabel;
         private VisualElement progressBar;
         private VisualElement progressFill;
+        private Button nextScenarioButton;
 
         // State
         private float startTime;
@@ -62,6 +63,21 @@ namespace WiseTwin
 
             // Setup UIDocument
             SetupUIDocument();
+
+            // S'abonner aux changements de langue
+            if (LocalizationManager.Instance != null)
+            {
+                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
+            }
+        }
+
+        void OnDestroy()
+        {
+            // Se désabonner des événements
+            if (LocalizationManager.Instance != null)
+            {
+                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+            }
         }
 
         void Start()
@@ -80,19 +96,9 @@ namespace WiseTwin
                 uiDocument = gameObject.AddComponent<UIDocument>();
             }
 
-            // Assigner le PanelSettings s'il n'est pas déjà assigné
             if (uiDocument.panelSettings == null)
             {
-                var panelSettings = Resources.Load<PanelSettings>("WiseTwinPanelSettings");
-                if (panelSettings != null)
-                {
-                    uiDocument.panelSettings = panelSettings;
-                    Debug.Log("[TrainingHUD] PanelSettings loaded from Resources");
-                }
-                else
-                {
-                    Debug.LogError("[TrainingHUD] Could not find WiseTwinPanelSettings in Resources folder!");
-                }
+                Debug.LogWarning("[TrainingHUD] PanelSettings is null! Please assign it in the inspector.");
             }
 
             root = uiDocument.rootVisualElement;
@@ -193,15 +199,34 @@ namespace WiseTwin
             progressSection.Add(progressBar);
             hudContainer.Add(progressSection);
 
-            // Section droite - Compteur
-            var counterSection = new VisualElement();
-            counterSection.style.width = Length.Percent(25);
-            counterSection.style.alignItems = Align.FlexEnd;
+            // Section droite - Bouton "Scénario suivant"
+            var buttonSection = new VisualElement();
+            buttonSection.style.marginLeft = 10;
+            buttonSection.style.alignItems = Align.Center;
 
-            var objectsLabel = new Label("Objets");
-            objectsLabel.style.fontSize = 11;
-            objectsLabel.style.color = new Color(textColor.r, textColor.g, textColor.b, 0.6f);
-            counterSection.Add(objectsLabel);
+            // Bouton "Scénario suivant"
+            nextScenarioButton = new Button(() => OnNextScenarioButtonClicked());
+            nextScenarioButton.name = "next-scenario-button";
+            nextScenarioButton.text = GetLocalizedText("next_scenario");
+            nextScenarioButton.style.height = 32;
+            nextScenarioButton.style.paddingLeft = 15;
+            nextScenarioButton.style.paddingRight = 15;
+            nextScenarioButton.style.fontSize = 14;
+            nextScenarioButton.style.backgroundColor = progressColor;
+            nextScenarioButton.style.color = Color.white;
+            nextScenarioButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            nextScenarioButton.style.borderTopLeftRadius = 16;
+            nextScenarioButton.style.borderTopRightRadius = 16;
+            nextScenarioButton.style.borderBottomLeftRadius = 16;
+            nextScenarioButton.style.borderBottomRightRadius = 16;
+            nextScenarioButton.SetEnabled(false); // Disabled by default
+
+            // Style for disabled state
+            nextScenarioButton.style.opacity = 0.5f;
+
+            buttonSection.Add(nextScenarioButton);
+
+            hudContainer.Add(buttonSection);
 
             root.Add(hudContainer);
 
@@ -350,13 +375,13 @@ namespace WiseTwin
             hudContainer.style.display = DisplayStyle.None;
         }
 
-        // Méthode utilitaire pour compter les objets interactables
+        /// <summary>
+        /// DEPRECATED: Auto-detection is no longer needed - ProgressionManager automatically sets the total from metadata
+        /// </summary>
+        [System.Obsolete("AutoDetectInteractables is deprecated. ProgressionManager automatically initializes the total from metadata scenarios.")]
         public void AutoDetectInteractables()
         {
-            var interactables = FindObjectsByType<InteractableObject>(FindObjectsSortMode.None);
-            SetTotalObjects(interactables.Length);
-
-            if (debugMode) Debug.Log($"[TrainingHUD] Auto-detected {interactables.Length} interactable objects");
+            Debug.LogWarning("[TrainingHUD] AutoDetectInteractables is deprecated. The total is automatically set by ProgressionManager from metadata.");
         }
 
         // Pour les tests
@@ -394,35 +419,176 @@ namespace WiseTwin
                 // Créer l'UI de complétion s'il n'existe pas
                 GameObject completionGO = new GameObject("TrainingCompletionUI");
                 completionUI = completionGO.AddComponent<UI.TrainingCompletionUI>();
-                completionGO.AddComponent<UIDocument>();
+
+                // Ajouter UIDocument
+                var uiDoc = completionGO.AddComponent<UIDocument>();
+
+                // Essayer de trouver et assigner le PanelSettings du HUD actuel
+                if (uiDocument != null && uiDocument.panelSettings != null)
+                {
+                    uiDoc.panelSettings = uiDocument.panelSettings;
+                    if (debugMode) Debug.Log("[TrainingHUD] PanelSettings assigned to TrainingCompletionUI from TrainingHUD");
+                }
             }
 
-            // Afficher l'écran de complétion
-            completionUI.ShowCompletionScreen(totalTime, currentProgress);
-
-            // Animation de célébration sur la barre de progression
-            if (progressFill != null)
+            // IMPORTANT: Afficher l'écran de complétion avec les statistiques
+            if (completionUI != null)
             {
-                progressFill.style.backgroundColor = new Color(0.2f, 0.9f, 0.4f, 1f);
-
-                // Pulse animation
-                StartCoroutine(PulseProgressBar());
+                completionUI.ShowCompletionScreen(totalTime, totalObjects);
+                if (debugMode) Debug.Log("[TrainingHUD] Completion screen displayed successfully");
+            }
+            else
+            {
+                Debug.LogError("[TrainingHUD] Failed to create or find TrainingCompletionUI!");
             }
         }
 
-        System.Collections.IEnumerator PulseProgressBar()
+        // New scenario-based methods
+        /// <summary>
+        /// Called when a scenario starts - disables the next button
+        /// </summary>
+        public void OnScenarioStarted()
         {
-            if (progressFill == null) yield break;
-
-            Color successColor = new Color(0.2f, 0.9f, 0.4f, 1f);
-            Color pulseColor = new Color(0.3f, 1f, 0.5f, 1f);
-
-            for (int i = 0; i < 3; i++)
+            if (nextScenarioButton != null)
             {
-                progressFill.style.backgroundColor = pulseColor;
-                yield return new WaitForSeconds(0.3f);
-                progressFill.style.backgroundColor = successColor;
-                yield return new WaitForSeconds(0.3f);
+                nextScenarioButton.SetEnabled(false);
+                nextScenarioButton.style.opacity = 0.5f;
+
+                if (debugMode) Debug.Log("[TrainingHUD] Next scenario button disabled (scenario in progress)");
+            }
+        }
+
+        /// <summary>
+        /// Called when a scenario is completed - increments progress and enables the next button
+        /// </summary>
+        public void OnScenarioCompleted()
+        {
+            // Incrémenter le compteur de progression
+            if (currentProgress < totalObjects)
+            {
+                currentProgress++;
+                UpdateProgressDisplay();
+
+                if (debugMode) Debug.Log($"[TrainingHUD] Progress incremented: {currentProgress}/{totalObjects}");
+            }
+
+            // Activer le bouton "Next Scenario"
+            if (nextScenarioButton != null)
+            {
+                nextScenarioButton.SetEnabled(true);
+                nextScenarioButton.style.opacity = 1f;
+
+                if (debugMode) Debug.Log("[TrainingHUD] Next scenario button enabled");
+            }
+        }
+
+        /// <summary>
+        /// Called when all scenarios are completed - hides the next button
+        /// </summary>
+        public void OnAllScenariosCompleted()
+        {
+            if (nextScenarioButton != null)
+            {
+                nextScenarioButton.style.display = DisplayStyle.None;
+
+                if (debugMode) Debug.Log("[TrainingHUD] All scenarios completed - button hidden");
+            }
+
+            // Show completion UI
+            OnTrainingCompleted();
+        }
+
+        /// <summary>
+        /// Called when next scenario button is clicked
+        /// </summary>
+        void OnNextScenarioButtonClicked()
+        {
+            if (debugMode) Debug.Log("[TrainingHUD] Next scenario button clicked");
+
+            // Disable button until next scenario is completed
+            if (nextScenarioButton != null)
+            {
+                nextScenarioButton.SetEnabled(false);
+                nextScenarioButton.style.opacity = 0.5f;
+            }
+
+            // Tell progression manager to move to next scenario
+            if (ProgressionManager.Instance != null)
+            {
+                ProgressionManager.Instance.MoveToNextScenario();
+            }
+            else
+            {
+                Debug.LogError("[TrainingHUD] ProgressionManager.Instance is null!");
+            }
+        }
+
+        /// <summary>
+        /// Get localized text for the UI
+        /// </summary>
+        string GetLocalizedText(string key)
+        {
+            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+
+            if (lang == "fr")
+            {
+                return key switch
+                {
+                    "next_scenario" => "Scénario suivant ▶",
+                    _ => key
+                };
+            }
+            else
+            {
+                return key switch
+                {
+                    "next_scenario" => "Next Scenario ▶",
+                    _ => key
+                };
+            }
+        }
+
+        /// <summary>
+        /// Initialize for scenario-based progression
+        /// </summary>
+        public void InitializeForScenarios()
+        {
+            if (ProgressionManager.Instance != null)
+            {
+                int totalScenarios = ProgressionManager.Instance.TotalScenarios;
+                SetTotalObjects(totalScenarios);
+
+                // Enable the button at the start so user can begin the first scenario
+                if (nextScenarioButton != null)
+                {
+                    nextScenarioButton.SetEnabled(true);
+                    nextScenarioButton.style.opacity = 1f;
+                }
+
+                // Update button text with current language
+                UpdateButtonText();
+
+                if (debugMode) Debug.Log($"[TrainingHUD] Initialized for {totalScenarios} scenarios");
+            }
+        }
+
+        /// <summary>
+        /// Called when language changes - updates UI text
+        /// </summary>
+        void OnLanguageChanged(string newLanguage)
+        {
+            UpdateButtonText();
+            if (debugMode) Debug.Log($"[TrainingHUD] Language changed to: {newLanguage}, button text updated");
+        }
+
+        /// <summary>
+        /// Update button text based on current language
+        /// </summary>
+        void UpdateButtonText()
+        {
+            if (nextScenarioButton != null)
+            {
+                nextScenarioButton.text = GetLocalizedText("next_scenario");
             }
         }
     }

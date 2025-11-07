@@ -6,699 +6,414 @@ using WiseTwin.UI;
 namespace WiseTwin
 {
     /// <summary>
-    /// Méthode de détection des InteractableObjects
-    /// </summary>
-    public enum DetectionMethod
-    {
-        /// <summary>
-        /// Recherche dans toute la scène
-        /// </summary>
-        EntireScene,
-
-        /// <summary>
-        /// Recherche uniquement parmi les enfants d'un GameObject parent
-        /// </summary>
-        ChildrenOnly
-    }
-
-    /// <summary>
-    /// Gestionnaire de progression guidée pour les objets interactables
-    /// Affiche les objets un par un dans un ordre défini, et active le suivant après complétion
+    /// Manages progression through training scenarios
+    /// Displays scenarios sequentially from metadata.json and handles completion
+    /// NEW SYSTEM: Works directly with metadata scenarios (no more InteractableObjects)
     /// </summary>
     public class ProgressionManager : MonoBehaviour
     {
-        [Header("Auto-Detection")]
-        [Tooltip("Détecter automatiquement tous les InteractableObjects dans la scène au démarrage")]
-        [SerializeField] private bool autoDetectOnStart = true;
-
-        [Tooltip("Méthode de détection des objets")]
-        [SerializeField] private DetectionMethod detectionMethod = DetectionMethod.EntireScene;
-
-        [Tooltip("Parent GameObject pour la recherche (si detectionMethod = ChildrenOnly)")]
-        [SerializeField] private Transform searchParent;
-
         [Header("Configuration")]
-        [Tooltip("Liste ordonnée des objets interactables à afficher progressivement (remplie automatiquement si autoDetect activé)")]
-        [SerializeField] private List<InteractableObject> progressionSequence = new List<InteractableObject>();
+        [Tooltip("Auto-start the first scenario when training begins")]
+        [SerializeField] private bool autoStartFirstScenario = true;
 
-        [Tooltip("Exiger un ordre séquentiel (un à la fois) ou permettre l'interaction libre (tous visibles)")]
-        [SerializeField] private bool requireSequentialOrder = true;
-
-        [Tooltip("Mode de visibilité pour les objets pas encore actifs (seulement si requireSequentialOrder = true)")]
-        [SerializeField] private ProgressionVisibilityMode visibilityMode = ProgressionVisibilityMode.Transparent;
-
-        [Tooltip("Afficher les objets déjà complétés normalement ou les cacher")]
-        [SerializeField] private bool showCompletedObjects = true;
-
-        [Tooltip("Cacher aussi les objets complétés (un seul objet visible à la fois)")]
-        [SerializeField] private bool hideCompletedObjects = false;
-
-        [Tooltip("Permettre de revenir en arrière dans la progression")]
-        [SerializeField] private bool allowBackTracking = false;
-
-        [Tooltip("Réinitialiser la progression au démarrage")]
+        [Tooltip("Reset progression on Start")]
         [SerializeField] private bool resetOnStart = true;
-
-        [Header("Options de complétion")]
-        [Tooltip("Requis que tous les objets soient complétés avec succès")]
-        [SerializeField] private bool requireSuccessForAll = true;
-
-        [Tooltip("Nombre d'essais autorisés par objet (0 = illimité)")]
-        [SerializeField] private int maxAttemptsPerObject = 0;
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
 
-        // État de la progression
-        private int currentStepIndex = 0;
-        private HashSet<string> completedObjectIds = new HashSet<string>();
+        // Progression state
+        private List<ScenarioData> scenarios;
+        private int currentScenarioIndex = -1;
+        private HashSet<string> completedScenarioIds = new HashSet<string>();
         private Dictionary<string, int> attemptCounts = new Dictionary<string, int>();
         private bool isProgressionActive = false;
+        private bool isWaitingForCompletion = false;
 
-        // Cache pour mapper objectId -> InteractableObject
-        private Dictionary<string, InteractableObject> objectIdToInteractable = new Dictionary<string, InteractableObject>();
+        // References
+        private MetadataLoader metadataLoader;
+        private ContentDisplayManager contentDisplayManager;
 
-        // Événements
-        public event Action<int, InteractableObject> OnStepActivated;
-        public event Action<int, InteractableObject, bool> OnStepCompleted; // stepIndex, object, success
-        public event Action OnProgressionCompleted;
-        public event Action<InteractableObject, int> OnMaxAttemptsReached; // object, attemptCount
+        // Singleton
+        public static ProgressionManager Instance { get; private set; }
 
-        // Propriétés publiques
-        public int CurrentStepIndex => currentStepIndex;
-        public int TotalSteps => progressionSequence.Count;
+        // Events
+        public event Action<int, ScenarioData> OnScenarioStarted; // index, scenario
+        public event Action<int, ScenarioData, bool> OnScenarioCompleted; // index, scenario, success
+        public event Action OnAllScenariosCompleted;
+        public event Action OnProgressionReset;
+
+        // Public properties
+        public int CurrentScenarioIndex => currentScenarioIndex;
+        public int TotalScenarios => scenarios?.Count ?? 0;
         public bool IsProgressionActive => isProgressionActive;
-        public float ProgressPercentage => TotalSteps > 0 ? (float)currentStepIndex / TotalSteps * 100f : 0f;
-        public List<InteractableObject> ProgressionSequence => new List<InteractableObject>(progressionSequence);
+        public bool IsWaitingForCompletion => isWaitingForCompletion;
+        public float ProgressPercentage => TotalScenarios > 0 ? (float)(currentScenarioIndex + 1) / TotalScenarios * 100f : 0f;
+        public ScenarioData CurrentScenario => scenarios != null && currentScenarioIndex >= 0 && currentScenarioIndex < scenarios.Count
+            ? scenarios[currentScenarioIndex]
+            : null;
+        public bool CanMoveToNext => isWaitingForCompletion && !contentDisplayManager.IsDisplaying;
+
+        void Awake()
+        {
+            if (Instance == null)
+            {
+                Instance = this;
+                if (transform.parent == null)
+                {
+                    DontDestroyOnLoad(gameObject);
+                }
+            }
+            else
+            {
+                Destroy(gameObject);
+                return;
+            }
+        }
 
         void Start()
         {
-            // Détection automatique des InteractableObjects si activé
-            if (autoDetectOnStart)
+            // Get references
+            metadataLoader = MetadataLoader.Instance;
+            contentDisplayManager = ContentDisplayManager.Instance;
+
+            if (metadataLoader == null)
             {
-                AutoDetectInteractableObjects();
+                Debug.LogError("[ProgressionManager] MetadataLoader.Instance is null!");
+                return;
             }
 
-            // S'assurer de l'abonnement aux événements (au cas où OnEnable était trop tôt)
-            if (ContentDisplayManager.Instance != null)
+            if (contentDisplayManager == null)
             {
-                // Se désabonner d'abord pour éviter les doublons
-                ContentDisplayManager.Instance.OnContentCompleted -= HandleContentCompleted;
-                // Puis se réabonner
-                ContentDisplayManager.Instance.OnContentCompleted += HandleContentCompleted;
-                if (debugMode) Debug.Log("[ProgressionManager] ✅ Re-subscribed to ContentDisplayManager.OnContentCompleted in Start()");
+                Debug.LogError("[ProgressionManager] ContentDisplayManager.Instance is null!");
+                return;
             }
-            else
-            {
-                if (debugMode) Debug.LogError("[ProgressionManager] ❌ ContentDisplayManager.Instance is NULL in Start()!");
-            }
+
+            // Subscribe to content completed event
+            contentDisplayManager.OnContentCompleted += HandleContentCompleted;
 
             if (resetOnStart)
             {
+                // Wait for metadata to be loaded before starting
+                if (metadataLoader.IsLoaded)
+                {
+                    InitializeProgression();
+                }
+                else
+                {
+                    // Wait for metadata to load
+                    metadataLoader.OnMetadataLoaded += OnMetadataLoaded;
+                    if (debugMode) Debug.Log("[ProgressionManager] Waiting for metadata to load...");
+                }
+            }
+        }
+
+        void OnDestroy()
+        {
+            if (contentDisplayManager != null)
+            {
+                contentDisplayManager.OnContentCompleted -= HandleContentCompleted;
+            }
+
+            if (metadataLoader != null)
+            {
+                metadataLoader.OnMetadataLoaded -= OnMetadataLoaded;
+            }
+        }
+
+        void OnMetadataLoaded(Dictionary<string, object> metadata)
+        {
+            InitializeProgression();
+        }
+
+        /// <summary>
+        /// Initialize progression with scenarios from metadata
+        /// </summary>
+        void InitializeProgression()
+        {
+            // Load scenarios from metadata
+            scenarios = metadataLoader.GetScenarios();
+
+            if (scenarios == null || scenarios.Count == 0)
+            {
+                Debug.LogError("[ProgressionManager] No scenarios found in metadata!");
+                return;
+            }
+
+            if (debugMode) Debug.Log($"[ProgressionManager] Loaded {scenarios.Count} scenarios from metadata");
+
+            // Initialize HUD with total scenarios
+            if (TrainingHUD.Instance != null)
+            {
+                TrainingHUD.Instance.InitializeForScenarios();
+            }
+
+            // Start progression if auto-start is enabled
+            if (autoStartFirstScenario)
+            {
                 StartProgression();
             }
-        }
-
-        void OnEnable()
-        {
-            // S'abonner aux événements du ContentDisplayManager
-            if (ContentDisplayManager.Instance != null)
+            else
             {
-                ContentDisplayManager.Instance.OnContentCompleted += HandleContentCompleted;
-                if (debugMode) Debug.Log("[ProgressionManager] Subscribed to ContentDisplayManager.OnContentCompleted");
-            }
-            else if (debugMode)
-            {
-                Debug.LogWarning("[ProgressionManager] ContentDisplayManager.Instance is null, cannot subscribe to events");
-            }
-        }
-
-        void OnDisable()
-        {
-            // Se désabonner des événements
-            if (ContentDisplayManager.Instance != null)
-            {
-                ContentDisplayManager.Instance.OnContentCompleted -= HandleContentCompleted;
+                // If not auto-starting, user needs to click button to begin
+                if (debugMode) Debug.Log("[ProgressionManager] Waiting for user to click Next Scenario button");
             }
         }
 
         /// <summary>
-        /// Démarre ou redémarre la progression guidée
+        /// Start or restart the scenario progression
         /// </summary>
         public void StartProgression()
         {
-            if (progressionSequence.Count == 0)
+            if (scenarios == null || scenarios.Count == 0)
             {
-                Debug.LogWarning("[ProgressionManager] No objects in progression sequence!");
+                Debug.LogError("[ProgressionManager] Cannot start progression: no scenarios loaded");
                 return;
             }
 
-            // Réinitialiser l'état
-            currentStepIndex = 0;
-            completedObjectIds.Clear();
+            // Reset state
+            currentScenarioIndex = -1;
+            completedScenarioIds.Clear();
             attemptCounts.Clear();
-            objectIdToInteractable.Clear();
-
-            // Construire le cache objectId -> InteractableObject
-            foreach (var interactable in progressionSequence)
-            {
-                if (interactable != null)
-                {
-                    var mapper = interactable.GetComponent<ObjectMetadataMapper>();
-                    if (mapper != null)
-                    {
-                        objectIdToInteractable[mapper.MetadataId] = interactable;
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[ProgressionManager] {interactable.name} has no ObjectMetadataMapper!");
-                    }
-                }
-            }
-
             isProgressionActive = true;
+            isWaitingForCompletion = false;
 
-            // Configurer la visibilité de tous les objets
-            UpdateAllObjectsVisibility();
+            OnProgressionReset?.Invoke();
 
-            if (debugMode) Debug.Log($"[ProgressionManager] Progression started with {progressionSequence.Count} steps");
+            if (debugMode) Debug.Log("[ProgressionManager] Progression started");
+
+            // Reset HUD progress
+            if (TrainingHUD.Instance != null)
+            {
+                TrainingHUD.Instance.UpdateProgress(0);
+            }
+
+            // Start first scenario
+            MoveToNextScenario();
         }
 
         /// <summary>
-        /// Arrête la progression et restaure tous les objets à leur état normal
+        /// Display the current scenario
         /// </summary>
-        public void StopProgression()
+        void StartCurrentScenario()
         {
-            isProgressionActive = false;
-
-            // Restaurer tous les objets
-            foreach (var interactable in progressionSequence)
+            if (currentScenarioIndex < 0 || currentScenarioIndex >= scenarios.Count)
             {
-                if (interactable != null)
-                {
-                    interactable.ExitProgressionMode();
-                }
+                Debug.LogError($"[ProgressionManager] Invalid scenario index: {currentScenarioIndex}");
+                return;
             }
 
-            if (debugMode) Debug.Log("[ProgressionManager] Progression stopped");
+            var scenario = scenarios[currentScenarioIndex];
+            isWaitingForCompletion = false;
+
+            if (debugMode) Debug.Log($"[ProgressionManager] Starting scenario {currentScenarioIndex + 1}/{scenarios.Count}: {scenario.id} ({scenario.type})");
+
+            // Disable next button while scenario is in progress
+            if (TrainingHUD.Instance != null)
+            {
+                TrainingHUD.Instance.OnScenarioStarted();
+            }
+
+            // Display the scenario
+            contentDisplayManager.DisplayScenario(scenario);
+
+            // Trigger event
+            OnScenarioStarted?.Invoke(currentScenarioIndex, scenario);
         }
 
         /// <summary>
-        /// Passe à l'étape suivante de la progression
+        /// Move to the next scenario (called by button or auto-progression)
         /// </summary>
-        public void MoveToNextStep()
+        public void MoveToNextScenario()
         {
-            if (!isProgressionActive) return;
-
-            if (currentStepIndex < progressionSequence.Count - 1)
-            {
-                currentStepIndex++;
-                UpdateAllObjectsVisibility();
-
-                var currentObject = progressionSequence[currentStepIndex];
-                OnStepActivated?.Invoke(currentStepIndex, currentObject);
-
-                if (debugMode) Debug.Log($"[ProgressionManager] Moved to step {currentStepIndex + 1}/{progressionSequence.Count}: {currentObject.name}");
-            }
-            else
-            {
-                // Progression complète
-                CompleteProgression();
-            }
-        }
-
-        /// <summary>
-        /// Revient à l'étape précédente (si allowBackTracking est activé)
-        /// </summary>
-        public void MoveToPreviousStep()
-        {
-            if (!isProgressionActive || !allowBackTracking) return;
-
-            if (currentStepIndex > 0)
-            {
-                currentStepIndex--;
-                UpdateAllObjectsVisibility();
-
-                var currentObject = progressionSequence[currentStepIndex];
-                OnStepActivated?.Invoke(currentStepIndex, currentObject);
-
-                if (debugMode) Debug.Log($"[ProgressionManager] Moved back to step {currentStepIndex + 1}/{progressionSequence.Count}: {currentObject.name}");
-            }
-        }
-
-        /// <summary>
-        /// Saute directement à une étape spécifique
-        /// </summary>
-        public void JumpToStep(int stepIndex)
-        {
-            if (!isProgressionActive) return;
-
-            if (stepIndex >= 0 && stepIndex < progressionSequence.Count)
-            {
-                currentStepIndex = stepIndex;
-                UpdateAllObjectsVisibility();
-
-                var currentObject = progressionSequence[currentStepIndex];
-                OnStepActivated?.Invoke(currentStepIndex, currentObject);
-
-                if (debugMode) Debug.Log($"[ProgressionManager] Jumped to step {currentStepIndex + 1}/{progressionSequence.Count}: {currentObject.name}");
-            }
-        }
-
-        /// <summary>
-        /// Met à jour la visibilité de tous les objets selon leur position dans la progression
-        /// </summary>
-        private void UpdateAllObjectsVisibility()
-        {
-            if (!requireSequentialOrder)
-            {
-                // Mode ordre libre : tous les objets non-complétés sont visibles et interactables
-                for (int i = 0; i < progressionSequence.Count; i++)
-                {
-                    var interactable = progressionSequence[i];
-                    if (interactable == null) continue;
-
-                    var mapper = interactable.GetComponent<ObjectMetadataMapper>();
-                    if (mapper == null) continue;
-
-                    string objectId = mapper.MetadataId;
-                    bool isCompleted = completedObjectIds.Contains(objectId);
-
-                    if (isCompleted)
-                    {
-                        // Objet complété
-                        if (hideCompletedObjects)
-                        {
-                            // Cacher les objets complétés
-                            interactable.SetProgressionState(false, visibilityMode);
-                        }
-                        else if (showCompletedObjects)
-                        {
-                            // Garder les objets complétés visibles
-                            interactable.ExitProgressionMode();
-                        }
-                        else
-                        {
-                            interactable.SetProgressionState(false, visibilityMode);
-                        }
-                    }
-                    else
-                    {
-                        // Objet non complété - le rendre interactable
-                        interactable.SetProgressionState(true, visibilityMode);
-                    }
-                }
-            }
-            else
-            {
-                // Mode séquentiel : un seul objet actif à la fois
-                for (int i = 0; i < progressionSequence.Count; i++)
-                {
-                    var interactable = progressionSequence[i];
-                    if (interactable == null) continue;
-
-                    var mapper = interactable.GetComponent<ObjectMetadataMapper>();
-                    if (mapper == null) continue;
-
-                    string objectId = mapper.MetadataId;
-                    bool isCompleted = completedObjectIds.Contains(objectId);
-
-                    if (i < currentStepIndex)
-                    {
-                        // Objet déjà passé
-                        if (hideCompletedObjects)
-                        {
-                            // Cacher les objets complétés (un seul objet visible à la fois)
-                            interactable.SetProgressionState(false, visibilityMode);
-                        }
-                        else if (showCompletedObjects && isCompleted)
-                        {
-                            // Garder les objets complétés visibles
-                            interactable.ExitProgressionMode();
-                        }
-                        else
-                        {
-                            interactable.SetProgressionState(false, visibilityMode);
-                        }
-                    }
-                    else if (i == currentStepIndex)
-                    {
-                        // Objet actuel - le rendre interactable
-                        interactable.SetProgressionState(true, visibilityMode);
-                    }
-                    else
-                    {
-                        // Objet futur - le cacher selon le mode
-                        interactable.SetProgressionState(false, visibilityMode);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gère l'événement de complétion d'un contenu
-        /// </summary>
-        private void HandleContentCompleted(string objectId, bool success)
-        {
-            if (debugMode) Debug.Log($"[ProgressionManager] 🎯 HandleContentCompleted called: objectId={objectId}, success={success}");
-
+            // If progression not active, check if this is the first click to start
             if (!isProgressionActive)
             {
-                if (debugMode) Debug.Log("[ProgressionManager] Progression not active, ignoring completion event");
-                return;
-            }
-
-            if (!requireSequentialOrder)
-            {
-                // Mode ordre libre : accepter la complétion de n'importe quel objet
-                HandleFreeOrderCompletion(objectId, success);
-            }
-            else
-            {
-                // Mode séquentiel : vérifier que c'est bien l'objet actuel
-                HandleSequentialCompletion(objectId, success);
-            }
-        }
-
-        /// <summary>
-        /// Gère la complétion en mode ordre libre
-        /// </summary>
-        private void HandleFreeOrderCompletion(string objectId, bool success)
-        {
-            // Trouver l'objet interactable correspondant
-            if (!objectIdToInteractable.TryGetValue(objectId, out InteractableObject completedObject))
-            {
-                if (debugMode) Debug.Log($"[ProgressionManager] Object {objectId} not found in progression sequence");
-                return;
-            }
-
-            // Trouver l'index de l'objet
-            int objectIndex = progressionSequence.IndexOf(completedObject);
-            if (objectIndex < 0)
-            {
-                if (debugMode) Debug.Log($"[ProgressionManager] Object {objectId} not in progression sequence");
-                return;
-            }
-
-            // Incrémenter le compteur d'essais
-            if (!attemptCounts.ContainsKey(objectId))
-            {
-                attemptCounts[objectId] = 0;
-            }
-            attemptCounts[objectId]++;
-
-            if (debugMode) Debug.Log($"[ProgressionManager] Object {objectId} completed with success={success}, attempt {attemptCounts[objectId]}");
-
-            // Vérifier le nombre d'essais max
-            if (maxAttemptsPerObject > 0 && attemptCounts[objectId] >= maxAttemptsPerObject && !success)
-            {
-                OnMaxAttemptsReached?.Invoke(completedObject, attemptCounts[objectId]);
-
-                if (debugMode) Debug.LogWarning($"[ProgressionManager] Max attempts reached for {objectId}");
-
-                // Décider si on marque comme complété quand même
-                if (!requireSuccessForAll)
+                if (currentScenarioIndex == -1)
                 {
-                    completedObjectIds.Add(objectId);
-                    OnStepCompleted?.Invoke(objectIndex, completedObject, false);
-                    UpdateAllObjectsVisibility();
-                    CheckAllCompleted();
+                    // First click - start the progression
+                    if (debugMode) Debug.Log("[ProgressionManager] Starting progression from first button click");
+                    StartProgression();
+                    return;
                 }
-                return;
-            }
-
-            // Si succès, marquer comme complété
-            if (success)
-            {
-                completedObjectIds.Add(objectId);
-                OnStepCompleted?.Invoke(objectIndex, completedObject, true);
-                UpdateAllObjectsVisibility();
-                CheckAllCompleted();
-            }
-            else
-            {
-                // Échec - permettre de réessayer
-                OnStepCompleted?.Invoke(objectIndex, completedObject, false);
-
-                if (!requireSuccessForAll)
+                else
                 {
-                    // Si on n'exige pas le succès, marquer quand même comme complété
-                    completedObjectIds.Add(objectId);
-                    UpdateAllObjectsVisibility();
-                    CheckAllCompleted();
+                    if (debugMode) Debug.LogWarning("[ProgressionManager] Progression is not active");
+                    return;
                 }
             }
-        }
 
-        /// <summary>
-        /// Gère la complétion en mode séquentiel
-        /// </summary>
-        private void HandleSequentialCompletion(string objectId, bool success)
-        {
-            // Vérifier que c'est bien l'objet actuel
-            if (currentStepIndex >= progressionSequence.Count) return;
-
-            var currentObject = progressionSequence[currentStepIndex];
-            var mapper = currentObject.GetComponent<ObjectMetadataMapper>();
-
-            if (mapper == null || mapper.MetadataId != objectId)
+            // If currently displaying content and waiting for completion, ignore
+            if (contentDisplayManager.IsDisplaying && !isWaitingForCompletion)
             {
-                // Ce n'est pas l'objet actuel, ignorer
-                if (debugMode) Debug.Log($"[ProgressionManager] Content completed for {objectId}, but current object is {mapper?.MetadataId}");
+                if (debugMode) Debug.LogWarning("[ProgressionManager] Cannot move to next: current scenario not completed");
                 return;
             }
 
-            // Incrémenter le compteur d'essais
-            if (!attemptCounts.ContainsKey(objectId))
-            {
-                attemptCounts[objectId] = 0;
-            }
-            attemptCounts[objectId]++;
+            currentScenarioIndex++;
 
-            if (debugMode) Debug.Log($"[ProgressionManager] Object {objectId} completed with success={success}, attempt {attemptCounts[objectId]}");
-
-            // Vérifier le nombre d'essais max
-            if (maxAttemptsPerObject > 0 && attemptCounts[objectId] >= maxAttemptsPerObject && !success)
-            {
-                OnMaxAttemptsReached?.Invoke(currentObject, attemptCounts[objectId]);
-
-                if (debugMode) Debug.LogWarning($"[ProgressionManager] Max attempts reached for {objectId}");
-
-                // Décider si on passe quand même à la suivante ou non
-                if (!requireSuccessForAll)
-                {
-                    // Marquer comme "complété" même en échec
-                    completedObjectIds.Add(objectId);
-                    OnStepCompleted?.Invoke(currentStepIndex, currentObject, false);
-                    MoveToNextStep();
-                }
-                return;
-            }
-
-            // Si succès, passer à l'étape suivante
-            if (success)
-            {
-                completedObjectIds.Add(objectId);
-                OnStepCompleted?.Invoke(currentStepIndex, currentObject, true);
-                MoveToNextStep();
-            }
-            else
-            {
-                // Échec - permettre de réessayer
-                OnStepCompleted?.Invoke(currentStepIndex, currentObject, false);
-
-                if (!requireSuccessForAll)
-                {
-                    // Si on n'exige pas le succès, passer quand même à la suivante
-                    completedObjectIds.Add(objectId);
-                    MoveToNextStep();
-                }
-            }
-        }
-
-        /// <summary>
-        /// Vérifie si tous les objets ont été complétés (mode ordre libre)
-        /// </summary>
-        private void CheckAllCompleted()
-        {
-            if (completedObjectIds.Count >= progressionSequence.Count)
+            // Check if we've completed all scenarios
+            if (currentScenarioIndex >= scenarios.Count)
             {
                 CompleteProgression();
-            }
-            else if (debugMode)
-            {
-                Debug.Log($"[ProgressionManager] {completedObjectIds.Count}/{progressionSequence.Count} objects completed");
-            }
-        }
-
-        /// <summary>
-        /// Complète la progression
-        /// </summary>
-        private void CompleteProgression()
-        {
-            isProgressionActive = false;
-
-            // Restaurer tous les objets
-            foreach (var interactable in progressionSequence)
-            {
-                if (interactable != null)
-                {
-                    interactable.ExitProgressionMode();
-                }
+                return;
             }
 
-            OnProgressionCompleted?.Invoke();
-
-            if (debugMode) Debug.Log("[ProgressionManager] Progression completed!");
+            // Start the next scenario
+            StartCurrentScenario();
         }
 
         /// <summary>
-        /// Vérifie si un objet spécifique est complété
+        /// Handle content completion from ContentDisplayManager
         /// </summary>
-        public bool IsObjectCompleted(string objectId)
+        void HandleContentCompleted(string scenarioId, bool success)
         {
-            return completedObjectIds.Contains(objectId);
-        }
-
-        /// <summary>
-        /// Obtient le nombre d'essais pour un objet
-        /// </summary>
-        public int GetAttemptCount(string objectId)
-        {
-            return attemptCounts.ContainsKey(objectId) ? attemptCounts[objectId] : 0;
-        }
-
-        /// <summary>
-        /// Obtient l'objet interactable actuel
-        /// </summary>
-        public InteractableObject GetCurrentObject()
-        {
-            if (currentStepIndex >= 0 && currentStepIndex < progressionSequence.Count)
+            if (!isProgressionActive)
             {
-                return progressionSequence[currentStepIndex];
+                return;
             }
-            return null;
-        }
 
-        /// <summary>
-        /// Détecte automatiquement tous les InteractableObjects dans la scène
-        /// et les ajoute à la progression sequence selon leur ordre dans la hiérarchie
-        /// </summary>
-        public void AutoDetectInteractableObjects()
-        {
-            progressionSequence.Clear();
-
-            InteractableObject[] foundObjects;
-
-            // Déterminer la méthode de recherche
-            if (detectionMethod == DetectionMethod.ChildrenOnly && searchParent != null)
+            // Verify this is the current scenario
+            var currentScenario = CurrentScenario;
+            if (currentScenario == null || currentScenario.id != scenarioId)
             {
-                // Rechercher uniquement parmi les enfants du parent spécifié
-                foundObjects = searchParent.GetComponentsInChildren<InteractableObject>(true);
+                if (debugMode) Debug.LogWarning($"[ProgressionManager] Completed scenario {scenarioId} doesn't match current scenario");
+                return;
+            }
 
-                if (debugMode)
-                {
-                    Debug.Log($"[ProgressionManager] Searching in children of '{searchParent.name}'");
-                }
+            if (debugMode) Debug.Log($"[ProgressionManager] Scenario completed: {scenarioId} (success: {success})");
+
+            // Mark as completed
+            completedScenarioIds.Add(scenarioId);
+            isWaitingForCompletion = true;
+
+            // Track attempts
+            if (!attemptCounts.ContainsKey(scenarioId))
+            {
+                attemptCounts[scenarioId] = 0;
+            }
+            attemptCounts[scenarioId]++;
+
+            // Trigger event
+            OnScenarioCompleted?.Invoke(currentScenarioIndex, currentScenario, success);
+
+            // Check if this was the last scenario
+            if (currentScenarioIndex >= scenarios.Count - 1)
+            {
+                // This was the last scenario - complete the progression
+                if (debugMode) Debug.Log("[ProgressionManager] Last scenario completed - finishing progression");
+                CompleteProgression();
             }
             else
             {
-                // Rechercher dans toute la scène
-                foundObjects = FindObjectsByType<InteractableObject>(FindObjectsSortMode.None);
-
-                if (debugMode)
+                // Notify TrainingHUD to enable next button
+                if (TrainingHUD.Instance != null)
                 {
-                    Debug.Log($"[ProgressionManager] Searching in entire scene");
+                    TrainingHUD.Instance.OnScenarioCompleted();
                 }
-            }
-
-            // Créer une liste avec les objets et leur index dans la hiérarchie
-            var objectsWithIndex = new List<(InteractableObject obj, int siblingIndex, string path)>();
-
-            foreach (var obj in foundObjects)
-            {
-                // Ignorer cet objet lui-même s'il a aussi un InteractableObject
-                if (obj.transform == transform) continue;
-
-                // Calculer le "path" hiérarchique pour le tri
-                string hierarchyPath = GetHierarchyPath(obj.transform);
-                int siblingIndex = obj.transform.GetSiblingIndex();
-
-                objectsWithIndex.Add((obj, siblingIndex, hierarchyPath));
-            }
-
-            // Trier par path hiérarchique (cela garantit l'ordre de haut en bas dans la hiérarchie)
-            objectsWithIndex.Sort((a, b) => string.Compare(a.path, b.path, StringComparison.Ordinal));
-
-            // Ajouter à la progression sequence
-            foreach (var item in objectsWithIndex)
-            {
-                progressionSequence.Add(item.obj);
-            }
-
-            if (debugMode)
-            {
-                Debug.Log($"[ProgressionManager] Auto-detected {progressionSequence.Count} InteractableObjects:");
-                for (int i = 0; i < progressionSequence.Count; i++)
-                {
-                    Debug.Log($"  [{i}] {progressionSequence[i].name} - {objectsWithIndex[i].path}");
-                }
-            }
-
-            if (progressionSequence.Count == 0)
-            {
-                Debug.LogWarning("[ProgressionManager] No InteractableObjects found!");
             }
         }
 
         /// <summary>
-        /// Obtient le chemin hiérarchique complet d'un Transform pour le tri
+        /// Complete the entire progression
         /// </summary>
-        private string GetHierarchyPath(Transform t)
+        void CompleteProgression()
         {
-            string path = t.GetSiblingIndex().ToString("D4");
-            Transform parent = t.parent;
+            isProgressionActive = false;
+            isWaitingForCompletion = false;
 
-            while (parent != null)
+            if (debugMode) Debug.Log("[ProgressionManager] All scenarios completed!");
+
+            OnAllScenariosCompleted?.Invoke();
+
+            // Notify TrainingHUD
+            if (TrainingHUD.Instance != null)
             {
-                path = parent.GetSiblingIndex().ToString("D4") + "/" + path;
-                parent = parent.parent;
+                TrainingHUD.Instance.OnAllScenariosCompleted();
             }
+        }
 
-            return path;
+        /// <summary>
+        /// Get scenario by index
+        /// </summary>
+        public ScenarioData GetScenario(int index)
+        {
+            if (scenarios == null || index < 0 || index >= scenarios.Count)
+            {
+                return null;
+            }
+            return scenarios[index];
+        }
+
+        /// <summary>
+        /// Check if a scenario is completed
+        /// </summary>
+        public bool IsScenarioCompleted(string scenarioId)
+        {
+            return completedScenarioIds.Contains(scenarioId);
+        }
+
+        /// <summary>
+        /// Get attempt count for a scenario
+        /// </summary>
+        public int GetAttemptCount(string scenarioId)
+        {
+            return attemptCounts.ContainsKey(scenarioId) ? attemptCounts[scenarioId] : 0;
+        }
+
+        /// <summary>
+        /// Reset progression (can be called manually)
+        /// </summary>
+        public void ResetProgression()
+        {
+            if (debugMode) Debug.Log("[ProgressionManager] Resetting progression");
+            StartProgression();
         }
 
         #region Editor Helpers
 
-        [ContextMenu("Auto-Detect InteractableObjects")]
-        private void ContextMenu_AutoDetect()
-        {
-            AutoDetectInteractableObjects();
-            Debug.Log($"[ProgressionManager] Auto-detection completed! Found {progressionSequence.Count} objects.");
-        }
-
         [ContextMenu("Start Progression")]
         private void ContextMenu_StartProgression()
         {
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning("[ProgressionManager] Can only start progression in Play Mode");
+                return;
+            }
             StartProgression();
         }
 
-        [ContextMenu("Stop Progression")]
-        private void ContextMenu_StopProgression()
+        [ContextMenu("Reset Progression")]
+        private void ContextMenu_ResetProgression()
         {
-            StopProgression();
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning("[ProgressionManager] Can only reset progression in Play Mode");
+                return;
+            }
+            ResetProgression();
         }
 
-        [ContextMenu("Next Step")]
-        private void ContextMenu_NextStep()
+        [ContextMenu("Next Scenario")]
+        private void ContextMenu_NextScenario()
         {
-            MoveToNextStep();
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning("[ProgressionManager] Can only move to next scenario in Play Mode");
+                return;
+            }
+            MoveToNextScenario();
         }
 
-        [ContextMenu("Previous Step")]
-        private void ContextMenu_PreviousStep()
+        [ContextMenu("Show Current Status")]
+        private void ContextMenu_ShowStatus()
         {
-            MoveToPreviousStep();
+            Debug.Log($"[ProgressionManager] Status:\n" +
+                     $"  Active: {isProgressionActive}\n" +
+                     $"  Current: {currentScenarioIndex + 1}/{TotalScenarios}\n" +
+                     $"  Waiting: {isWaitingForCompletion}\n" +
+                     $"  Progress: {ProgressPercentage:F1}%\n" +
+                     $"  Completed: {completedScenarioIds.Count}");
         }
 
         #endregion

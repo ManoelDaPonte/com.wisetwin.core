@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System;
 using System.Linq;
 using WiseTwin.Analytics;
+using Newtonsoft.Json.Linq;
 
 namespace WiseTwin.UI
 {
@@ -49,69 +50,126 @@ namespace WiseTwin.UI
         private QuestionInteractionData currentQuestionData;
         private string currentQuestionKey; // Clé de la question pour tracking
 
+        // Evaluation mode
+        private bool evaluationMode = false;
+
+        // Store content data for language change updates
+        private Dictionary<string, object> storedContentData;
+        private Dictionary<string, object> currentQuestionData_Raw; // Current question raw data
+
+        // Interface implementation (without evaluationMode parameter)
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
+        {
+            Display(objectId, contentData, root, false);
+        }
+
+        // Overload with evaluationMode parameter
+        public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root, bool evaluationMode)
         {
             currentObjectId = objectId;
             rootElement = root;
+            this.evaluationMode = evaluationMode;
 
-            // Si contentData contient déjà les données de question directement
-            if (contentData.ContainsKey("text"))
+            // Store content data for language changes
+            storedContentData = contentData;
+
+            // Subscribe to language changes
+            if (LocalizationManager.Instance != null)
+            {
+                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
+            }
+
+            // Si contentData contient déjà les données de question directement (nouveau format)
+            if (contentData.ContainsKey("questionText") || contentData.ContainsKey("options"))
             {
                 // Question unique passée directement
                 questionKeys = null;
                 allObjectData = null;
                 DisplaySingleQuestion(contentData);
             }
-            else
+            // NEW: Support for "questions" array format
+            else if (contentData.ContainsKey("questions"))
             {
-                // Potentiellement plusieurs questions
-                allObjectData = contentData;
-                questionKeys = new List<string>();
-
-                // Chercher toutes les clés de questions (question_1, question_2, etc.)
-                foreach (var key in contentData.Keys)
+                var questionsValue = contentData["questions"];
+                if (questionsValue is Newtonsoft.Json.Linq.JArray questionsArray && questionsArray.Count > 0)
                 {
-                    if (key.StartsWith("question_"))
+                    // Convert JArray to list of dictionaries
+                    allObjectData = new Dictionary<string, object>();
+                    questionKeys = new List<string>();
+
+                    for (int i = 0; i < questionsArray.Count; i++)
                     {
-                        questionKeys.Add(key);
+                        string questionKey = $"question_{i + 1}";
+                        var questionDict = questionsArray[i].ToObject<Dictionary<string, object>>();
+                        allObjectData[questionKey] = questionDict;
+                        questionKeys.Add(questionKey);
+                    }
+
+                    if (questionKeys.Count > 0)
+                    {
+                        currentQuestionIndex = 0;
+                        CreateQuestionUI(); // Create UI elements before displaying
+                        DisplayCurrentQuestion();
+                    }
+                    else
+                    {
+                        Debug.LogError("[QuestionDisplayer] No questions found in array");
                     }
                 }
-
-                // Trier les questions par ordre numérique
-                questionKeys.Sort((a, b) =>
+                else if (questionsValue is List<object> questionsList && questionsList.Count > 0)
                 {
-                    int numA = int.Parse(a.Replace("question_", ""));
-                    int numB = int.Parse(b.Replace("question_", ""));
-                    return numA.CompareTo(numB);
-                });
+                    // Handle as list of objects
+                    allObjectData = new Dictionary<string, object>();
+                    questionKeys = new List<string>();
 
-                if (ContentDisplayManager.Instance?.DebugMode ?? false)
-                {
-                    LogDebug($"Found {questionKeys.Count} questions for {objectId}");
-                }
+                    for (int i = 0; i < questionsList.Count; i++)
+                    {
+                        string questionKey = $"question_{i + 1}";
+                        allObjectData[questionKey] = questionsList[i];
+                        questionKeys.Add(questionKey);
+                    }
 
-                if (questionKeys.Count > 0)
-                {
-                    currentQuestionIndex = 0;
-                    CreateQuestionUI();
-                    DisplayCurrentQuestion();
+                    if (questionKeys.Count > 0)
+                    {
+                        currentQuestionIndex = 0;
+                        CreateQuestionUI(); // Create UI elements before displaying
+                        DisplayCurrentQuestion();
+                    }
                 }
                 else
                 {
-                    if (ContentDisplayManager.Instance?.DebugMode ?? false)
-                    {
-                        LogError($"No questions found for {objectId}");
-                    }
+                    Debug.LogError("[QuestionDisplayer] Invalid 'questions' format");
                 }
+            }
+            else
+            {
+                Debug.LogError($"[QuestionDisplayer] No valid question format found for {objectId}. Expected 'questionTextEN/FR' or 'questions' array.");
             }
         }
 
         private void DisplaySingleQuestion(Dictionary<string, object> contentData)
         {
+            // Store raw question data for language updates
+            currentQuestionData_Raw = contentData;
+
             hasAnswered = false;
             isValidating = false; // Réinitialiser le flag de validation
             selectedAnswerIndex = -1;
             selectedAnswerIndexes.Clear();
+
+            // Réinitialiser le bouton (désactivé au départ)
+            if (validateButton != null)
+            {
+                validateButton.SetEnabled(false);
+                validateButton.style.opacity = 0.5f;
+            }
+
+            // Masquer le feedback container
+            if (feedbackContainer != null)
+            {
+                feedbackContainer.style.display = DisplayStyle.None;
+            }
 
             if (ContentDisplayManager.Instance?.DebugMode ?? false)
             {
@@ -121,16 +179,13 @@ namespace WiseTwin.UI
             // Obtenir la langue actuelle
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
 
-            // Extraire les données de la question
-            string questionText = ExtractLocalizedText(contentData, "text", lang);
+            // Extraire les données de la question (nouveau format uniquement)
+            string questionText = ExtractLocalizedText(contentData, "questionText", lang);
             var options = ExtractLocalizedList(contentData, "options", lang);
             currentQuestionKey = "question"; // Clé unique pour question simple
 
-            // Vérifier le mode de sélection (single ou multiple)
-            string selectionMode = contentData.ContainsKey("selectionMode")
-                ? ExtractString(contentData, "selectionMode")
-                : "single";
-            isMultipleChoice = (selectionMode == "multiple");
+            // Vérifier le mode de sélection (nouveau format uniquement)
+            isMultipleChoice = contentData.ContainsKey("isMultipleChoice") && contentData["isMultipleChoice"] is bool b && b;
 
             // Gérer les réponses correctes selon le mode
             if (isMultipleChoice)
@@ -328,10 +383,20 @@ namespace WiseTwin.UI
             feedbackContainer.Add(feedbackLabel);
             questionBox.Add(feedbackContainer);
 
-            // Bouton Valider
-            validateButton = new Button(() => ValidateAnswer());
-            validateButton.name = "validate-button";
-            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
+            // Bouton Continuer (désactivé par défaut jusqu'à sélection)
+            validateButton = new Button(() => ContinueToNext());
+            validateButton.name = "continue-button";
+
+            // Déterminer le texte du bouton selon le contexte
+            if (questionKeys != null && questionKeys.Count > 1)
+            {
+                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+            }
+            else
+            {
+                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+            }
+
             validateButton.style.height = 50;
             validateButton.style.fontSize = 18;
             validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
@@ -342,6 +407,8 @@ namespace WiseTwin.UI
             validateButton.style.borderBottomLeftRadius = 10;
             validateButton.style.borderBottomRightRadius = 10;
             validateButton.style.marginTop = 20;
+            validateButton.SetEnabled(false); // Désactivé par défaut
+            validateButton.style.opacity = 0.5f;
             questionBox.Add(validateButton);
 
             modalContainer.Add(questionBox);
@@ -363,6 +430,20 @@ namespace WiseTwin.UI
 
             hasAnswered = false;
             selectedAnswerIndex = -1;
+            selectedAnswerIndexes.Clear();
+
+            // Réinitialiser le bouton (désactivé pour la nouvelle question)
+            if (validateButton != null)
+            {
+                validateButton.SetEnabled(false);
+                validateButton.style.opacity = 0.5f;
+            }
+
+            // Masquer le feedback container
+            if (feedbackContainer != null)
+            {
+                feedbackContainer.style.display = DisplayStyle.None;
+            }
 
             string currentKey = questionKeys[currentQuestionIndex];
             if (ContentDisplayManager.Instance?.DebugMode ?? false)
@@ -371,14 +452,17 @@ namespace WiseTwin.UI
             }
 
             // Mise à jour de l'indicateur de progression
-            if (questionKeys.Count > 1)
+            if (progressLabel != null)
             {
-                progressLabel.text = $"Question {currentQuestionIndex + 1} / {questionKeys.Count}";
-                progressLabel.style.display = DisplayStyle.Flex;
-            }
-            else
-            {
-                progressLabel.style.display = DisplayStyle.None;
+                if (questionKeys.Count > 1)
+                {
+                    progressLabel.text = $"Question {currentQuestionIndex + 1} / {questionKeys.Count}";
+                    progressLabel.style.display = DisplayStyle.Flex;
+                }
+                else
+                {
+                    progressLabel.style.display = DisplayStyle.None;
+                }
             }
 
             if (allObjectData.ContainsKey(currentKey))
@@ -390,6 +474,8 @@ namespace WiseTwin.UI
                 if (questionData is Dictionary<string, object> dict)
                 {
                     questionDict = dict;
+                    // Store raw question data for language updates
+                    currentQuestionData_Raw = dict;
                 }
                 else if (questionData != null)
                 {
@@ -397,6 +483,8 @@ namespace WiseTwin.UI
                     {
                         string json = Newtonsoft.Json.JsonConvert.SerializeObject(questionData);
                         questionDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                        // Store raw question data for language updates
+                        currentQuestionData_Raw = questionDict;
                     }
                     catch (System.Exception e)
                     {
@@ -412,15 +500,12 @@ namespace WiseTwin.UI
                     // Obtenir la langue actuelle
                     string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
 
-                    // Extraire les données de la question
-                    string questionText = ExtractLocalizedText(questionDict, "text", lang);
+                    // Extraire les données de la question (nouveau format uniquement)
+                    string questionText = ExtractLocalizedText(questionDict, "questionText", lang);
                     var options = ExtractLocalizedList(questionDict, "options", lang);
 
-                    // Vérifier le mode de sélection pour chaque question
-                    string selectionMode = questionDict.ContainsKey("selectionMode")
-                        ? ExtractString(questionDict, "selectionMode")
-                        : "single";
-                    isMultipleChoice = (selectionMode == "multiple");
+                    // Vérifier le mode de sélection (nouveau format uniquement)
+                    isMultipleChoice = questionDict.ContainsKey("isMultipleChoice") && questionDict["isMultipleChoice"] is bool b && b;
 
                     // Gérer les réponses correctes selon le mode
                     if (isMultipleChoice)
@@ -637,10 +722,20 @@ namespace WiseTwin.UI
 
             questionBox.Add(feedbackContainer);
 
-            // Bouton Valider
-            validateButton = new Button(() => ValidateAnswer());
-            validateButton.name = "validate-button";
-            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
+            // Bouton Continuer (désactivé par défaut jusqu'à sélection)
+            validateButton = new Button(() => ContinueToNext());
+            validateButton.name = "continue-button";
+
+            // Déterminer le texte du bouton selon le contexte
+            if (questionKeys != null && questionKeys.Count > 1)
+            {
+                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+            }
+            else
+            {
+                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+            }
+
             validateButton.style.height = 50;
             validateButton.style.fontSize = 18;
             validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
@@ -651,6 +746,8 @@ namespace WiseTwin.UI
             validateButton.style.borderBottomLeftRadius = 10;
             validateButton.style.borderBottomRightRadius = 10;
             validateButton.style.marginTop = 20;
+            validateButton.SetEnabled(false); // Désactivé par défaut
+            validateButton.style.opacity = 0.5f;
 
             questionBox.Add(validateButton);
 
@@ -792,6 +889,14 @@ namespace WiseTwin.UI
 
             // Mettre à jour l'UI
             UpdateOptionsUI();
+
+            // Activer le bouton Continuer dès qu'une sélection valide est faite
+            bool hasValidSelection = isMultipleChoice ? selectedAnswerIndexes.Count > 0 : selectedAnswerIndex >= 0;
+            if (validateButton != null && hasValidSelection)
+            {
+                validateButton.SetEnabled(true);
+                validateButton.style.opacity = 1f;
+            }
         }
 
         void UpdateOptionsUI()
@@ -939,26 +1044,138 @@ namespace WiseTwin.UI
             }
             else
             {
-                feedbackContainer.style.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.3f);
-                feedbackContainer.style.borderTopWidth = 2;
-                feedbackContainer.style.borderBottomWidth = 2;
-                feedbackContainer.style.borderLeftWidth = 2;
-                feedbackContainer.style.borderRightWidth = 2;
-                feedbackContainer.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                feedbackContainer.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                // En mode évaluation, ne pas afficher de feedback d'erreur
+                // et passer directement à la question suivante
+                if (evaluationMode)
+                {
+                    // Marquer comme répondu pour ne pas permettre de re-validation
+                    hasAnswered = true;
 
-                // Garder le bouton "Valider" - l'utilisateur peut changer sa réponse et re-valider
-                // Pas de changement de texte ni de couleur
-
-                // Réinitialiser le flag immédiatement pour permettre une nouvelle tentative
-                isValidating = false;
-
-                // Masquer automatiquement le feedback après 3 secondes
-                feedbackContainer.schedule.Execute(() => {
+                    // Pas de feedback visuel - juste passer à la suite
                     feedbackContainer.style.display = DisplayStyle.None;
-                }).ExecuteLater(3000); // 3 secondes
+
+                    // Si on a plusieurs questions, passer à la suivante
+                    if (questionKeys != null && questionKeys.Count > 1)
+                    {
+                        // Changer le bouton immédiatement
+                        validateButton.text = currentQuestionIndex < questionKeys.Count - 1
+                            ? (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Question suivante" : "Next Question")
+                            : (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Terminer" : "Finish");
+                        validateButton.clicked -= ValidateAnswer;
+                        validateButton.clicked += NextQuestion;
+                    }
+                    else
+                    {
+                        // Question unique - changer le bouton en "Continuer"
+                        validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+                        validateButton.clicked -= ValidateAnswer;
+                        validateButton.clicked += () => {
+                            OnCompleted?.Invoke(currentObjectId, true);
+                            Close();
+                        };
+                    }
+                }
+                else
+                {
+                    // Mode apprentissage normal : afficher le feedback d'erreur
+                    feedbackContainer.style.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.3f);
+                    feedbackContainer.style.borderTopWidth = 2;
+                    feedbackContainer.style.borderBottomWidth = 2;
+                    feedbackContainer.style.borderLeftWidth = 2;
+                    feedbackContainer.style.borderRightWidth = 2;
+                    feedbackContainer.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    feedbackContainer.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+
+                    // Garder le bouton "Valider" - l'utilisateur peut changer sa réponse et re-valider
+                    // Pas de changement de texte ni de couleur
+
+                    // Réinitialiser le flag immédiatement pour permettre une nouvelle tentative
+                    isValidating = false;
+
+                    // Masquer automatiquement le feedback après 3 secondes
+                    feedbackContainer.schedule.Execute(() => {
+                        feedbackContainer.style.display = DisplayStyle.None;
+                    }).ExecuteLater(3000); // 3 secondes
+                }
+            }
+        }
+
+        /// <summary>
+        /// Nouvelle fonction: Continue sans validation ni feedback
+        /// Enregistre la réponse et passe directement à la suite
+        /// </summary>
+        void ContinueToNext()
+        {
+            if (hasAnswered) return;
+
+            // Vérifier qu'une sélection a été faite
+            if (isMultipleChoice)
+            {
+                if (selectedAnswerIndexes.Count == 0) return;
+            }
+            else
+            {
+                if (selectedAnswerIndex < 0) return;
+            }
+
+            hasAnswered = true;
+
+            // Enregistrer la réponse dans les analytics
+            if (currentQuestionData != null)
+            {
+                var attemptIndexes = isMultipleChoice ? selectedAnswerIndexes : new List<int> { selectedAnswerIndex };
+                currentQuestionData.AddUserAttempt(attemptIndexes);
+
+                // Vérifier si la réponse est correcte pour les analytics
+                bool isCorrect = false;
+                if (isMultipleChoice)
+                {
+                    selectedAnswerIndexes.Sort();
+                    correctAnswerIndexes.Sort();
+                    isCorrect = selectedAnswerIndexes.Count == correctAnswerIndexes.Count &&
+                               selectedAnswerIndexes.SequenceEqual(correctAnswerIndexes);
+                }
+                else
+                {
+                    isCorrect = selectedAnswerIndex == correctAnswerIndex;
+                }
+
+                // Enregistrer le score dans analytics
+                currentQuestionData.finalScore = isCorrect ? 100f : 0f;
+
+                if (TrainingAnalytics.Instance != null)
+                {
+                    TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", currentQuestionData.finalScore);
+                    TrainingAnalytics.Instance.AddDataToCurrentInteraction("userAnswers", currentQuestionData.userAnswers);
+                    TrainingAnalytics.Instance.AddDataToCurrentInteraction("firstAttemptCorrect", isCorrect);
+                    TrainingAnalytics.Instance.EndCurrentInteraction(isCorrect);
+                }
+            }
+
+            // Passer à la question suivante ou terminer (sans feedback visuel)
+            if (questionKeys != null && questionKeys.Count > 1)
+            {
+                // Plusieurs questions: passer à la suivante
+                currentQuestionIndex++;
+                if (currentQuestionIndex >= questionKeys.Count)
+                {
+                    // Toutes les questions terminées
+                    OnCompleted?.Invoke(currentObjectId, true);
+                    Close();
+                }
+                else
+                {
+                    // Afficher la question suivante
+                    DisplayCurrentQuestion();
+                }
+            }
+            else
+            {
+                // Question unique: terminer
+                OnCompleted?.Invoke(currentObjectId, true);
+                Close();
             }
         }
 
@@ -990,35 +1207,97 @@ namespace WiseTwin.UI
             OnClosed?.Invoke(currentObjectId);
         }
 
+        void OnDestroy()
+        {
+            // Unsubscribe from language changes
+            if (LocalizationManager.Instance != null)
+            {
+                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+            }
+        }
+
+        /// <summary>
+        /// Called when language changes - updates question text and options
+        /// </summary>
+        void OnLanguageChanged(string newLanguage)
+        {
+            // Don't update if already answered or if no question data stored
+            if (hasAnswered || currentQuestionData_Raw == null)
+                return;
+
+            if (ContentDisplayManager.Instance?.DebugMode ?? false)
+            {
+                LogDebug($"Language changed to {newLanguage}, updating question display");
+            }
+
+            // Extract updated texts with new language
+            string questionText = ExtractLocalizedText(currentQuestionData_Raw, "questionText", newLanguage);
+            List<string> options = ExtractLocalizedList(currentQuestionData_Raw, "options", newLanguage);
+
+            // Update UI elements
+            if (questionLabel != null)
+            {
+                questionLabel.text = questionText;
+            }
+
+            // Update options
+            if (optionsContainer != null && options.Count > 0)
+            {
+                var optionButtons = optionsContainer.Query<Button>().ToList();
+                for (int i = 0; i < options.Count && i < optionButtons.Count; i++)
+                {
+                    var button = optionButtons[i];
+                    var label = button.Q<Label>();
+                    if (label != null)
+                    {
+                        label.text = options[i];
+                    }
+                }
+            }
+
+            // Update validate button text
+            if (validateButton != null)
+            {
+                validateButton.text = newLanguage == "fr" ? "Valider" : "Validate";
+            }
+        }
+
         // Méthodes utilitaires pour extraire les données
         string ExtractLocalizedText(Dictionary<string, object> data, string key, string language)
         {
-            if (!data.ContainsKey(key)) return "";
-
-            var textData = data[key];
-
-            // Si c'est directement une string
-            if (textData is string simpleText) return simpleText;
-
-            // Si c'est un Dictionary
-            if (textData is Dictionary<string, object> localizedText)
+            // Format: key: { "en": "...", "fr": "..." }
+            if (data.ContainsKey(key))
             {
-                if (localizedText.ContainsKey(language))
-                    return localizedText[language]?.ToString() ?? "";
-                if (localizedText.ContainsKey("en"))
-                    return localizedText["en"]?.ToString() ?? "";
-            }
-            // Si c'est un JObject de Newtonsoft
-            else if (textData != null && textData.GetType().FullName.Contains("JObject"))
-            {
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(textData);
-                var localizedJObject = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-                if (localizedJObject != null)
+                var value = data[key];
+
+                // Handle JObject (nested localization)
+                if (value is JObject jobj)
                 {
-                    if (localizedJObject.ContainsKey(language))
-                        return localizedJObject[language];
-                    if (localizedJObject.ContainsKey("en"))
-                        return localizedJObject["en"];
+                    if (jobj.ContainsKey(language))
+                    {
+                        return jobj[language]?.ToString() ?? "";
+                    }
+                    if (jobj.ContainsKey("en"))
+                    {
+                        return jobj["en"]?.ToString() ?? "";
+                    }
+                }
+                // Handle Dictionary<string, object> (nested localization)
+                else if (value is Dictionary<string, object> dict)
+                {
+                    if (dict.ContainsKey(language))
+                    {
+                        return dict[language]?.ToString() ?? "";
+                    }
+                    if (dict.ContainsKey("en"))
+                    {
+                        return dict["en"]?.ToString() ?? "";
+                    }
+                }
+                // Handle direct string value (non-localized)
+                else if (value is string str)
+                {
+                    return str;
                 }
             }
 
@@ -1028,54 +1307,75 @@ namespace WiseTwin.UI
         List<string> ExtractLocalizedList(Dictionary<string, object> data, string key, string language)
         {
             var result = new List<string>();
-            if (!data.ContainsKey(key)) return result;
 
-            var listData = data[key];
+            // Format: key: { "en": [...], "fr": [...] }
+            if (data.ContainsKey(key))
+            {
+                var value = data[key];
 
-            // Si c'est directement une liste
-            if (listData is List<object> simpleList)
-            {
-                foreach (var item in simpleList)
+                // Handle JObject with nested arrays
+                if (value is JObject jobj)
                 {
-                    result.Add(item?.ToString() ?? "");
-                }
-            }
-            // Si c'est un JArray de Newtonsoft
-            else if (listData != null && listData.GetType().FullName.Contains("JArray"))
-            {
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(listData);
-                var array = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json);
-                if (array != null) result.AddRange(array);
-            }
-            // Si c'est un dictionnaire de langues
-            else if (listData is Dictionary<string, object> localizedLists)
-            {
-                if (localizedLists.ContainsKey(language))
-                {
-                    var langData = localizedLists[language];
-                    if (langData is List<object> langList)
+                    JArray arrayData = null;
+                    if (jobj.ContainsKey(language))
                     {
-                        foreach (var item in langList)
+                        arrayData = jobj[language] as JArray;
+                    }
+                    else if (jobj.ContainsKey("en"))
+                    {
+                        arrayData = jobj["en"] as JArray;
+                    }
+
+                    if (arrayData != null)
+                    {
+                        foreach (var item in arrayData)
                         {
                             result.Add(item?.ToString() ?? "");
                         }
                     }
-                    else if (langData != null && langData.GetType().FullName.Contains("JArray"))
+                }
+                // Handle Dictionary with nested arrays
+                else if (value is Dictionary<string, object> dict)
+                {
+                    object arrayData = null;
+                    if (dict.ContainsKey(language))
                     {
-                        string json = Newtonsoft.Json.JsonConvert.SerializeObject(langData);
-                        var array = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json);
-                        if (array != null) result.AddRange(array);
+                        arrayData = dict[language];
+                    }
+                    else if (dict.ContainsKey("en"))
+                    {
+                        arrayData = dict["en"];
+                    }
+
+                    if (arrayData is JArray jarray)
+                    {
+                        foreach (var item in jarray)
+                        {
+                            result.Add(item?.ToString() ?? "");
+                        }
+                    }
+                    else if (arrayData is List<object> list)
+                    {
+                        foreach (var item in list)
+                        {
+                            result.Add(item?.ToString() ?? "");
+                        }
                     }
                 }
-            }
-            // Si c'est un JObject contenant les langues
-            else if (listData != null && listData.GetType().FullName.Contains("JObject"))
-            {
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(listData);
-                var localizedJObjectLists = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(json);
-                if (localizedJObjectLists != null && localizedJObjectLists.ContainsKey(language))
+                // Handle direct array (non-localized)
+                else if (value is JArray jarray)
                 {
-                    result.AddRange(localizedJObjectLists[language]);
+                    foreach (var item in jarray)
+                    {
+                        result.Add(item?.ToString() ?? "");
+                    }
+                }
+                else if (value is List<object> list)
+                {
+                    foreach (var item in list)
+                    {
+                        result.Add(item?.ToString() ?? "");
+                    }
                 }
             }
 
@@ -1083,6 +1383,7 @@ namespace WiseTwin.UI
             {
                 LogDebug($"ExtractLocalizedList for '{key}' in '{language}': found {result.Count} items");
             }
+
             return result;
         }
 

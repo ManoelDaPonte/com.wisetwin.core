@@ -47,6 +47,16 @@ public class FormationMetadataComplete
     public string createdAt;
     public string updatedAt;
     public Dictionary<string, Dictionary<string, object>> unity; // SIMPLIFIÉ : directement les objets
+
+    // New scenario-based system fields
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public List<object> scenarios; // Scenario configurations
+
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public Dictionary<string, object> settings; // Training settings (evaluationMode, etc.)
+
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public LocalizedString disclaimer; // Custom disclaimer text
 }
 
 // Classe pour la réponse API
