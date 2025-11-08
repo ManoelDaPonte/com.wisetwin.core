@@ -224,7 +224,7 @@ MonoBehaviour:
   cameraCollisionPadding: 0.05
   cameraObstructionMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 0
   hideInFirstPerson: []
   hideThreshold: 0.1
 --- !u!1 &8660310270731047179
