@@ -19,7 +19,7 @@ namespace WiseTwin.UI
         [Header("Visual Settings")]
         [SerializeField] private Color highlightColor = new Color(1f, 0.9f, 0.3f, 1f); // Jaune
         [SerializeField] private float highlightIntensity = 3.5f; // Augmenté pour plus de visibilité
-        [SerializeField] private bool pulseHighlight = true;
+        [SerializeField] private bool pulseHighlight = true; // Pulse jaune quand pas de survol
         [SerializeField] private float pulseSpeed = 3f; // Augmenté pour une pulsation plus visible
 
         private string currentObjectId;

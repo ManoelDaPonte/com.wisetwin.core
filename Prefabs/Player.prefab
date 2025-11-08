@@ -215,7 +215,7 @@ MonoBehaviour:
   rotationLerp: 15
   defaultThirdPersonDistance: 0
   minDistance: 0
-  maxDistance: 4
+  maxDistance: 1
   zoomSpeed: 2.5
   zoomLerp: 12
   headLocalOffset: {x: 0, y: 0.06, z: -0.08}

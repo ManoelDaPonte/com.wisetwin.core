@@ -17,11 +17,12 @@ namespace WiseTwin
         private Renderer objectRenderer;
         private Color originalEmissionColor;
         private bool hasOriginalEmission;
+        private Color highlightEmissionColor; // Couleur d'émission du highlight (avant hover)
 
         // Pour gérer le feedback visuel au survol
         private bool isHovered = false;
-        private float hoverScale = 1.05f;
-        private Vector3 originalScale;
+        private Color hoverColor = new Color(0, 0.8f, 0, 1f); // Vert foncé bien visible
+        private float hoverIntensity = 4.5f; // Intensité plus élevée pour bien voir
 
         public void Initialize(ProcedureDisplayer displayer, int index, GameObject obj)
         {
@@ -29,17 +30,22 @@ namespace WiseTwin
             stepIndex = index;
             associatedObject = obj;
             isActive = true;
-            originalScale = transform.localScale;
 
             // Récupérer le renderer pour le feedback visuel
             objectRenderer = GetComponent<Renderer>();
             if (objectRenderer != null && objectRenderer.material != null)
             {
-                // Sauvegarder l'émission originale
+                // Sauvegarder l'émission originale (avant tout highlight)
                 hasOriginalEmission = objectRenderer.material.IsKeywordEnabled("_EMISSION");
                 if (hasOriginalEmission && objectRenderer.material.HasProperty("_EmissionColor"))
                 {
                     originalEmissionColor = objectRenderer.material.GetColor("_EmissionColor");
+                }
+
+                // Sauvegarder la couleur d'émission du highlight actuel (jaune/pulse)
+                if (objectRenderer.material.HasProperty("_EmissionColor"))
+                {
+                    highlightEmissionColor = objectRenderer.material.GetColor("_EmissionColor");
                 }
             }
         }
@@ -94,30 +100,38 @@ namespace WiseTwin
         {
             if (hovering)
             {
-                // Augmenter légèrement l'échelle
-                transform.localScale = originalScale * hoverScale;
+                // Désactiver le pulse jaune pendant le survol
+                var pulseEffect = GetComponent<PulseEffect>();
+                if (pulseEffect != null)
+                {
+                    pulseEffect.enabled = false;
+                }
 
-                // Intensifier l'émission
+                // Changer la couleur d'émission en vert foncé
                 if (objectRenderer != null && objectRenderer.material != null &&
                     objectRenderer.material.HasProperty("_EmissionColor"))
                 {
-                    Color currentEmission = objectRenderer.material.GetColor("_EmissionColor");
-                    objectRenderer.material.SetColor("_EmissionColor", currentEmission * 1.3f);
+                    objectRenderer.material.SetColor("_EmissionColor", hoverColor * hoverIntensity);
                 }
+
+                // Note: Le curseur reste par défaut pour l'instant
             }
             else
             {
-                // Restaurer l'échelle normale
-                transform.localScale = originalScale;
+                // Réactiver le pulse jaune
+                var pulseEffect = GetComponent<PulseEffect>();
+                if (pulseEffect != null)
+                {
+                    pulseEffect.enabled = true;
+                }
 
-                // Restaurer l'émission normale (mais garder la surbrillance de base)
+                // Restaurer la couleur d'émission du highlight (jaune/pulse)
                 if (objectRenderer != null && objectRenderer.material != null &&
                     objectRenderer.material.HasProperty("_EmissionColor"))
                 {
-                    // L'émission de base est gérée par ProcedureDisplayer, on ne fait que retirer le boost
-                    Color currentEmission = objectRenderer.material.GetColor("_EmissionColor");
-                    objectRenderer.material.SetColor("_EmissionColor", currentEmission / 1.3f);
+                    objectRenderer.material.SetColor("_EmissionColor", highlightEmissionColor);
                 }
+
             }
         }
 
@@ -163,23 +177,12 @@ namespace WiseTwin
 
         void OnDestroy()
         {
-            // S'assurer que l'échelle est restaurée
-            if (originalScale != Vector3.zero)
-            {
-                transform.localScale = originalScale;
-            }
         }
 
         void OnDisable()
         {
             isActive = false;
             isHovered = false;
-
-            // Restaurer l'état visuel
-            if (originalScale != Vector3.zero)
-            {
-                transform.localScale = originalScale;
-            }
         }
     }
 }
