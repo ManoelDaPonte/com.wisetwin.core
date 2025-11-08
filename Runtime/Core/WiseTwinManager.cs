@@ -46,6 +46,11 @@ namespace WiseTwin
         public System.Action<Dictionary<string, object>> OnMetadataReady;
         public System.Action<string> OnMetadataError;
         public System.Action OnTrainingCompleted;
+
+        // Player spawn tracking
+        private Vector3 initialPlayerPosition;
+        private Quaternion initialPlayerRotation;
+        private bool playerSpawnPositionSaved = false;
         
         void Awake()
         {
@@ -66,13 +71,16 @@ namespace WiseTwin
         void Start()
         {
             DebugLog("🎯 WiseTwin Manager initialized successfully");
-            
+
             // Subscribe to metadata loader events if available
             if (metadataLoader != null)
             {
                 metadataLoader.OnMetadataLoaded += OnMetadataLoaded;
                 metadataLoader.OnLoadError += OnMetadataLoadError;
             }
+
+            // Save player's initial spawn position
+            SavePlayerSpawnPosition();
         }
         
         void InitializeComponents()
@@ -242,8 +250,69 @@ namespace WiseTwin
             metadataLoader.ReloadMetadata();
         }
         
+        /// <summary>
+        /// Save the player's current position as the spawn point
+        /// Called automatically on Start, but can be called manually to update
+        /// </summary>
+        public void SavePlayerSpawnPosition()
+        {
+            var player = FindFirstObjectByType<FirstPersonCharacter>();
+            if (player != null)
+            {
+                initialPlayerPosition = player.transform.position;
+                initialPlayerRotation = player.transform.rotation;
+                playerSpawnPositionSaved = true;
+                DebugLog($"💾 Player spawn position saved: {initialPlayerPosition}");
+            }
+            else
+            {
+                DebugLog("⚠️ Cannot save spawn position: FirstPersonCharacter not found in scene");
+            }
+        }
+
+        /// <summary>
+        /// Reset the player to their initial spawn position
+        /// Useful if player gets stuck or wants to restart positioning
+        /// </summary>
+        public void ResetPlayerPosition()
+        {
+            if (!playerSpawnPositionSaved)
+            {
+                DebugLog("⚠️ Cannot reset player: spawn position not saved yet");
+                SavePlayerSpawnPosition(); // Try to save it now
+                return;
+            }
+
+            var player = FindFirstObjectByType<FirstPersonCharacter>();
+            if (player != null)
+            {
+                var characterController = player.GetComponent<CharacterController>();
+                if (characterController != null)
+                {
+                    // Disable CharacterController to teleport properly
+                    characterController.enabled = false;
+                    player.transform.position = initialPlayerPosition;
+                    player.transform.rotation = initialPlayerRotation;
+                    characterController.enabled = true;
+
+                    DebugLog($"↻ Player reset to spawn position: {initialPlayerPosition}");
+                }
+                else
+                {
+                    // No CharacterController, just move directly
+                    player.transform.position = initialPlayerPosition;
+                    player.transform.rotation = initialPlayerRotation;
+                    DebugLog($"↻ Player reset to spawn position (no CharacterController): {initialPlayerPosition}");
+                }
+            }
+            else
+            {
+                DebugLog("❌ Cannot reset player: FirstPersonCharacter not found in scene");
+            }
+        }
+
         #endregion
-        
+
         #region Development Helpers
         
         /// <summary>

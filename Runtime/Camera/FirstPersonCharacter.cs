@@ -68,6 +68,11 @@ namespace WiseTwin
         private float yaw, pitch, verticalVelocity;
         private bool controlsEnabled = true; // Pour bloquer les inputs pendant les UI
 
+        // Cache for UI detection (to avoid FindObjectsByType every frame)
+        private UnityEngine.UIElements.UIDocument[] cachedUIDocuments;
+        private float lastUICacheTime = 0f;
+        private const float UI_CACHE_REFRESH_INTERVAL = 1f; // Refresh cache every 1 second
+
         // Animator hashes
         private readonly int hashMoveX = Animator.StringToHash("MoveX");
         private readonly int hashMoveY = Animator.StringToHash("MoveY");
@@ -247,7 +252,50 @@ namespace WiseTwin
             // Ne pas jouer l'animation si les contrôles sont bloqués (UI active)
             if (!controlsEnabled) return;
 
+            // Check if we're clicking on any UI Toolkit element
+            // TEMPORARY: Disabled to test if this causes camera issues
+            // if (IsClickingOnUI())
+            // {
+            //     return; // Don't play animation when clicking UI
+            // }
+
             if (animator) animator.SetTrigger(hashAction);
+        }
+
+        /// <summary>
+        /// Check if the mouse pointer is over any UI Toolkit element
+        /// </summary>
+        bool IsClickingOnUI()
+        {
+            // Get mouse position
+            if (UnityEngine.InputSystem.Mouse.current == null) return false;
+
+            Vector2 pointerPosition = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
+
+            // Refresh UI cache if needed (only every second, not every click)
+            if (cachedUIDocuments == null || Time.time - lastUICacheTime > UI_CACHE_REFRESH_INTERVAL)
+            {
+                cachedUIDocuments = FindObjectsByType<UnityEngine.UIElements.UIDocument>(FindObjectsSortMode.None);
+                lastUICacheTime = Time.time;
+            }
+
+            // Check cached UIDocuments
+            foreach (var uiDoc in cachedUIDocuments)
+            {
+                if (uiDoc != null && uiDoc.rootVisualElement != null && uiDoc.rootVisualElement.panel != null)
+                {
+                    // Try to pick an element at the pointer position
+                    var pickedElement = uiDoc.rootVisualElement.panel.Pick(pointerPosition);
+
+                    // If we picked a valid element that accepts clicks (not Ignore)
+                    if (pickedElement != null && pickedElement.pickingMode == UnityEngine.UIElements.PickingMode.Position)
+                    {
+                        return true; // We're clicking on UI
+                    }
+                }
+            }
+
+            return false; // Not clicking on any UI
         }
 
         void OnToggleView(InputAction.CallbackContext ctx)

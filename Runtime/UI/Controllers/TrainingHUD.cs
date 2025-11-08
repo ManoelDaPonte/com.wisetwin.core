@@ -31,6 +31,11 @@ namespace WiseTwin
         private VisualElement progressBar;
         private VisualElement progressFill;
         private Button nextScenarioButton;
+        private Button helpButton;
+        private Button resetButton;
+
+        // Pulse effect
+        private Coroutine pulseCoroutine;
 
         // State
         private float startTime;
@@ -117,56 +122,83 @@ namespace WiseTwin
             root.Clear();
             root.pickingMode = PickingMode.Ignore; // Ne pas bloquer les clics
 
-            // Container principal - barre horizontale en haut
+            // Container principal - barre horizontale en haut (plus large et haute)
             hudContainer = new VisualElement();
             hudContainer.name = "training-hud";
             hudContainer.style.position = Position.Absolute;
             hudContainer.style.top = 10;
             hudContainer.style.left = Length.Percent(50);
-            hudContainer.style.translate = new Translate(-200, 0);
-            hudContainer.style.width = 400;
-            hudContainer.style.height = 45;
+            hudContainer.style.translate = new Translate(-325, 0); // 650/2
+            hudContainer.style.width = 650;
+            hudContainer.style.height = 52;
             hudContainer.style.backgroundColor = backgroundColor;
-            hudContainer.style.borderTopLeftRadius = 22;
-            hudContainer.style.borderTopRightRadius = 22;
-            hudContainer.style.borderBottomLeftRadius = 22;
-            hudContainer.style.borderBottomRightRadius = 22;
+            hudContainer.style.borderTopLeftRadius = 26;
+            hudContainer.style.borderTopRightRadius = 26;
+            hudContainer.style.borderBottomLeftRadius = 26;
+            hudContainer.style.borderBottomRightRadius = 26;
             hudContainer.style.flexDirection = FlexDirection.Row;
             hudContainer.style.alignItems = Align.Center;
-            hudContainer.style.paddingLeft = 20;
+            hudContainer.style.paddingLeft = 12;
             hudContainer.style.paddingRight = 20;
             hudContainer.style.display = DisplayStyle.None;
             hudContainer.pickingMode = PickingMode.Ignore;
 
-            // Section gauche - Timer
-            var timerSection = new VisualElement();
-            timerSection.style.flexDirection = FlexDirection.Row;
-            timerSection.style.alignItems = Align.Center;
-            timerSection.style.width = Length.Percent(30);
+            // ===== Section 1: Boutons utilitaires (help et reset) =====
+            var utilitySection = new VisualElement();
+            utilitySection.style.flexDirection = FlexDirection.Row;
+            utilitySection.style.alignItems = Align.Center;
+            utilitySection.style.marginRight = 12;
 
-            // Icône timer
-            var timerIcon = new Label("⏱");
-            timerIcon.style.fontSize = 18;
-            timerIcon.style.marginRight = 8;
-            timerIcon.style.color = textColor;
-            timerSection.Add(timerIcon);
+            // Bouton Help (?)
+            helpButton = new Button(() => OnHelpButtonClicked());
+            helpButton.text = "?";
+            helpButton.name = "help-button";
+            helpButton.style.width = 38;
+            helpButton.style.height = 38;
+            helpButton.style.fontSize = 20;
+            helpButton.style.backgroundColor = new Color(0.2f, 0.3f, 0.5f, 0.8f);
+            helpButton.style.color = Color.white;
+            helpButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            helpButton.style.borderTopLeftRadius = 19;
+            helpButton.style.borderTopRightRadius = 19;
+            helpButton.style.borderBottomLeftRadius = 19;
+            helpButton.style.borderBottomRightRadius = 19;
+            helpButton.style.marginRight = 6;
+            helpButton.style.paddingTop = 0;
+            helpButton.style.paddingBottom = 0;
+            helpButton.style.paddingLeft = 0;
+            helpButton.style.paddingRight = 0;
+            utilitySection.Add(helpButton);
 
-            // Label timer
-            timerLabel = new Label("00:00");
-            timerLabel.style.fontSize = 16;
-            timerLabel.style.color = textColor;
-            timerLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            timerSection.Add(timerLabel);
+            // Bouton Reset (↻)
+            resetButton = new Button(() => OnResetButtonClicked());
+            resetButton.text = "↻";
+            resetButton.name = "reset-button";
+            resetButton.style.width = 38;
+            resetButton.style.height = 38;
+            resetButton.style.fontSize = 22;
+            resetButton.style.backgroundColor = new Color(0.5f, 0.3f, 0.2f, 0.8f);
+            resetButton.style.color = Color.white;
+            resetButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            resetButton.style.borderTopLeftRadius = 19;
+            resetButton.style.borderTopRightRadius = 19;
+            resetButton.style.borderBottomLeftRadius = 19;
+            resetButton.style.borderBottomRightRadius = 19;
+            resetButton.style.paddingTop = 0;
+            resetButton.style.paddingBottom = 0;
+            resetButton.style.paddingLeft = 0;
+            resetButton.style.paddingRight = 0;
+            utilitySection.Add(resetButton);
 
-            hudContainer.Add(timerSection);
+            hudContainer.Add(utilitySection);
 
-            // Section centre - Barre de progression
+            // ===== Section 2: Barre de progression (plus large) =====
             var progressSection = new VisualElement();
             progressSection.style.flexGrow = 1;
             progressSection.style.flexDirection = FlexDirection.Column;
             progressSection.style.justifyContent = Justify.Center;
-            progressSection.style.marginLeft = 15;
-            progressSection.style.marginRight = 15;
+            progressSection.style.marginLeft = 5;
+            progressSection.style.marginRight = 18;
 
             // Label de progression
             progressLabel = new Label("0 / 0");
@@ -178,7 +210,7 @@ namespace WiseTwin
 
             // Barre de progression
             progressBar = new VisualElement();
-            progressBar.style.height = 6;
+            progressBar.style.height = 7;
             progressBar.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 0.5f);
             progressBar.style.borderTopLeftRadius = 3;
             progressBar.style.borderTopRightRadius = 3;
@@ -199,26 +231,28 @@ namespace WiseTwin
             progressSection.Add(progressBar);
             hudContainer.Add(progressSection);
 
-            // Section droite - Bouton "Scénario suivant"
+            // ===== Section 3: Bouton "Next Scenario" avec icône play =====
             var buttonSection = new VisualElement();
-            buttonSection.style.marginLeft = 10;
             buttonSection.style.alignItems = Align.Center;
 
-            // Bouton "Scénario suivant"
+            // Bouton "▶" (play icon)
             nextScenarioButton = new Button(() => OnNextScenarioButtonClicked());
             nextScenarioButton.name = "next-scenario-button";
-            nextScenarioButton.text = GetLocalizedText("next_scenario");
-            nextScenarioButton.style.height = 32;
-            nextScenarioButton.style.paddingLeft = 15;
-            nextScenarioButton.style.paddingRight = 15;
-            nextScenarioButton.style.fontSize = 14;
+            nextScenarioButton.text = "▶"; // Play icon
+            nextScenarioButton.style.width = 45;
+            nextScenarioButton.style.height = 38;
+            nextScenarioButton.style.fontSize = 18;
             nextScenarioButton.style.backgroundColor = progressColor;
             nextScenarioButton.style.color = Color.white;
             nextScenarioButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            nextScenarioButton.style.borderTopLeftRadius = 16;
-            nextScenarioButton.style.borderTopRightRadius = 16;
-            nextScenarioButton.style.borderBottomLeftRadius = 16;
-            nextScenarioButton.style.borderBottomRightRadius = 16;
+            nextScenarioButton.style.borderTopLeftRadius = 19;
+            nextScenarioButton.style.borderTopRightRadius = 19;
+            nextScenarioButton.style.borderBottomLeftRadius = 19;
+            nextScenarioButton.style.borderBottomRightRadius = 19;
+            nextScenarioButton.style.paddingTop = 0;
+            nextScenarioButton.style.paddingBottom = 0;
+            nextScenarioButton.style.paddingLeft = 0;
+            nextScenarioButton.style.paddingRight = 0;
             nextScenarioButton.SetEnabled(false); // Disabled by default
 
             // Style for disabled state
@@ -230,7 +264,7 @@ namespace WiseTwin
 
             root.Add(hudContainer);
 
-            if (debugMode) Debug.Log("[TrainingHUD] HUD created");
+            if (debugMode) Debug.Log("[TrainingHUD] HUD created with new design");
         }
 
         public void Show()
@@ -445,10 +479,13 @@ namespace WiseTwin
 
         // New scenario-based methods
         /// <summary>
-        /// Called when a scenario starts - disables the next button
+        /// Called when a scenario starts - disables the next button and stops pulse
         /// </summary>
         public void OnScenarioStarted()
         {
+            // Stop pulse effect while scenario is active
+            StopPulseEffect();
+
             if (nextScenarioButton != null)
             {
                 nextScenarioButton.SetEnabled(false);
@@ -459,7 +496,7 @@ namespace WiseTwin
         }
 
         /// <summary>
-        /// Called when a scenario is completed - increments progress and enables the next button
+        /// Called when a scenario is completed - increments progress, enables the next button, and starts pulse
         /// </summary>
         public void OnScenarioCompleted()
         {
@@ -478,7 +515,10 @@ namespace WiseTwin
                 nextScenarioButton.SetEnabled(true);
                 nextScenarioButton.style.opacity = 1f;
 
-                if (debugMode) Debug.Log("[TrainingHUD] Next scenario button enabled");
+                // Start pulse effect to draw attention
+                StartPulseEffect();
+
+                if (debugMode) Debug.Log("[TrainingHUD] Next scenario button enabled with pulse effect");
             }
         }
 
@@ -505,6 +545,9 @@ namespace WiseTwin
         {
             if (debugMode) Debug.Log("[TrainingHUD] Next scenario button clicked");
 
+            // Stop pulse effect
+            StopPulseEffect();
+
             // Disable button until next scenario is completed
             if (nextScenarioButton != null)
             {
@@ -524,28 +567,110 @@ namespace WiseTwin
         }
 
         /// <summary>
+        /// Called when help button (?) is clicked
+        /// </summary>
+        void OnHelpButtonClicked()
+        {
+            if (debugMode) Debug.Log("[TrainingHUD] Help button clicked");
+
+            // Show tutorial UI
+            if (TutorialUI.Instance != null)
+            {
+                TutorialUI.Instance.Show();
+            }
+            else
+            {
+                Debug.LogWarning("[TrainingHUD] TutorialUI.Instance is null - cannot show tutorial");
+            }
+        }
+
+        /// <summary>
+        /// Called when reset button (↻) is clicked
+        /// </summary>
+        void OnResetButtonClicked()
+        {
+            if (debugMode) Debug.Log("[TrainingHUD] Reset button clicked");
+
+            // Reset player position via WiseTwinManager
+            if (WiseTwinManager.Instance != null)
+            {
+                WiseTwinManager.Instance.ResetPlayerPosition();
+            }
+            else
+            {
+                Debug.LogWarning("[TrainingHUD] WiseTwinManager.Instance is null - cannot reset position");
+            }
+        }
+
+        /// <summary>
+        /// Start pulse effect on the next scenario button
+        /// </summary>
+        void StartPulseEffect()
+        {
+            if (nextScenarioButton == null) return;
+
+            // Stop existing pulse if any
+            StopPulseEffect();
+
+            // Start new pulse coroutine
+            pulseCoroutine = StartCoroutine(PulseCoroutine());
+
+            if (debugMode) Debug.Log("[TrainingHUD] Pulse effect started");
+        }
+
+        /// <summary>
+        /// Stop pulse effect on the next scenario button
+        /// </summary>
+        void StopPulseEffect()
+        {
+            if (pulseCoroutine != null)
+            {
+                StopCoroutine(pulseCoroutine);
+                pulseCoroutine = null;
+
+                // Reset scale to normal
+                if (nextScenarioButton != null)
+                {
+                    nextScenarioButton.style.scale = new Scale(Vector3.one);
+                }
+
+                if (debugMode) Debug.Log("[TrainingHUD] Pulse effect stopped");
+            }
+        }
+
+        /// <summary>
+        /// Coroutine that animates the pulse effect
+        /// </summary>
+        IEnumerator PulseCoroutine()
+        {
+            float pulseSpeed = 1f; // 1 second per cycle
+            float pulseAmount = 0.08f; // ±8% scale
+
+            while (true)
+            {
+                float time = Time.time * pulseSpeed;
+                float scale = 1f + Mathf.Sin(time * Mathf.PI * 2f) * pulseAmount;
+
+                if (nextScenarioButton != null)
+                {
+                    nextScenarioButton.style.scale = new Scale(new Vector3(scale, scale, 1f));
+                }
+
+                yield return null;
+            }
+        }
+
+        /// <summary>
         /// Get localized text for the UI
         /// </summary>
         string GetLocalizedText(string key)
         {
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-
-            if (lang == "fr")
+            // Note: next_scenario uses play icon (▶) instead of text for better UX
+            return key switch
             {
-                return key switch
-                {
-                    "next_scenario" => "Scénario suivant",
-                    _ => key
-                };
-            }
-            else
-            {
-                return key switch
-                {
-                    "next_scenario" => "Next Scenario",
-                    _ => key
-                };
-            }
+                "next_scenario" => "▶",
+                _ => key
+            };
         }
 
         /// <summary>
@@ -563,6 +688,9 @@ namespace WiseTwin
                 {
                     nextScenarioButton.SetEnabled(true);
                     nextScenarioButton.style.opacity = 1f;
+
+                    // Start pulse effect to indicate user can begin
+                    StartPulseEffect();
                 }
 
                 // Update button text with current language

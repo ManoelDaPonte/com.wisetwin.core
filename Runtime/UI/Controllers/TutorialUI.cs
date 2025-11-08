@@ -7,6 +7,7 @@ namespace WiseTwin
     /// <summary>
     /// Displays tutorial instructions after the disclaimer
     /// Shows controls and interface explanations before training starts
+    /// Can be reopened at any time via the help button
     /// </summary>
     public class TutorialUI : MonoBehaviour
     {
@@ -33,8 +34,28 @@ namespace WiseTwin
         // Events
         public System.Action OnTutorialCompleted;
 
+        // Singleton
+        public static TutorialUI Instance { get; private set; }
+
         void Awake()
         {
+            if (Instance == null)
+            {
+                Instance = this;
+                // Ne pas appliquer DontDestroyOnLoad si on est dans WiseTwinSystem
+                // C'est le parent WiseTwinSystem qui gère la persistance
+                if (transform.parent == null)
+                {
+                    DontDestroyOnLoad(gameObject);
+                }
+                // Pas de warning si on est enfant de WiseTwinSystem
+            }
+            else
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             uiDocument = GetComponent<UIDocument>();
             if (uiDocument == null)
             {
@@ -46,6 +67,26 @@ namespace WiseTwin
             {
                 if (debugMode) Debug.LogWarning("[TutorialUI] Clearing UXML to avoid conflicts");
                 uiDocument.visualTreeAsset = null;
+            }
+
+            // S'abonner aux changements de langue
+            if (LocalizationManager.Instance != null)
+            {
+                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
+            }
+        }
+
+        void OnDestroy()
+        {
+            // Se désabonner des événements
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+
+            if (LocalizationManager.Instance != null)
+            {
+                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
             }
         }
 
@@ -63,15 +104,36 @@ namespace WiseTwin
 
         /// <summary>
         /// Show the tutorial with the specified language
+        /// Can be called multiple times to reopen the tutorial
         /// </summary>
-        public void Show(string languageCode = "en")
+        public void Show(string languageCode = "")
         {
-            currentLanguage = languageCode;
+            // Use current language from LocalizationManager if not specified
+            if (string.IsNullOrEmpty(languageCode))
+            {
+                currentLanguage = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            }
+            else
+            {
+                currentLanguage = languageCode;
+            }
 
             if (root == null)
             {
                 root = uiDocument.rootVisualElement;
-                root.Clear();
+            }
+
+            // Si le panel existe déjà et qu'on est en train de l'afficher, ne rien faire
+            if (IsDisplaying && tutorialPanel != null && tutorialPanel.style.display == DisplayStyle.Flex)
+            {
+                if (debugMode) Debug.Log("[TutorialUI] Tutorial already displaying");
+                return;
+            }
+
+            // Recréer le panel avec la langue actuelle
+            if (tutorialPanel != null && tutorialPanel.parent != null)
+            {
+                root.Remove(tutorialPanel);
             }
 
             // Bloquer les contrôles du personnage pendant le tutorial
@@ -87,7 +149,7 @@ namespace WiseTwin
             // Fade in animation
             StartCoroutine(FadeIn());
 
-            if (debugMode) Debug.Log($"[TutorialUI] Tutorial shown in {languageCode}");
+            if (debugMode) Debug.Log($"[TutorialUI] Tutorial shown in {currentLanguage}");
         }
 
         /// <summary>
@@ -234,7 +296,7 @@ namespace WiseTwin
                     "questions_title" => "Questions",
                     "questions_desc" => "Lisez attentivement les questions. L'indication sous les réponses vous précise s'il s'agit d'un choix unique (une seule réponse) ou d'un choix multiple (plusieurs réponses possibles).",
                     "interface_title" => "Interface & Résultats",
-                    "interface_desc" => "Le chronomètre en haut suit votre temps de formation. La barre de progression montre votre avancement. Votre score détaillé s'affichera à la fin de la formation.",
+                    "interface_desc" => "Le chronomètre en haut suit votre temps de formation. La barre de progression montre votre avancement. Cliquez sur le bouton '▶' pour passer au prochain scénario. Le bouton '?' vous permet de rouvrir ce tutoriel à tout moment. Le bouton '↻' vous ramène à votre position de départ si vous êtes bloqué. Votre score détaillé s'affichera à la fin de la formation.",
                     "start_button" => "Commencer la formation",
                     _ => key
                 };
@@ -251,7 +313,7 @@ namespace WiseTwin
                     "questions_title" => "Questions",
                     "questions_desc" => "Read the questions carefully. The instruction below the answers tells you if it's a single choice (one answer) or multiple choice (several answers possible).",
                     "interface_title" => "Interface & Results",
-                    "interface_desc" => "The timer at the top tracks your training time. The progress bar shows your advancement. Your detailed score will be displayed at the end of the training.",
+                    "interface_desc" => "The timer at the top tracks your training time. The progress bar shows your advancement. Click the '▶' button to move to the next scenario. The '?' button allows you to reopen this tutorial at any time. The '↻' button resets your position to the starting point if you get stuck. Your detailed score will be displayed at the end of the training.",
                     "start_button" => "Start Training",
                     _ => key
                 };
@@ -308,6 +370,29 @@ namespace WiseTwin
             }
 
             if (debugMode) Debug.Log("[TutorialUI] Tutorial hidden");
+        }
+
+        /// <summary>
+        /// Called when language changes - refresh the tutorial if it's currently displayed
+        /// </summary>
+        void OnLanguageChanged(string newLanguage)
+        {
+            currentLanguage = newLanguage;
+
+            // Si le tutoriel est actuellement affiché, le recréer avec la nouvelle langue
+            if (IsDisplaying && tutorialPanel != null && tutorialPanel.style.display == DisplayStyle.Flex)
+            {
+                if (debugMode) Debug.Log($"[TutorialUI] Language changed to {newLanguage}, refreshing tutorial");
+
+                // Recréer le panel sans bloquer à nouveau les contrôles (déjà bloqués)
+                if (tutorialPanel.parent != null)
+                {
+                    root.Remove(tutorialPanel);
+                }
+
+                CreateTutorialPanel();
+                tutorialPanel.style.opacity = 1; // Déjà affiché, pas de fade
+            }
         }
     }
 }
