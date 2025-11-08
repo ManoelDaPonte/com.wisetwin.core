@@ -82,7 +82,7 @@ public class ProcedureStepClickHandler : MonoBehaviour
 ## Feedback Visuel
 
 Le système fournit automatiquement :
-- ✅ **Hover vert** quand vous êtes assez proche ET que la souris survole l'objet (l'objet devient vert)
+- ✅ **Hover + Scale** quand vous êtes assez proche ET que la souris survole l'objet
 - ❌ **Pas de hover** si vous êtes trop loin, même si la souris est sur l'objet
 - 🎯 **Click autorisé** seulement si vous êtes dans la zone ET que vous survolez
 

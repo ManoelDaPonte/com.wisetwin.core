@@ -20,8 +20,8 @@ namespace WiseTwin
 
         // Pour gérer le feedback visuel au survol
         private bool isHovered = false;
-        private Color hoverColor = new Color(0.1f, 1f, 0.3f); // Vert vif
-        private Color originalColor;
+        private float hoverScale = 1.05f;
+        private Vector3 originalScale;
 
         // Distance maximale de clic
         [Header("Click Distance Settings")]
@@ -42,17 +42,12 @@ namespace WiseTwin
             stepIndex = index;
             associatedObject = obj;
             isActive = true;
+            originalScale = transform.localScale;
 
             // Récupérer le renderer pour le feedback visuel
             objectRenderer = GetComponent<Renderer>();
             if (objectRenderer != null && objectRenderer.material != null)
             {
-                // Sauvegarder la couleur originale du matériau
-                if (objectRenderer.material.HasProperty("_Color"))
-                {
-                    originalColor = objectRenderer.material.GetColor("_Color");
-                }
-
                 // Sauvegarder l'émission originale
                 hasOriginalEmission = objectRenderer.material.IsKeywordEnabled("_EMISSION");
                 if (hasOriginalEmission && objectRenderer.material.HasProperty("_EmissionColor"))
@@ -158,34 +153,31 @@ namespace WiseTwin
 
         void ApplyHoverFeedback(bool hovering)
         {
-            if (objectRenderer == null || objectRenderer.material == null) return;
-
             if (hovering)
             {
-                // Changer la couleur en vert
-                if (objectRenderer.material.HasProperty("_Color"))
-                {
-                    objectRenderer.material.SetColor("_Color", hoverColor);
-                }
+                // Augmenter légèrement l'échelle
+                transform.localScale = originalScale * hoverScale;
 
-                // Intensifier l'émission en vert
-                if (objectRenderer.material.HasProperty("_EmissionColor"))
+                // Intensifier l'émission
+                if (objectRenderer != null && objectRenderer.material != null &&
+                    objectRenderer.material.HasProperty("_EmissionColor"))
                 {
-                    objectRenderer.material.SetColor("_EmissionColor", hoverColor * 2f);
+                    Color currentEmission = objectRenderer.material.GetColor("_EmissionColor");
+                    objectRenderer.material.SetColor("_EmissionColor", currentEmission * 1.3f);
                 }
             }
             else
             {
-                // Restaurer la couleur originale
-                if (objectRenderer.material.HasProperty("_Color"))
-                {
-                    objectRenderer.material.SetColor("_Color", originalColor);
-                }
+                // Restaurer l'échelle normale
+                transform.localScale = originalScale;
 
-                // Restaurer l'émission jaune de base (gérée par ProcedureDisplayer)
-                if (hasOriginalEmission && objectRenderer.material.HasProperty("_EmissionColor"))
+                // Restaurer l'émission normale (mais garder la surbrillance de base)
+                if (objectRenderer != null && objectRenderer.material != null &&
+                    objectRenderer.material.HasProperty("_EmissionColor"))
                 {
-                    objectRenderer.material.SetColor("_EmissionColor", originalEmissionColor);
+                    // L'émission de base est gérée par ProcedureDisplayer, on ne fait que retirer le boost
+                    Color currentEmission = objectRenderer.material.GetColor("_EmissionColor");
+                    objectRenderer.material.SetColor("_EmissionColor", currentEmission / 1.3f);
                 }
             }
         }
@@ -232,13 +224,10 @@ namespace WiseTwin
 
         void OnDestroy()
         {
-            // Restaurer la couleur originale si possible
-            if (objectRenderer != null && objectRenderer.material != null)
+            // S'assurer que l'échelle est restaurée
+            if (originalScale != Vector3.zero)
             {
-                if (objectRenderer.material.HasProperty("_Color") && originalColor != default(Color))
-                {
-                    objectRenderer.material.SetColor("_Color", originalColor);
-                }
+                transform.localScale = originalScale;
             }
         }
 
@@ -248,12 +237,9 @@ namespace WiseTwin
             isHovered = false;
 
             // Restaurer l'état visuel
-            if (objectRenderer != null && objectRenderer.material != null)
+            if (originalScale != Vector3.zero)
             {
-                if (objectRenderer.material.HasProperty("_Color") && originalColor != default(Color))
-                {
-                    objectRenderer.material.SetColor("_Color", originalColor);
-                }
+                transform.localScale = originalScale;
             }
         }
     }
