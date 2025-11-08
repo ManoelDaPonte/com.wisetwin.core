@@ -23,19 +23,6 @@ namespace WiseTwin
         private float hoverScale = 1.05f;
         private Vector3 originalScale;
 
-        // Distance maximale de clic
-        [Header("Click Distance Settings")]
-        [Tooltip("Distance maximale pour pouvoir cliquer (en mètres Unity)")]
-        public float maxClickDistance = 5f;
-
-        [Tooltip("Utiliser une distance relative à la taille de l'objet (s'adapte au scale)")]
-        public bool useRelativeDistance = true;
-
-        [Tooltip("Si useRelativeDistance = true, distance = facteur × taille de l'objet")]
-        public float relativeDistanceFactor = 3f;
-
-        private bool isInRange = false;
-
         public void Initialize(ProcedureDisplayer displayer, int index, GameObject obj)
         {
             procedureDisplayer = displayer;
@@ -82,29 +69,14 @@ namespace WiseTwin
             Vector2 mousePos = Mouse.current.position.ReadValue();
             Ray ray = mainCamera.ScreenPointToRay(new Vector3(mousePos.x, mousePos.y, 0));
 
-            // Calculer la distance maximale effective
-            float effectiveMaxDistance = maxClickDistance;
-            if (useRelativeDistance)
-            {
-                // Distance basée sur la taille de l'objet (s'adapte au scale)
-                Bounds bounds = GetObjectBounds();
-                float objectSize = bounds.size.magnitude;
-                effectiveMaxDistance = objectSize * relativeDistanceFactor;
-            }
-
-            // Vérifier la distance entre la caméra et l'objet
-            float distanceToObject = Vector3.Distance(mainCamera.transform.position, transform.position);
-            isInRange = distanceToObject <= effectiveMaxDistance;
-
-            // Effectuer le raycast avec la distance maximale
+            // Effectuer le raycast
             RaycastHit hit;
             bool wasHovered = isHovered;
 
-            // Vérifier si on touche cet objet spécifique ET si on est assez proche
-            if (Physics.Raycast(ray, out hit, effectiveMaxDistance * 1.5f)) // 1.5x pour éviter les coupures brusques
+            // Vérifier si on touche cet objet spécifique
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity))
             {
-                bool hitThisObject = (hit.transform == transform || hit.transform.IsChildOf(transform));
-                isHovered = hitThisObject && isInRange;
+                isHovered = (hit.transform == transform || hit.transform.IsChildOf(transform));
             }
             else
             {
@@ -116,39 +88,6 @@ namespace WiseTwin
             {
                 ApplyHoverFeedback(isHovered);
             }
-        }
-
-        Bounds GetObjectBounds()
-        {
-            // Calculer les bounds de l'objet (incluant tous les renderers enfants)
-            Bounds bounds = new Bounds(transform.position, Vector3.one);
-            bool hasBounds = false;
-
-            Renderer[] renderers = GetComponentsInChildren<Renderer>();
-            foreach (Renderer renderer in renderers)
-            {
-                if (hasBounds)
-                {
-                    bounds.Encapsulate(renderer.bounds);
-                }
-                else
-                {
-                    bounds = renderer.bounds;
-                    hasBounds = true;
-                }
-            }
-
-            // Fallback si pas de renderer
-            if (!hasBounds)
-            {
-                Collider col = GetComponent<Collider>();
-                if (col != null)
-                {
-                    bounds = col.bounds;
-                }
-            }
-
-            return bounds;
         }
 
         void ApplyHoverFeedback(bool hovering)
