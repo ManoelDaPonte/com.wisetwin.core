@@ -147,13 +147,19 @@ namespace WiseTwin
             // Separator
             CreateSeparator(contentContainer);
 
-            // Section 2: Scenario Navigation
-            CreateSection(contentContainer, GetText("navigation_title"), GetText("navigation_desc"));
+            // Section 2: Interactive Procedures
+            CreateSection(contentContainer, GetText("procedures_title"), GetText("procedures_desc"));
 
             // Separator
             CreateSeparator(contentContainer);
 
-            // Section 3: Interface
+            // Section 3: Questions
+            CreateSection(contentContainer, GetText("questions_title"), GetText("questions_desc"));
+
+            // Separator
+            CreateSeparator(contentContainer);
+
+            // Section 4: Interface
             CreateSection(contentContainer, GetText("interface_title"), GetText("interface_desc"));
 
             // Start button
@@ -221,12 +227,14 @@ namespace WiseTwin
                 return key switch
                 {
                     "title" => "Comment utiliser la formation",
-                    "movement_title" => "Déplacement",
-                    "movement_desc" => "Utilisez les touches WASD ou les flèches pour vous déplacer. Déplacez la souris pour regarder autour de vous et explorer l'environnement.",
-                    "navigation_title" => "Navigation des scénarios",
-                    "navigation_desc" => "Cliquez sur le bouton 'Scénario suivant' en haut de l'écran pour progresser dans la formation. Complétez chaque scénario avant de passer au suivant.",
-                    "interface_title" => "Interface",
-                    "interface_desc" => "Le chronomètre en haut suit votre temps de formation. La barre de progression montre votre avancement.",
+                    "movement_title" => "Déplacement & Caméra",
+                    "movement_desc" => "Utilisez WASD ou les flèches pour vous déplacer. Maintenez le clic droit de la souris et déplacez-la pour regarder autour de vous. Utilisez la molette de la souris pour zoomer : zoomez complètement pour passer en vue première personne.",
+                    "procedures_title" => "Procédures interactives",
+                    "procedures_desc" => "Les objets qui clignotent doivent être cliqués pour valider une étape. Attention : si plusieurs objets clignotent en même temps, vous devez trouver et cliquer sur le bon objet !",
+                    "questions_title" => "Questions",
+                    "questions_desc" => "Lisez attentivement les questions. L'indication sous les réponses vous précise s'il s'agit d'un choix unique (une seule réponse) ou d'un choix multiple (plusieurs réponses possibles).",
+                    "interface_title" => "Interface & Résultats",
+                    "interface_desc" => "Le chronomètre en haut suit votre temps de formation. La barre de progression montre votre avancement. Votre score détaillé s'affichera à la fin de la formation.",
                     "start_button" => "Commencer la formation",
                     _ => key
                 };
@@ -236,12 +244,14 @@ namespace WiseTwin
                 return key switch
                 {
                     "title" => "How to Use the Training",
-                    "movement_title" => "Movement",
-                    "movement_desc" => "Use WASD keys or arrow keys to move. Move the mouse to look around and explore the environment.",
-                    "navigation_title" => "Scenario Navigation",
-                    "navigation_desc" => "Click the 'Next Scenario' button at the top of the screen to progress through the training. Complete each scenario before moving to the next.",
-                    "interface_title" => "Interface",
-                    "interface_desc" => "The timer at the top tracks your training time. The progress bar shows your advancement.",
+                    "movement_title" => "Movement & Camera",
+                    "movement_desc" => "Use WASD or arrow keys to move. Hold right mouse button and move the mouse to look around. Use the mouse wheel to zoom: zoom in completely to switch to first-person view.",
+                    "procedures_title" => "Interactive Procedures",
+                    "procedures_desc" => "Blinking objects must be clicked to validate a step. Beware: if multiple objects are blinking at the same time, you must find and click the correct one!",
+                    "questions_title" => "Questions",
+                    "questions_desc" => "Read the questions carefully. The instruction below the answers tells you if it's a single choice (one answer) or multiple choice (several answers possible).",
+                    "interface_title" => "Interface & Results",
+                    "interface_desc" => "The timer at the top tracks your training time. The progress bar shows your advancement. Your detailed score will be displayed at the end of the training.",
                     "start_button" => "Start Training",
                     _ => key
                 };
