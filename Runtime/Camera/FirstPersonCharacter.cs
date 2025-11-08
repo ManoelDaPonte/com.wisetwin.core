@@ -253,30 +253,36 @@ namespace WiseTwin
             if (!controlsEnabled) return;
 
             // Check if we're clicking on any UI Toolkit element
-            // TEMPORARY: Disabled to test if this causes camera issues
-            // if (IsClickingOnUI())
-            // {
-            //     return; // Don't play animation when clicking UI
-            // }
+            if (IsClickingOnUI())
+            {
+                return; // Don't play animation when clicking UI
+            }
 
             if (animator) animator.SetTrigger(hashAction);
         }
 
         /// <summary>
-        /// Check if the mouse pointer is over any UI Toolkit element
+        /// Check if the mouse pointer is over any interactive UI element (Button, etc.)
+        /// Returns false for non-interactive UI like modals/backgrounds so player can still click 3D objects
         /// </summary>
         bool IsClickingOnUI()
         {
             // Get mouse position
             if (UnityEngine.InputSystem.Mouse.current == null) return false;
 
-            Vector2 pointerPosition = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
+            Vector2 mousePos = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
+
+            // UI Toolkit uses coordinates with origin at TOP-LEFT
+            // Input System uses coordinates with origin at BOTTOM-LEFT
+            // So we need to flip Y coordinate
+            Vector2 pointerPosition = new Vector2(mousePos.x, Screen.height - mousePos.y);
 
             // Refresh UI cache if needed (only every second, not every click)
             if (cachedUIDocuments == null || Time.time - lastUICacheTime > UI_CACHE_REFRESH_INTERVAL)
             {
                 cachedUIDocuments = FindObjectsByType<UnityEngine.UIElements.UIDocument>(FindObjectsSortMode.None);
                 lastUICacheTime = Time.time;
+                Debug.Log($"[FirstPersonCharacter] Cached {cachedUIDocuments.Length} UIDocuments");
             }
 
             // Check cached UIDocuments
@@ -287,15 +293,22 @@ namespace WiseTwin
                     // Try to pick an element at the pointer position
                     var pickedElement = uiDoc.rootVisualElement.panel.Pick(pointerPosition);
 
-                    // If we picked a valid element that accepts clicks (not Ignore)
-                    if (pickedElement != null && pickedElement.pickingMode == UnityEngine.UIElements.PickingMode.Position)
+                    if (pickedElement != null)
                     {
-                        return true; // We're clicking on UI
+                        Debug.Log($"[FirstPersonCharacter] Picked element: {pickedElement.GetType().Name} (name: {pickedElement.name})");
+
+                        // Only block animation if we're clicking on an INTERACTIVE element (Button)
+                        // This allows clicking 3D objects even when modals are displayed
+                        if (pickedElement is UnityEngine.UIElements.Button)
+                        {
+                            Debug.Log("[FirstPersonCharacter] Blocking animation - clicked on Button!");
+                            return true; // We're clicking on an interactive UI button
+                        }
                     }
                 }
             }
 
-            return false; // Not clicking on any UI
+            return false; // Not clicking on any interactive UI
         }
 
         void OnToggleView(InputAction.CallbackContext ctx)

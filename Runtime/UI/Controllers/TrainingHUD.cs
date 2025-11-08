@@ -141,7 +141,7 @@ namespace WiseTwin
             hudContainer.style.paddingLeft = 12;
             hudContainer.style.paddingRight = 20;
             hudContainer.style.display = DisplayStyle.None;
-            hudContainer.pickingMode = PickingMode.Ignore;
+            hudContainer.pickingMode = PickingMode.Position; // Allow picking buttons inside
 
             // ===== Section 1: Boutons utilitaires (help et reset) =====
             var utilitySection = new VisualElement();
