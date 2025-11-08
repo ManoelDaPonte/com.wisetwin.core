@@ -79,6 +79,13 @@ namespace WiseTwin.UI
             totalTime = trainingTime;
             totalInteractions = modulesCompleted;
 
+            // Bloquer les contrôles du personnage pendant l'écran de fin
+            var character = FindFirstObjectByType<FirstPersonCharacter>();
+            if (character != null)
+            {
+                character.SetControlsEnabled(false);
+            }
+
             CreateCompletionUI();
 
             // Notifier que la formation est terminée

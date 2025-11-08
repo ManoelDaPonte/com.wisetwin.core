@@ -66,6 +66,7 @@ namespace WiseTwin
         private Vector2 moveInput, lookInput;
         private bool isSprinting, isLooking;
         private float yaw, pitch, verticalVelocity;
+        private bool controlsEnabled = true; // Pour bloquer les inputs pendant les UI
 
         // Animator hashes
         private readonly int hashMoveX = Animator.StringToHash("MoveX");
@@ -163,6 +164,18 @@ namespace WiseTwin
 
         void ReadInput()
         {
+            if (!controlsEnabled)
+            {
+                // Bloquer tous les inputs et remettre le curseur visible
+                moveInput = Vector2.zero;
+                lookInput = Vector2.zero;
+                isSprinting = false;
+                isLooking = false;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                return;
+            }
+
             moveInput = moveAction.ReadValue<Vector2>();
             lookInput = lookAction.ReadValue<Vector2>();
             isSprinting = sprintAction.IsPressed();
@@ -231,6 +244,9 @@ namespace WiseTwin
 
         void OnActionPerformed(InputAction.CallbackContext ctx)
         {
+            // Ne pas jouer l'animation si les contrôles sont bloqués (UI active)
+            if (!controlsEnabled) return;
+
             if (animator) animator.SetTrigger(hashAction);
         }
 
@@ -312,6 +328,36 @@ namespace WiseTwin
             for (int i = 0; i < hideInFirstPerson.Length; i++)
             {
                 if (hideInFirstPerson[i]) hideInFirstPerson[i].enabled = !hide ? true : false;
+            }
+        }
+
+        /// <summary>
+        /// Active ou désactive les contrôles du personnage (pour bloquer pendant les UI)
+        /// </summary>
+        public void SetControlsEnabled(bool enabled)
+        {
+            controlsEnabled = enabled;
+
+            if (!enabled)
+            {
+                // Réinitialiser les inputs
+                moveInput = Vector2.zero;
+                lookInput = Vector2.zero;
+                isSprinting = false;
+                isLooking = false;
+
+                // Remettre le curseur visible
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+
+                // Arrêter les animations de mouvement
+                if (animator)
+                {
+                    animator.SetFloat(hashMoveX, 0f);
+                    animator.SetFloat(hashMoveY, 0f);
+                    animator.SetBool(hashIsMoving, false);
+                    animator.SetBool(hashSprint, false);
+                }
             }
         }
     }

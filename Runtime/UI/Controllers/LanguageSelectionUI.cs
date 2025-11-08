@@ -837,6 +837,13 @@ namespace WiseTwin
                 Initialize();
             }
 
+            // Bloquer les contrôles du personnage pendant la sélection de langue
+            var character = FindFirstObjectByType<FirstPersonCharacter>();
+            if (character != null)
+            {
+                character.SetControlsEnabled(false);
+            }
+
             if (languageSelectionPanel != null)
             {
                 if (debugMode) Debug.Log("[LanguageSelectionUI] Showing language selection panel");

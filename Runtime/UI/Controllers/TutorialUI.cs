@@ -74,6 +74,13 @@ namespace WiseTwin
                 root.Clear();
             }
 
+            // Bloquer les contrôles du personnage pendant le tutorial
+            var character = FindFirstObjectByType<FirstPersonCharacter>();
+            if (character != null)
+            {
+                character.SetControlsEnabled(false);
+            }
+
             CreateTutorialPanel();
             IsDisplaying = true;
 
@@ -282,6 +289,13 @@ namespace WiseTwin
 
             tutorialPanel.style.display = DisplayStyle.None;
             IsDisplaying = false;
+
+            // Débloquer les contrôles du personnage
+            var character = FindFirstObjectByType<FirstPersonCharacter>();
+            if (character != null)
+            {
+                character.SetControlsEnabled(true);
+            }
 
             if (debugMode) Debug.Log("[TutorialUI] Tutorial hidden");
         }

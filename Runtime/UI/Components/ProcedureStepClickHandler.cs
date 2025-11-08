@@ -20,8 +20,21 @@ namespace WiseTwin
 
         // Pour gérer le feedback visuel au survol
         private bool isHovered = false;
-        private float hoverScale = 1.05f;
-        private Vector3 originalScale;
+        private Color hoverColor = new Color(0.1f, 1f, 0.3f); // Vert vif
+        private Color originalColor;
+
+        // Distance maximale de clic
+        [Header("Click Distance Settings")]
+        [Tooltip("Distance maximale pour pouvoir cliquer (en mètres Unity)")]
+        public float maxClickDistance = 5f;
+
+        [Tooltip("Utiliser une distance relative à la taille de l'objet (s'adapte au scale)")]
+        public bool useRelativeDistance = true;
+
+        [Tooltip("Si useRelativeDistance = true, distance = facteur × taille de l'objet")]
+        public float relativeDistanceFactor = 3f;
+
+        private bool isInRange = false;
 
         public void Initialize(ProcedureDisplayer displayer, int index, GameObject obj)
         {
@@ -29,12 +42,17 @@ namespace WiseTwin
             stepIndex = index;
             associatedObject = obj;
             isActive = true;
-            originalScale = transform.localScale;
 
             // Récupérer le renderer pour le feedback visuel
             objectRenderer = GetComponent<Renderer>();
             if (objectRenderer != null && objectRenderer.material != null)
             {
+                // Sauvegarder la couleur originale du matériau
+                if (objectRenderer.material.HasProperty("_Color"))
+                {
+                    originalColor = objectRenderer.material.GetColor("_Color");
+                }
+
                 // Sauvegarder l'émission originale
                 hasOriginalEmission = objectRenderer.material.IsKeywordEnabled("_EMISSION");
                 if (hasOriginalEmission && objectRenderer.material.HasProperty("_EmissionColor"))
@@ -69,14 +87,29 @@ namespace WiseTwin
             Vector2 mousePos = Mouse.current.position.ReadValue();
             Ray ray = mainCamera.ScreenPointToRay(new Vector3(mousePos.x, mousePos.y, 0));
 
-            // Effectuer le raycast
+            // Calculer la distance maximale effective
+            float effectiveMaxDistance = maxClickDistance;
+            if (useRelativeDistance)
+            {
+                // Distance basée sur la taille de l'objet (s'adapte au scale)
+                Bounds bounds = GetObjectBounds();
+                float objectSize = bounds.size.magnitude;
+                effectiveMaxDistance = objectSize * relativeDistanceFactor;
+            }
+
+            // Vérifier la distance entre la caméra et l'objet
+            float distanceToObject = Vector3.Distance(mainCamera.transform.position, transform.position);
+            isInRange = distanceToObject <= effectiveMaxDistance;
+
+            // Effectuer le raycast avec la distance maximale
             RaycastHit hit;
             bool wasHovered = isHovered;
 
-            // Vérifier si on touche cet objet spécifique
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+            // Vérifier si on touche cet objet spécifique ET si on est assez proche
+            if (Physics.Raycast(ray, out hit, effectiveMaxDistance * 1.5f)) // 1.5x pour éviter les coupures brusques
             {
-                isHovered = (hit.transform == transform || hit.transform.IsChildOf(transform));
+                bool hitThisObject = (hit.transform == transform || hit.transform.IsChildOf(transform));
+                isHovered = hitThisObject && isInRange;
             }
             else
             {
@@ -90,33 +123,69 @@ namespace WiseTwin
             }
         }
 
+        Bounds GetObjectBounds()
+        {
+            // Calculer les bounds de l'objet (incluant tous les renderers enfants)
+            Bounds bounds = new Bounds(transform.position, Vector3.one);
+            bool hasBounds = false;
+
+            Renderer[] renderers = GetComponentsInChildren<Renderer>();
+            foreach (Renderer renderer in renderers)
+            {
+                if (hasBounds)
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+                else
+                {
+                    bounds = renderer.bounds;
+                    hasBounds = true;
+                }
+            }
+
+            // Fallback si pas de renderer
+            if (!hasBounds)
+            {
+                Collider col = GetComponent<Collider>();
+                if (col != null)
+                {
+                    bounds = col.bounds;
+                }
+            }
+
+            return bounds;
+        }
+
         void ApplyHoverFeedback(bool hovering)
         {
+            if (objectRenderer == null || objectRenderer.material == null) return;
+
             if (hovering)
             {
-                // Augmenter légèrement l'échelle
-                transform.localScale = originalScale * hoverScale;
-
-                // Intensifier l'émission
-                if (objectRenderer != null && objectRenderer.material != null &&
-                    objectRenderer.material.HasProperty("_EmissionColor"))
+                // Changer la couleur en vert
+                if (objectRenderer.material.HasProperty("_Color"))
                 {
-                    Color currentEmission = objectRenderer.material.GetColor("_EmissionColor");
-                    objectRenderer.material.SetColor("_EmissionColor", currentEmission * 1.3f);
+                    objectRenderer.material.SetColor("_Color", hoverColor);
+                }
+
+                // Intensifier l'émission en vert
+                if (objectRenderer.material.HasProperty("_EmissionColor"))
+                {
+                    objectRenderer.material.SetColor("_EmissionColor", hoverColor * 2f);
                 }
             }
             else
             {
-                // Restaurer l'échelle normale
-                transform.localScale = originalScale;
-
-                // Restaurer l'émission normale (mais garder la surbrillance de base)
-                if (objectRenderer != null && objectRenderer.material != null &&
-                    objectRenderer.material.HasProperty("_EmissionColor"))
+                // Restaurer la couleur originale
+                if (objectRenderer.material.HasProperty("_Color"))
                 {
-                    // L'émission de base est gérée par ProcedureDisplayer, on ne fait que retirer le boost
-                    Color currentEmission = objectRenderer.material.GetColor("_EmissionColor");
-                    objectRenderer.material.SetColor("_EmissionColor", currentEmission / 1.3f);
+                    objectRenderer.material.SetColor("_Color", originalColor);
+                }
+
+                // Restaurer l'émission jaune de base (gérée par ProcedureDisplayer)
+                if (hasOriginalEmission && objectRenderer.material.HasProperty("_EmissionColor"))
+                {
+                    objectRenderer.material.SetColor("_EmissionColor", originalEmissionColor);
                 }
             }
         }
@@ -163,10 +232,13 @@ namespace WiseTwin
 
         void OnDestroy()
         {
-            // S'assurer que l'échelle est restaurée
-            if (originalScale != Vector3.zero)
+            // Restaurer la couleur originale si possible
+            if (objectRenderer != null && objectRenderer.material != null)
             {
-                transform.localScale = originalScale;
+                if (objectRenderer.material.HasProperty("_Color") && originalColor != default(Color))
+                {
+                    objectRenderer.material.SetColor("_Color", originalColor);
+                }
             }
         }
 
@@ -176,9 +248,12 @@ namespace WiseTwin
             isHovered = false;
 
             // Restaurer l'état visuel
-            if (originalScale != Vector3.zero)
+            if (objectRenderer != null && objectRenderer.material != null)
             {
-                transform.localScale = originalScale;
+                if (objectRenderer.material.HasProperty("_Color") && originalColor != default(Color))
+                {
+                    objectRenderer.material.SetColor("_Color", originalColor);
+                }
             }
         }
     }
