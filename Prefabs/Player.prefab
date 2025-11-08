@@ -213,7 +213,7 @@ MonoBehaviour:
   maxPitch: 80
   rotateOnlyOnRightClick: 1
   rotationLerp: 15
-  defaultThirdPersonDistance: 0
+  defaultThirdPersonDistance: 1
   minDistance: 0
   maxDistance: 2
   zoomSpeed: 2.5
