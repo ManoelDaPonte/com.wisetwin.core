@@ -398,24 +398,23 @@ namespace WiseTwin.UI
             buttonSection.style.borderTopWidth = 1;
             buttonSection.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
 
-            // Info text adapté selon si le highlight est activé ou non
+            // Info text adapté selon le contexte (avec/sans fakes, avec/sans highlight)
+            // On vérifiera dynamiquement pour chaque étape s'il y a des fakes
             var infoLabel = new Label();
-            if (shouldHighlight)
-            {
-                infoLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Cliquez sur l'objet surligné pour valider l'étape"
-                    : "Click on the highlighted object to validate the step";
-            }
-            else
-            {
-                infoLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Cliquez sur l'objet indiqué pour valider l'étape"
-                    : "Click on the indicated object to validate the step";
-            }
+            infoLabel.name = "instruction-label";
             infoLabel.style.fontSize = 14;
             infoLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
             infoLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             infoLabel.style.whiteSpace = WhiteSpace.Normal;
+            infoLabel.style.paddingTop = 10;
+            infoLabel.style.paddingBottom = 10;
+            infoLabel.style.paddingLeft = 15;
+            infoLabel.style.paddingRight = 15;
+            infoLabel.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.5f);
+            infoLabel.style.borderTopLeftRadius = 8;
+            infoLabel.style.borderTopRightRadius = 8;
+            infoLabel.style.borderBottomLeftRadius = 8;
+            infoLabel.style.borderBottomRightRadius = 8;
             buttonSection.Add(infoLabel);
 
             instructionPanel.Add(buttonSection);
@@ -466,6 +465,9 @@ namespace WiseTwin.UI
             // Mettre à jour la barre de progression
             float progress = (float)currentStepIndex / steps.Count * 100f;
             progressFill.style.width = Length.Percent(progress);
+
+            // Mettre à jour le texte d'instruction selon le contexte
+            UpdateInstructionLabel(currentStep);
 
             // IMPORTANT : Nettoyer TOUS les objets de la séquence avant de démarrer la nouvelle étape
             // Cela évite qu'un objet garde un handler ou une surbrillance de l'étape précédente
@@ -531,6 +533,49 @@ namespace WiseTwin.UI
 
                 // NE PAS désactiver les autres objets car ils pourraient être nécessaires pour les étapes suivantes
                 // Le système de ProcedureStepClickHandler s'occupe déjà de gérer les clics sur les bons objets
+            }
+        }
+
+        void UpdateInstructionLabel(ProcedureStep step)
+        {
+            // Trouver le label d'instruction
+            var instructionLabel = modalContainer?.Q<Label>("instruction-label");
+            if (instructionLabel == null) return;
+
+            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            bool hasFakeObjects = (step.fakeObjects != null && step.fakeObjects.Count > 0);
+
+            if (hasFakeObjects)
+            {
+                // Il y a des fake objects - message d'avertissement
+                if (shouldHighlight)
+                {
+                    instructionLabel.text = lang == "fr"
+                        ? "⚠️ Cliquez sur le bon objet. Attention, plusieurs objets clignotent, choisissez le bon !"
+                        : "⚠️ Click on the correct object. Beware, multiple objects are blinking, choose the right one!";
+                }
+                else
+                {
+                    instructionLabel.text = lang == "fr"
+                        ? "⚠️ Cliquez sur le bon objet parmi ceux proposés."
+                        : "⚠️ Click on the correct object among those proposed.";
+                }
+            }
+            else
+            {
+                // Pas de fake objects - instruction simple
+                if (shouldHighlight)
+                {
+                    instructionLabel.text = lang == "fr"
+                        ? "💡 Cliquez sur l'objet qui clignote pour valider l'étape."
+                        : "💡 Click on the blinking object to validate the step.";
+                }
+                else
+                {
+                    instructionLabel.text = lang == "fr"
+                        ? "💡 Cliquez sur l'objet indiqué pour valider l'étape."
+                        : "💡 Click on the indicated object to validate the step.";
+                }
             }
         }
 

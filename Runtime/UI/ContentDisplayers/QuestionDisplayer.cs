@@ -360,6 +360,26 @@ namespace WiseTwin.UI
             questionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             questionBox.Add(questionLabel);
 
+            // Label d'instruction (choix unique/multiple)
+            var instructionLabel = new Label();
+            instructionLabel.name = "instruction-label";
+            instructionLabel.style.fontSize = 16;
+            instructionLabel.style.color = new Color(0.8f, 0.8f, 0.9f, 1f);
+            instructionLabel.style.marginBottom = 20;
+            instructionLabel.style.paddingTop = 10;
+            instructionLabel.style.paddingBottom = 10;
+            instructionLabel.style.paddingLeft = 15;
+            instructionLabel.style.paddingRight = 15;
+            instructionLabel.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.6f);
+            instructionLabel.style.borderTopLeftRadius = 8;
+            instructionLabel.style.borderTopRightRadius = 8;
+            instructionLabel.style.borderBottomLeftRadius = 8;
+            instructionLabel.style.borderBottomRightRadius = 8;
+            instructionLabel.style.whiteSpace = WhiteSpace.Normal;
+            instructionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            instructionLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
+            questionBox.Add(instructionLabel);
+
             // Container des options avec scroll
             optionsContainer = new ScrollView();
             optionsContainer.style.marginBottom = 30;
@@ -600,6 +620,24 @@ namespace WiseTwin.UI
                     questionLabel.text = questionText;
                     currentQuestionKey = currentKey; // Stocker la clé pour le tracking
 
+                    // Mettre à jour le label d'instruction
+                    var instructionLabel = modalContainer?.Q<Label>("instruction-label");
+                    if (instructionLabel != null)
+                    {
+                        if (isMultipleChoice)
+                        {
+                            instructionLabel.text = lang == "fr"
+                                ? "📝 Vous pouvez sélectionner plusieurs réponses"
+                                : "📝 You can select multiple answers";
+                        }
+                        else
+                        {
+                            instructionLabel.text = lang == "fr"
+                                ? "📝 Sélectionnez une seule réponse"
+                                : "📝 Select only one answer";
+                        }
+                    }
+
                     // Clear options container et recréer les options
                     optionsContainer.Clear();
                     for (int i = 0; i < options.Count; i++)
@@ -688,6 +726,41 @@ namespace WiseTwin.UI
             questionLabel.style.whiteSpace = WhiteSpace.Normal;
             questionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             questionBox.Add(questionLabel);
+
+            // Label d'instruction (choix unique/multiple)
+            var instructionLabel = new Label();
+            instructionLabel.name = "instruction-label";
+            instructionLabel.style.fontSize = 16;
+            instructionLabel.style.color = new Color(0.8f, 0.8f, 0.9f, 1f);
+            instructionLabel.style.marginBottom = 20;
+            instructionLabel.style.paddingTop = 10;
+            instructionLabel.style.paddingBottom = 10;
+            instructionLabel.style.paddingLeft = 15;
+            instructionLabel.style.paddingRight = 15;
+            instructionLabel.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.6f);
+            instructionLabel.style.borderTopLeftRadius = 8;
+            instructionLabel.style.borderTopRightRadius = 8;
+            instructionLabel.style.borderBottomLeftRadius = 8;
+            instructionLabel.style.borderBottomRightRadius = 8;
+            instructionLabel.style.whiteSpace = WhiteSpace.Normal;
+            instructionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            instructionLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
+
+            // Mettre à jour le texte selon le mode
+            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            if (isMultipleChoice)
+            {
+                instructionLabel.text = lang == "fr"
+                    ? "📝 Vous pouvez sélectionner plusieurs réponses"
+                    : "📝 You can select multiple answers";
+            }
+            else
+            {
+                instructionLabel.text = lang == "fr"
+                    ? "📝 Sélectionnez une seule réponse"
+                    : "📝 Select only one answer";
+            }
+            questionBox.Add(instructionLabel);
 
             // Container des options avec scroll
             optionsContainer = new ScrollView();

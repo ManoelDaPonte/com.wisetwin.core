@@ -61,15 +61,6 @@ namespace WiseTwin.Editor
             }
             GUI.backgroundColor = Color.white;
 
-            // Bouton pour télécharger les métadonnées depuis l'API
-            EditorGUILayout.Space(10);
-            GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
-            if (GUILayout.Button("📥 Download Metadata from API", GUILayout.Height(30)))
-            {
-                DownloadMetadataFromAPI(data);
-            }
-            GUI.backgroundColor = Color.white;
-
             EditorGUILayout.Space(10);
 
             // Azure Configuration (only show if not in local mode)
@@ -100,12 +91,6 @@ namespace WiseTwin.Editor
 
                 EditorGUILayout.Space(10);
             }
-
-            // Debug Settings
-            EditorGUILayout.LabelField("🐛 Debug Configuration", EditorStyles.boldLabel);
-            data.enableDebugLogs = EditorGUILayout.Toggle("Enable Debug Logs", data.enableDebugLogs);
-            data.requestTimeout = EditorGUILayout.FloatField("Request Timeout (s)", data.requestTimeout);
-            data.maxRetryAttempts = EditorGUILayout.IntField("Max Retry Attempts", data.maxRetryAttempts);
 
             EditorGUILayout.EndVertical();
 
@@ -167,8 +152,6 @@ namespace WiseTwin.Editor
                 loader.apiBaseUrl = data.azureApiUrl;
                 loader.containerId = data.containerId;
                 loader.buildType = data.buildType;
-                loader.requestTimeout = data.requestTimeout;
-                loader.maxRetryAttempts = data.maxRetryAttempts;
 
                 Debug.Log($"✅ MetadataLoader configured:");
                 Debug.Log($"   - Mode: {(data.useLocalMode ? "Local" : "Production")}");
@@ -178,14 +161,6 @@ namespace WiseTwin.Editor
             EditorUtility.DisplayDialog(
                 "Settings Applied",
                 "Configuration applied to scene GameObjects successfully!",
-                "OK");
-        }
-
-        private static void DownloadMetadataFromAPI(WiseTwinEditorData data)
-        {
-            EditorUtility.DisplayDialog(
-                "Download Metadata",
-                "Cette fonctionnalité téléchargera les métadonnées depuis l'API.\n\nImplémentation en cours...",
                 "OK");
         }
     }

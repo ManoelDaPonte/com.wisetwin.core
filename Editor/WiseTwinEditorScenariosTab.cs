@@ -18,40 +18,6 @@ namespace WiseTwin.Editor
             EditorGUILayout.HelpBox("Configure your training scenarios visually. Choose type (Question/Procedure/Text), configure parameters, and export to metadata.json.", MessageType.Info);
             EditorGUILayout.Space();
 
-            // Import/Export section
-            EditorGUILayout.LabelField("📥 Import & Examples", EditorStyles.boldLabel);
-            EditorGUILayout.BeginVertical("box");
-
-            EditorGUILayout.LabelField("View JSON Format Examples:", EditorStyles.miniLabel);
-            EditorGUILayout.BeginHorizontal();
-
-            if (GUILayout.Button("📄 Question Format"))
-            {
-                ShowQuestionFormatExample();
-            }
-            if (GUILayout.Button("📋 Procedure Format"))
-            {
-                ShowProcedureFormatExample();
-            }
-            if (GUILayout.Button("📝 Text Format"))
-            {
-                ShowTextFormatExample();
-            }
-
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space(5);
-
-            GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
-            if (GUILayout.Button("📥 Import Scenarios from JSON", GUILayout.Height(25)))
-            {
-                ScenarioImportWindow.ShowWindow(data);
-            }
-            GUI.backgroundColor = Color.white;
-
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space();
-
             // Add scenario button
             if (GUILayout.Button("➕ Add New Scenario", GUILayout.Height(30)))
             {
@@ -115,11 +81,14 @@ namespace WiseTwin.Editor
                 }
                 GUI.enabled = true;
 
-                // Select button
-                GUI.backgroundColor = (data.selectedScenarioIndex == i) ? new Color(0.4f, 0.8f, 1f) : Color.white;
-                if (GUILayout.Button($"{i + 1}. {data.scenarios[i].id} ({data.scenarios[i].type})", GUILayout.Height(25)))
+                // Select/Toggle button
+                bool isSelected = (data.selectedScenarioIndex == i);
+                GUI.backgroundColor = isSelected ? new Color(0.4f, 0.8f, 1f) : Color.white;
+                string buttonText = isSelected ? $"▼ {i + 1}. {data.scenarios[i].id} ({data.scenarios[i].type})" : $"▶ {i + 1}. {data.scenarios[i].id} ({data.scenarios[i].type})";
+                if (GUILayout.Button(buttonText, GUILayout.Height(25)))
                 {
-                    data.selectedScenarioIndex = i;
+                    // Toggle: si déjà sélectionné, replier (-1), sinon ouvrir (i)
+                    data.selectedScenarioIndex = isSelected ? -1 : i;
                 }
                 GUI.backgroundColor = Color.white;
 
@@ -156,8 +125,6 @@ namespace WiseTwin.Editor
             EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 1), Color.gray);
             EditorGUILayout.Space();
 
-            data.scenarioScrollPosition = EditorGUILayout.BeginScrollView(data.scenarioScrollPosition, GUILayout.Height(500));
-
             // Basic info
             EditorGUILayout.LabelField("Basic Information", EditorStyles.boldLabel);
             scenario.id = EditorGUILayout.TextField("Scenario ID", scenario.id);
@@ -179,8 +146,6 @@ namespace WiseTwin.Editor
                     DrawTextEditor(scenario.textData);
                     break;
             }
-
-            EditorGUILayout.EndScrollView();
         }
 
         private static void DrawQuestionsEditor(List<QuestionScenarioData> questions)
@@ -224,12 +189,13 @@ namespace WiseTwin.Editor
         {
             EditorGUILayout.LabelField("Question Configuration", EditorStyles.boldLabel);
 
-            // Question text
+            // Question text (larger area with word wrap)
             EditorGUILayout.LabelField("Question Text", EditorStyles.miniBoldLabel);
             EditorGUILayout.LabelField("  (English)", EditorStyles.miniLabel);
-            question.questionTextEN = EditorGUILayout.TextArea(question.questionTextEN, GUILayout.Height(60));
+            GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
+            question.questionTextEN = EditorGUILayout.TextArea(question.questionTextEN, textAreaStyle, GUILayout.Height(80));
             EditorGUILayout.LabelField("  (Français)", EditorStyles.miniLabel);
-            question.questionTextFR = EditorGUILayout.TextArea(question.questionTextFR, GUILayout.Height(60));
+            question.questionTextFR = EditorGUILayout.TextArea(question.questionTextFR, textAreaStyle, GUILayout.Height(80));
 
             EditorGUILayout.Space();
 
@@ -309,26 +275,19 @@ namespace WiseTwin.Editor
 
             EditorGUILayout.Space();
 
-            // Feedback
+            // Feedback (larger area with word wrap)
             EditorGUILayout.LabelField("Feedback Messages", EditorStyles.miniBoldLabel);
             EditorGUILayout.LabelField("Success Feedback (English):", EditorStyles.miniLabel);
-            question.feedbackEN = EditorGUILayout.TextArea(question.feedbackEN, GUILayout.Height(40));
+            question.feedbackEN = EditorGUILayout.TextArea(question.feedbackEN, textAreaStyle, GUILayout.Height(60));
             EditorGUILayout.LabelField("Success Feedback (Français):", EditorStyles.miniLabel);
-            question.feedbackFR = EditorGUILayout.TextArea(question.feedbackFR, GUILayout.Height(40));
+            question.feedbackFR = EditorGUILayout.TextArea(question.feedbackFR, textAreaStyle, GUILayout.Height(60));
 
             EditorGUILayout.Space();
 
             EditorGUILayout.LabelField("Error Feedback (English):", EditorStyles.miniLabel);
-            question.incorrectFeedbackEN = EditorGUILayout.TextArea(question.incorrectFeedbackEN, GUILayout.Height(40));
+            question.incorrectFeedbackEN = EditorGUILayout.TextArea(question.incorrectFeedbackEN, textAreaStyle, GUILayout.Height(60));
             EditorGUILayout.LabelField("Error Feedback (Français):", EditorStyles.miniLabel);
-            question.incorrectFeedbackFR = EditorGUILayout.TextArea(question.incorrectFeedbackFR, GUILayout.Height(40));
-
-            EditorGUILayout.Space();
-
-            // Hint (optional)
-            EditorGUILayout.LabelField("Hint (Optional)", EditorStyles.miniBoldLabel);
-            question.hintEN = EditorGUILayout.TextField("  EN", question.hintEN);
-            question.hintFR = EditorGUILayout.TextField("  FR", question.hintFR);
+            question.incorrectFeedbackFR = EditorGUILayout.TextArea(question.incorrectFeedbackFR, textAreaStyle, GUILayout.Height(60));
         }
 
         private static void DrawProcedureEditor(ProcedureScenarioData procedure)
@@ -343,10 +302,11 @@ namespace WiseTwin.Editor
             EditorGUILayout.Space();
 
             EditorGUILayout.LabelField("Description", EditorStyles.miniBoldLabel);
+            GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
             EditorGUILayout.LabelField("  (English)", EditorStyles.miniLabel);
-            procedure.descriptionEN = EditorGUILayout.TextArea(procedure.descriptionEN, GUILayout.Height(40));
+            procedure.descriptionEN = EditorGUILayout.TextArea(procedure.descriptionEN, textAreaStyle, GUILayout.Height(60));
             EditorGUILayout.LabelField("  (Français)", EditorStyles.miniLabel);
-            procedure.descriptionFR = EditorGUILayout.TextArea(procedure.descriptionFR, GUILayout.Height(40));
+            procedure.descriptionFR = EditorGUILayout.TextArea(procedure.descriptionFR, textAreaStyle, GUILayout.Height(60));
 
             EditorGUILayout.Space();
 
@@ -435,19 +395,17 @@ namespace WiseTwin.Editor
             }
             step.targetObjectName = EditorGUILayout.TextField("Object Name", step.targetObjectName);
 
-            // Step text
+            // Step text (larger area with word wrap)
             EditorGUILayout.LabelField("Text", EditorStyles.miniLabel);
-            step.textEN = EditorGUILayout.TextField("  EN", step.textEN);
-            step.textFR = EditorGUILayout.TextField("  FR", step.textFR);
+            GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
+            EditorGUILayout.LabelField("  EN:", EditorStyles.miniLabel);
+            step.textEN = EditorGUILayout.TextArea(step.textEN, textAreaStyle, GUILayout.Height(50));
+            EditorGUILayout.LabelField("  FR:", EditorStyles.miniLabel);
+            step.textFR = EditorGUILayout.TextArea(step.textFR, textAreaStyle, GUILayout.Height(50));
 
             // Highlight
             step.highlightColor = EditorGUILayout.ColorField("Highlight Color", step.highlightColor);
             step.useBlinking = EditorGUILayout.Toggle("Use Blinking", step.useBlinking);
-
-            // Hint
-            EditorGUILayout.LabelField("Hint (Optional)", EditorStyles.miniLabel);
-            step.hintEN = EditorGUILayout.TextField("  EN", step.hintEN);
-            step.hintFR = EditorGUILayout.TextField("  FR", step.hintFR);
 
             EditorGUILayout.Space();
 
@@ -539,163 +497,11 @@ namespace WiseTwin.Editor
             EditorGUILayout.Space();
 
             EditorGUILayout.LabelField("Content", EditorStyles.miniBoldLabel);
+            GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
             EditorGUILayout.LabelField("  (English)", EditorStyles.miniLabel);
-            text.contentEN = EditorGUILayout.TextArea(text.contentEN, GUILayout.Height(150));
+            text.contentEN = EditorGUILayout.TextArea(text.contentEN, textAreaStyle, GUILayout.Height(150));
             EditorGUILayout.LabelField("  (Français)", EditorStyles.miniLabel);
-            text.contentFR = EditorGUILayout.TextArea(text.contentFR, GUILayout.Height(150));
-        }
-
-        // ============= JSON FORMAT EXAMPLES =============
-
-        private static void ShowQuestionFormatExample()
-        {
-            string exampleJSON = @"{
-  ""id"": ""scenario_1"",
-  ""type"": ""question"",
-  ""evaluationMode"": false,
-  ""question"": {
-    ""questionText"": {
-      ""en"": ""What is the capital of France?"",
-      ""fr"": ""Quelle est la capitale de la France ?""
-    },
-    ""options"": {
-      ""en"": [""London"", ""Berlin"", ""Paris"", ""Madrid""],
-      ""fr"": [""Londres"", ""Berlin"", ""Paris"", ""Madrid""]
-    },
-    ""correctAnswers"": [2],
-    ""isMultipleChoice"": false,
-    ""feedback"": {
-      ""en"": ""Correct! Paris is the capital of France."",
-      ""fr"": ""Correct ! Paris est la capitale de la France.""
-    },
-    ""incorrectFeedback"": {
-      ""en"": ""Incorrect. The capital of France is Paris."",
-      ""fr"": ""Incorrect. La capitale de la France est Paris.""
-    },
-    ""hint"": {
-      ""en"": ""Think about the Eiffel Tower!"",
-      ""fr"": ""Pensez à la Tour Eiffel !""
-    }
-  }
-}";
-
-            JSONFormatWindow.ShowWindow("Question Scenario Format", exampleJSON);
-        }
-
-        private static void ShowProcedureFormatExample()
-        {
-            string exampleJSON = @"{
-  ""id"": ""scenario_2"",
-  ""type"": ""procedure"",
-  ""evaluationMode"": true,
-  ""procedure"": {
-    ""title"": {
-      ""en"": ""Assembly Procedure"",
-      ""fr"": ""Procédure d'assemblage""
-    },
-    ""description"": {
-      ""en"": ""Follow these steps to assemble the device."",
-      ""fr"": ""Suivez ces étapes pour assembler l'appareil.""
-    },
-    ""allowSkipSteps"": false,
-    ""showStepNumbers"": true,
-    ""requireSequentialOrder"": true,
-    ""steps"": [
-      {
-        ""text"": {
-          ""en"": ""Pick up the base component"",
-          ""fr"": ""Prenez le composant de base""
-        },
-        ""targetObjectName"": ""BaseObject"",
-        ""highlightColor"": ""#00FF00"",
-        ""useBlinking"": true,
-        ""hint"": {
-          ""en"": ""Look for the blue component"",
-          ""fr"": ""Cherchez le composant bleu""
-        }
-      },
-      {
-        ""text"": {
-          ""en"": ""Attach the top piece"",
-          ""fr"": ""Fixez la pièce supérieure""
-        },
-        ""targetObjectName"": ""TopPiece"",
-        ""highlightColor"": ""#FFFF00"",
-        ""useBlinking"": false
-      }
-    ],
-    ""fakeObjects"": [
-      {
-        ""objectName"": ""WrongPiece"",
-        ""errorMessage"": {
-          ""en"": ""This is the wrong piece!"",
-          ""fr"": ""Ce n'est pas la bonne pièce !""
-        }
-      }
-    ]
-  }
-}";
-
-            JSONFormatWindow.ShowWindow("Procedure Scenario Format", exampleJSON);
-        }
-
-        private static void ShowTextFormatExample()
-        {
-            string exampleJSON = @"{
-  ""id"": ""scenario_3"",
-  ""type"": ""text"",
-  ""evaluationMode"": false,
-  ""text"": {
-    ""title"": {
-      ""en"": ""Safety Instructions"",
-      ""fr"": ""Instructions de sécurité""
-    },
-    ""content"": {
-      ""en"": ""Please read these safety instructions carefully before starting the training."",
-      ""fr"": ""Veuillez lire attentivement ces instructions de sécurité avant de commencer la formation.""
-    }
-  }
-}";
-
-            JSONFormatWindow.ShowWindow("Text Scenario Format", exampleJSON);
-        }
-    }
-
-    // ============= JSON FORMAT PREVIEW WINDOW =============
-
-    public class JSONFormatWindow : EditorWindow
-    {
-        private Vector2 scrollPosition;
-        private string jsonContent;
-        private string windowTitle;
-
-        public static void ShowWindow(string title, string json)
-        {
-            JSONFormatWindow window = GetWindow<JSONFormatWindow>(title);
-            window.windowTitle = title;
-            window.jsonContent = json;
-            window.minSize = new Vector2(600, 500);
-            window.Show();
-        }
-
-        void OnGUI()
-        {
-            EditorGUILayout.LabelField($"📋 {windowTitle}", EditorStyles.largeLabel);
-            EditorGUILayout.Space();
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("📋 Copy to Clipboard"))
-            {
-                EditorGUIUtility.systemCopyBuffer = jsonContent;
-                ShowNotification(new GUIContent("JSON copied to clipboard!"));
-            }
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space();
-
-            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-            EditorGUILayout.TextArea(jsonContent, GUILayout.ExpandHeight(true));
-            EditorGUILayout.EndScrollView();
+            text.contentFR = EditorGUILayout.TextArea(text.contentFR, textAreaStyle, GUILayout.Height(150));
         }
     }
 
@@ -939,12 +745,17 @@ namespace WiseTwin.Editor
                 question.incorrectFeedbackFR = GetString(feedbackDict, "fr");
             }
 
-            // Load hint
+            // Load hint (reset to empty if not present)
             if (questionDict.ContainsKey("hint"))
             {
                 var hintDict = GetDictionary(questionDict["hint"]);
                 question.hintEN = GetString(hintDict, "en");
                 question.hintFR = GetString(hintDict, "fr");
+            }
+            else
+            {
+                question.hintEN = "";
+                question.hintFR = "";
             }
         }
 
@@ -1015,6 +826,11 @@ namespace WiseTwin.Editor
                             var hintDict = GetDictionary(stepDict["hint"]);
                             step.hintEN = GetString(hintDict, "en");
                             step.hintFR = GetString(hintDict, "fr");
+                        }
+                        else
+                        {
+                            step.hintEN = "";
+                            step.hintFR = "";
                         }
 
                         // NEW: Load fake objects for this step

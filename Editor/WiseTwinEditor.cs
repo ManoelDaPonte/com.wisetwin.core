@@ -37,7 +37,6 @@ public class WiseTwinEditor : EditorWindow
 
         settingsFilePath = Path.Combine(Application.persistentDataPath, "WiseTwinSettings.json");
         LoadSettings();
-        LoadLanguagePreference();
         InitializeSceneId();
 
         // Synchroniser automatiquement avec WiseTwinManager au chargement
@@ -47,19 +46,6 @@ public class WiseTwinEditor : EditorWindow
         };
         LoadExistingJSONContent();
         InitializeUnityContent();
-    }
-    
-    void LoadLanguagePreference()
-    {
-        string savedLanguage = PlayerPrefs.GetString("WiseTwin_Language", "en");
-        for (int i = 0; i < data.languageCodes.Length; i++)
-        {
-            if (data.languageCodes[i] == savedLanguage)
-            {
-                data.selectedLanguageIndex = i;
-                break;
-            }
-        }
     }
     
     void LoadSettings()
@@ -79,12 +65,6 @@ public class WiseTwinEditor : EditorWindow
                     data.containerId = settingsDict["containerId"].ToString();
                 if (settingsDict.ContainsKey("buildType"))
                     data.buildType = settingsDict["buildType"].ToString();
-                if (settingsDict.ContainsKey("requestTimeout"))
-                    data.requestTimeout = Convert.ToSingle(settingsDict["requestTimeout"]);
-                if (settingsDict.ContainsKey("maxRetryAttempts"))
-                    data.maxRetryAttempts = Convert.ToInt32(settingsDict["maxRetryAttempts"]);
-                if (settingsDict.ContainsKey("enableDebugLogs"))
-                    data.enableDebugLogs = (bool)settingsDict["enableDebugLogs"];
 
             }
             catch (System.Exception e)
@@ -103,10 +83,7 @@ public class WiseTwinEditor : EditorWindow
                 ["useLocalMode"] = data.useLocalMode,
                 ["azureApiUrl"] = data.azureApiUrl,
                 ["containerId"] = data.containerId,
-                ["buildType"] = data.buildType,
-                ["requestTimeout"] = data.requestTimeout,
-                ["maxRetryAttempts"] = data.maxRetryAttempts,
-                ["enableDebugLogs"] = data.enableDebugLogs
+                ["buildType"] = data.buildType
             };
 
             string jsonContent = JsonConvert.SerializeObject(settingsDict, Formatting.Indented);
@@ -364,12 +341,17 @@ public class WiseTwinEditor : EditorWindow
             question.incorrectFeedbackFR = GetString(feedbackDict, "fr");
         }
 
-        // Load hint
+        // Load hint (reset to empty if not present)
         if (questionDict.ContainsKey("hint"))
         {
             var hintDict = GetDictionary(questionDict["hint"]);
             question.hintEN = GetString(hintDict, "en");
             question.hintFR = GetString(hintDict, "fr");
+        }
+        else
+        {
+            question.hintEN = "";
+            question.hintFR = "";
         }
     }
 
@@ -450,12 +432,17 @@ public class WiseTwinEditor : EditorWindow
                 if (stepDict.ContainsKey("useBlinking"))
                     step.useBlinking = Convert.ToBoolean(stepDict["useBlinking"]);
 
-                // Load hint
+                // Load hint (reset to empty if not present)
                 if (stepDict.ContainsKey("hint"))
                 {
                     var hintDict = GetDictionary(stepDict["hint"]);
                     step.hintEN = GetString(hintDict, "en");
                     step.hintFR = GetString(hintDict, "fr");
+                }
+                else
+                {
+                    step.hintEN = "";
+                    step.hintFR = "";
                 }
 
                 // NEW: Load fake objects for this step
@@ -638,18 +625,6 @@ public class WiseTwinEditor : EditorWindow
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("🎯", GUILayout.Width(30));
         EditorGUILayout.LabelField("WiseTwin Editor", EditorStyles.largeLabel);
-
-        // Language selector in top-right corner
-        GUILayout.FlexibleSpace();
-        GUILayout.Label("🌐", GUILayout.Width(20));
-        int newLanguageIndex = EditorGUILayout.Popup(data.selectedLanguageIndex, data.supportedLanguages, GUILayout.Width(100));
-        if (newLanguageIndex != data.selectedLanguageIndex)
-        {
-            data.selectedLanguageIndex = newLanguageIndex;
-            // Save language preference for runtime
-            PlayerPrefs.SetString("WiseTwin_Language", data.languageCodes[data.selectedLanguageIndex]);
-            PlayerPrefs.Save();
-        }
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.LabelField("Centralized management for WiseTwin Unity projects", EditorStyles.helpBox);
@@ -922,15 +897,7 @@ public class WiseTwinEditor : EditorWindow
                 ["useBlinking"] = step.useBlinking
             };
 
-            // Add hint if provided
-            if (!string.IsNullOrEmpty(step.hintEN) || !string.IsNullOrEmpty(step.hintFR))
-            {
-                stepDict["hint"] = new Dictionary<string, string>
-                {
-                    ["en"] = step.hintEN,
-                    ["fr"] = step.hintFR
-                };
-            }
+            // Note: Hints removed for procedures - not exported to JSON anymore
 
             // NEW: Add fake objects for this step if any
             if (step.fakeObjects != null && step.fakeObjects.Count > 0)
@@ -1189,8 +1156,6 @@ public class WiseTwinEditor : EditorWindow
             loader.apiBaseUrl = data.azureApiUrl;
             loader.containerId = data.containerId;
             loader.buildType = data.buildType;
-            loader.requestTimeout = data.requestTimeout;
-            loader.maxRetryAttempts = data.maxRetryAttempts;
 
             Debug.Log($"✅ MetadataLoader configured:");
             Debug.Log($"   - Mode: {(data.useLocalMode ? "Local" : "Production")}");

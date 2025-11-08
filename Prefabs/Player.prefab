@@ -215,7 +215,7 @@ MonoBehaviour:
   rotationLerp: 15
   defaultThirdPersonDistance: 0
   minDistance: 0
-  maxDistance: 1
+  maxDistance: 2
   zoomSpeed: 2.5
   zoomLerp: 12
   headLocalOffset: {x: 0, y: 0.06, z: -0.08}
@@ -252,7 +252,7 @@ Transform:
   m_GameObject: {fileID: 8660310270731047179}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.821, z: -0.796}
+  m_LocalPosition: {x: 0, y: 1.642, z: 0.127}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

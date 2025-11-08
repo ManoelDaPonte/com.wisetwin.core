@@ -20,9 +20,6 @@ namespace WiseTwin.Editor
         public string azureApiUrl = "https://your-domain.com/api/unity/metadata";
         public string containerId = "";
         public string buildType = "wisetrainer";
-        public float requestTimeout = 30f;
-        public int maxRetryAttempts = 3;
-        public bool enableDebugLogs = true;
 
         // ============= METADATA CONFIG =============
         public string projectTitleEN = "Training Test";
@@ -48,15 +45,9 @@ namespace WiseTwin.Editor
         // ============= UI STATE =============
         public Vector2 scrollPosition;
         public Vector2 unityContentScrollPosition;
-        public Vector2 scenarioScrollPosition;
         public bool hasLoadedExistingJSON = false;
         public string currentLoadedFile = "";
         public string sceneId = "";
-
-        // Language selector
-        public int selectedLanguageIndex = 0;
-        public readonly string[] supportedLanguages = { "English", "Français" };
-        public readonly string[] languageCodes = { "en", "fr" };
 
         // Difficulty options (en français)
         public readonly string[] difficultyOptions = { "Facile", "Intermédiaire", "Avancé", "Expert" };
