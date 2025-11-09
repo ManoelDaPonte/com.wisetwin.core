@@ -278,23 +278,6 @@ namespace WiseTwin.UI
             headerSection.style.borderBottomWidth = 1;
             headerSection.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
 
-            // Bouton fermer (X)
-            var closeButton = new Button(() => Close());
-            closeButton.text = "X";
-            closeButton.style.position = Position.Absolute;
-            closeButton.style.top = 15;
-            closeButton.style.right = 15;
-            closeButton.style.width = 30;
-            closeButton.style.height = 30;
-            closeButton.style.fontSize = 20;
-            closeButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
-            closeButton.style.color = Color.white;
-            closeButton.style.borderTopLeftRadius = 15;
-            closeButton.style.borderTopRightRadius = 15;
-            closeButton.style.borderBottomLeftRadius = 15;
-            closeButton.style.borderBottomRightRadius = 15;
-            headerSection.Add(closeButton);
-
             // Titre de la procédure
             titleLabel = new Label(procedureTitle);
             titleLabel.style.fontSize = 24;

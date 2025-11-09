@@ -326,23 +326,6 @@ namespace WiseTwin.UI
             questionBox.style.paddingLeft = 40;
             questionBox.style.paddingRight = 40;
 
-            // Bouton fermer (X)
-            var closeButton = new Button(() => Close());
-            closeButton.text = "X";
-            closeButton.style.position = Position.Absolute;
-            closeButton.style.top = 15;
-            closeButton.style.right = 15;
-            closeButton.style.width = 35;
-            closeButton.style.height = 35;
-            closeButton.style.fontSize = 24;
-            closeButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
-            closeButton.style.color = Color.white;
-            closeButton.style.borderTopLeftRadius = 17;
-            closeButton.style.borderTopRightRadius = 17;
-            closeButton.style.borderBottomLeftRadius = 17;
-            closeButton.style.borderBottomRightRadius = 17;
-            questionBox.Add(closeButton);
-
             // Indicateur de progression si plusieurs questions
             progressLabel = new Label();
             progressLabel.style.fontSize = 16;
@@ -701,23 +684,6 @@ namespace WiseTwin.UI
             questionBox.style.paddingBottom = 40;
             questionBox.style.paddingLeft = 40;
             questionBox.style.paddingRight = 40;
-
-            // Bouton fermer (X)
-            var closeButton = new Button(() => Close());
-            closeButton.text = "X";
-            closeButton.style.position = Position.Absolute;
-            closeButton.style.top = 15;
-            closeButton.style.right = 15;
-            closeButton.style.width = 35;
-            closeButton.style.height = 35;
-            closeButton.style.fontSize = 24;
-            closeButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
-            closeButton.style.color = Color.white;
-            closeButton.style.borderTopLeftRadius = 17;
-            closeButton.style.borderTopRightRadius = 17;
-            closeButton.style.borderBottomLeftRadius = 17;
-            closeButton.style.borderBottomRightRadius = 17;
-            questionBox.Add(closeButton);
 
             // Texte de la question
             questionLabel = new Label(questionText);

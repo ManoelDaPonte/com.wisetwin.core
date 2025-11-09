@@ -79,11 +79,23 @@ namespace WiseTwin.UI
             totalTime = trainingTime;
             totalInteractions = modulesCompleted;
 
+            // IMPORTANT : Forcer le HUD à 100% avant d'afficher l'UI de completion
+            if (TrainingHUD.Instance != null)
+            {
+                TrainingHUD.Instance.UpdateProgress(modulesCompleted);
+                Debug.Log($"[TrainingCompletionUI] Forced HUD to 100%: {modulesCompleted}/{modulesCompleted}");
+            }
+
             // Bloquer les contrôles du personnage pendant l'écran de fin
             var character = FindFirstObjectByType<FirstPersonCharacter>();
             if (character != null)
             {
                 character.SetControlsEnabled(false);
+                Debug.Log("[TrainingCompletionUI] Player controls disabled - cannot move or look around");
+            }
+            else
+            {
+                Debug.LogWarning("[TrainingCompletionUI] FirstPersonCharacter not found - controls may not be blocked!");
             }
 
             CreateCompletionUI();
@@ -133,6 +145,23 @@ namespace WiseTwin.UI
             successBox.style.borderBottomColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
             successBox.style.borderLeftColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
             successBox.style.borderRightColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
+
+            // Bouton fermer (X) en haut à droite
+            var closeButton = new Button(() => CloseCompletionUI());
+            closeButton.text = "X";
+            closeButton.style.position = Position.Absolute;
+            closeButton.style.top = 15;
+            closeButton.style.right = 15;
+            closeButton.style.width = 35;
+            closeButton.style.height = 35;
+            closeButton.style.fontSize = 24;
+            closeButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
+            closeButton.style.color = Color.white;
+            closeButton.style.borderTopLeftRadius = 17;
+            closeButton.style.borderTopRightRadius = 17;
+            closeButton.style.borderBottomLeftRadius = 17;
+            closeButton.style.borderBottomRightRadius = 17;
+            successBox.Add(closeButton);
 
             // Message de félicitations
             var congratsTitle = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
@@ -322,6 +351,26 @@ namespace WiseTwin.UI
 
             successBox.Add(scoreContainer);
 
+            // Message informatif pour indiquer qu'on peut quitter ou explorer
+            var infoMessage = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
+                ? "Vous pouvez maintenant fermer cette fenêtre pour explorer l'environnement 3D ou quitter la formation."
+                : "You can now close this window to explore the 3D environment or quit the training.");
+            infoMessage.style.fontSize = 14;
+            infoMessage.style.color = new Color(0.7f, 0.7f, 0.75f, 1f);
+            infoMessage.style.unityTextAlign = TextAnchor.MiddleCenter;
+            infoMessage.style.marginTop = 20;
+            infoMessage.style.paddingTop = 15;
+            infoMessage.style.paddingBottom = 10;
+            infoMessage.style.paddingLeft = 20;
+            infoMessage.style.paddingRight = 20;
+            infoMessage.style.backgroundColor = new Color(0.12f, 0.12f, 0.16f, 0.5f);
+            infoMessage.style.borderTopLeftRadius = 10;
+            infoMessage.style.borderTopRightRadius = 10;
+            infoMessage.style.borderBottomLeftRadius = 10;
+            infoMessage.style.borderBottomRightRadius = 10;
+            infoMessage.style.whiteSpace = WhiteSpace.Normal;
+            successBox.Add(infoMessage);
+
             modalContainer.Add(successBox);
             rootElement.Add(modalContainer);
 
@@ -365,6 +414,25 @@ namespace WiseTwin.UI
             int minutes = Mathf.FloorToInt(seconds / 60);
             int secs = Mathf.FloorToInt(seconds % 60);
             return $"{minutes:00}:{secs:00}";
+        }
+
+        /// <summary>
+        /// Ferme l'UI de completion et réactive les contrôles du personnage
+        /// </summary>
+        void CloseCompletionUI()
+        {
+            Debug.Log("[TrainingCompletionUI] Closing completion UI - User can now explore");
+
+            // Réactiver les contrôles du personnage
+            var character = FindFirstObjectByType<FirstPersonCharacter>();
+            if (character != null)
+            {
+                character.SetControlsEnabled(true);
+            }
+
+            // Nettoyer l'UI
+            rootElement?.Clear();
+            rootElement.pickingMode = PickingMode.Ignore;
         }
     }
 }
