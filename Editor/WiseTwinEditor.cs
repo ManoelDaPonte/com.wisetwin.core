@@ -240,9 +240,6 @@ public class WiseTwinEditor : EditorWindow
                         scenario.type = type;
                 }
 
-                if (scenarioDict.ContainsKey("evaluationMode"))
-                    scenario.evaluationMode = Convert.ToBoolean(scenarioDict["evaluationMode"]);
-
                 // Load content based on type
                 switch (scenario.type)
                 {
@@ -730,18 +727,13 @@ public class WiseTwinEditor : EditorWindow
         {
             metadata.scenarios = ConvertScenariosToJSON();
 
-            // Check if any scenario has evaluationMode enabled
-            bool hasEvaluationMode = data.scenarios.Any(s => s.evaluationMode);
-            if (hasEvaluationMode)
+            // Add default settings
+            metadata.settings = new Dictionary<string, object>
             {
-                metadata.settings = new Dictionary<string, object>
-                {
-                    ["evaluationMode"] = false, // Global default, can be overridden per scenario
-                    ["allowPause"] = true,
-                    ["showTimer"] = true,
-                    ["showProgress"] = true
-                };
-            }
+                ["allowPause"] = true,
+                ["showTimer"] = true,
+                ["showProgress"] = true
+            };
         }
 
         return metadata;
@@ -758,12 +750,6 @@ public class WiseTwinEditor : EditorWindow
                 ["id"] = scenario.id,
                 ["type"] = scenario.type.ToString().ToLower()
             };
-
-            // Add evaluationMode if enabled
-            if (scenario.evaluationMode)
-            {
-                scenarioDict["evaluationMode"] = true;
-            }
 
             // Add content based on type
             switch (scenario.type)

@@ -190,17 +190,14 @@ namespace WiseTwin.UI
             // Convert JObject to Dictionary<string, object>
             Dictionary<string, object> contentDict = contentData.ToObject<Dictionary<string, object>>();
 
-            // Check if evaluation mode is enabled for this scenario
-            bool evaluationMode = MetadataLoader.Instance?.IsEvaluationMode(scenario) ?? false;
-
-            // Display the content with evaluation mode if applicable
-            DisplayContent(scenario.id, contentType, contentDict, evaluationMode);
+            // Display the content
+            DisplayContent(scenario.id, contentType, contentDict);
         }
 
         /// <summary>
         /// Affiche un contenu en fonction de son type
         /// </summary>
-        public void DisplayContent(string objectId, ContentType contentType, Dictionary<string, object> contentData, bool evaluationMode = false)
+        public void DisplayContent(string objectId, ContentType contentType, Dictionary<string, object> contentData)
         {
             if (isDisplaying)
             {
@@ -229,15 +226,7 @@ namespace WiseTwin.UI
             }
 
             // Afficher le contenu
-            // Special handling for QuestionDisplayer to pass evaluationMode
-            if (currentDisplayer is QuestionDisplayer questionDisplayer)
-            {
-                questionDisplayer.Display(objectId, contentData, root, evaluationMode);
-            }
-            else
-            {
-                currentDisplayer.Display(objectId, contentData, root);
-            }
+            currentDisplayer.Display(objectId, contentData, root);
 
             if (debugMode) Debug.Log($"[ContentDisplayManager] After display - Root child count: {root.childCount}");
 

@@ -129,7 +129,6 @@ namespace WiseTwin.Editor
             EditorGUILayout.LabelField("Basic Information", EditorStyles.boldLabel);
             scenario.id = EditorGUILayout.TextField("Scenario ID", scenario.id);
             scenario.type = (ScenarioType)EditorGUILayout.EnumPopup("Type", scenario.type);
-            scenario.evaluationMode = EditorGUILayout.Toggle("Evaluation Mode", scenario.evaluationMode);
 
             EditorGUILayout.Space();
 
@@ -614,9 +613,6 @@ namespace WiseTwin.Editor
                             if (System.Enum.TryParse<ScenarioType>(typeStr, true, out var type))
                                 scenario.type = type;
                         }
-
-                        if (scenarioDict.ContainsKey("evaluationMode"))
-                            scenario.evaluationMode = System.Convert.ToBoolean(scenarioDict["evaluationMode"]);
 
                         // Load content based on type
                         switch (scenario.type)

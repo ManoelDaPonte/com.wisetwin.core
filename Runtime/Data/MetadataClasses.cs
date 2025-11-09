@@ -53,7 +53,7 @@ public class FormationMetadataComplete
     public List<object> scenarios; // Scenario configurations
 
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-    public Dictionary<string, object> settings; // Training settings (evaluationMode, etc.)
+    public Dictionary<string, object> settings; // Training settings (allowPause, showTimer, showProgress)
 
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public LocalizedString disclaimer; // Custom disclaimer text

@@ -50,25 +50,15 @@ namespace WiseTwin.UI
         private QuestionInteractionData currentQuestionData;
         private string currentQuestionKey; // Clé de la question pour tracking
 
-        // Evaluation mode
-        private bool evaluationMode = false;
-
         // Store content data for language change updates
         private Dictionary<string, object> storedContentData;
         private Dictionary<string, object> currentQuestionData_Raw; // Current question raw data
 
-        // Interface implementation (without evaluationMode parameter)
+        // Interface implementation
         public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root)
-        {
-            Display(objectId, contentData, root, false);
-        }
-
-        // Overload with evaluationMode parameter
-        public void Display(string objectId, Dictionary<string, object> contentData, VisualElement root, bool evaluationMode)
         {
             currentObjectId = objectId;
             rootElement = root;
-            this.evaluationMode = evaluationMode;
 
             // Bloquer les contrôles du personnage pendant l'affichage de la question
             var character = FindFirstObjectByType<FirstPersonCharacter>();
@@ -394,19 +384,10 @@ namespace WiseTwin.UI
             feedbackContainer.Add(feedbackLabel);
             questionBox.Add(feedbackContainer);
 
-            // Bouton Continuer (désactivé par défaut jusqu'à sélection)
-            validateButton = new Button(() => ContinueToNext());
-            validateButton.name = "continue-button";
-
-            // Déterminer le texte du bouton selon le contexte
-            if (questionKeys != null && questionKeys.Count > 1)
-            {
-                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
-            }
-            else
-            {
-                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
-            }
+            // Bouton Valider (désactivé par défaut jusqu'à sélection)
+            validateButton = new Button(ValidateAnswer);
+            validateButton.name = "validate-button";
+            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
 
             validateButton.style.height = 50;
             validateButton.style.fontSize = 18;
@@ -770,19 +751,10 @@ namespace WiseTwin.UI
 
             questionBox.Add(feedbackContainer);
 
-            // Bouton Continuer (désactivé par défaut jusqu'à sélection)
-            validateButton = new Button(() => ContinueToNext());
-            validateButton.name = "continue-button";
-
-            // Déterminer le texte du bouton selon le contexte
-            if (questionKeys != null && questionKeys.Count > 1)
-            {
-                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
-            }
-            else
-            {
-                validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
-            }
+            // Bouton Valider (désactivé par défaut jusqu'à sélection)
+            validateButton = new Button(ValidateAnswer);
+            validateButton.name = "validate-button";
+            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
 
             validateButton.style.height = 50;
             validateButton.style.fontSize = 18;
@@ -913,6 +885,8 @@ namespace WiseTwin.UI
             if (feedbackContainer != null && feedbackContainer.style.display == DisplayStyle.Flex)
             {
                 feedbackContainer.style.display = DisplayStyle.None;
+                // Réinitialiser le feedback visuel sur les options
+                ResetOptionsVisualFeedback();
             }
 
             if (isMultipleChoice)
@@ -989,6 +963,133 @@ namespace WiseTwin.UI
 
         private bool isValidating = false; // Protection contre les doubles clics
 
+        /// <summary>
+        /// Réinitialise le feedback visuel sur les options (retire les checkmarks/crosses et les couleurs de feedback)
+        /// </summary>
+        void ResetOptionsVisualFeedback()
+        {
+            var allOptionElements = optionsContainer.Query<VisualElement>().Where(e => e.name != null && e.name.StartsWith("option-")).ToList();
+
+            for (int i = 0; i < allOptionElements.Count; i++)
+            {
+                var option = optionsContainer.Q<VisualElement>($"option-{i}");
+                if (option == null) continue;
+
+                // Retirer les checkmarks/crossmarks si présents
+                var checkmark = option.Q<Label>("checkmark");
+                if (checkmark != null)
+                {
+                    option.Remove(checkmark);
+                }
+
+                var crossmark = option.Q<Label>("crossmark");
+                if (crossmark != null)
+                {
+                    option.Remove(crossmark);
+                }
+            }
+
+            // Mettre à jour l'affichage des options (va appliquer les couleurs par défaut)
+            UpdateOptionsUI();
+        }
+
+        /// <summary>
+        /// Affiche un feedback visuel sur les options après validation
+        /// Colore les bonnes réponses en vert et les mauvaises sélections en rouge
+        /// </summary>
+        void ShowAnswerFeedback(bool userAnsweredCorrectly)
+        {
+            // Parcourir toutes les options pour les colorer
+            int optionCount = isMultipleChoice ? correctAnswerIndexes.Count : 1;
+            // Pour obtenir le nombre total d'options, on utilise le nombre d'enfants dans optionsContainer
+            var allOptionElements = optionsContainer.Query<VisualElement>().Where(e => e.name != null && e.name.StartsWith("option-")).ToList();
+
+            for (int i = 0; i < allOptionElements.Count; i++)
+            {
+                var option = optionsContainer.Q<VisualElement>($"option-{i}");
+                if (option == null) continue;
+
+                var indicator = option.Q<VisualElement>("indicator");
+                if (indicator == null) continue;
+
+                // Déterminer si cette option est correcte
+                bool isCorrectOption = isMultipleChoice
+                    ? correctAnswerIndexes.Contains(i)
+                    : (i == correctAnswerIndex);
+
+                // Déterminer si cette option a été sélectionnée par l'utilisateur
+                bool isUserSelected = isMultipleChoice
+                    ? selectedAnswerIndexes.Contains(i)
+                    : (i == selectedAnswerIndex);
+
+                // Appliquer le style en fonction du statut
+                if (isCorrectOption)
+                {
+                    // Option correcte - toujours afficher en vert
+                    option.style.backgroundColor = new Color(0.1f, 0.5f, 0.3f, 0.4f);
+                    option.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    option.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    option.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    option.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    indicator.style.backgroundColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    indicator.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    indicator.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    indicator.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    indicator.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+
+                    // Ajouter un label "✓" pour indiquer que c'est correct
+                    var checkmark = option.Q<Label>("checkmark");
+                    if (checkmark == null)
+                    {
+                        checkmark = new Label("✓");
+                        checkmark.name = "checkmark";
+                        checkmark.style.fontSize = 20;
+                        checkmark.style.color = new Color(0.1f, 0.8f, 0.4f, 1f);
+                        checkmark.style.unityFontStyleAndWeight = FontStyle.Bold;
+                        checkmark.style.marginLeft = 10;
+                        option.Add(checkmark);
+                    }
+                }
+                else if (isUserSelected)
+                {
+                    // Option incorrecte sélectionnée par l'utilisateur - afficher en rouge
+                    option.style.backgroundColor = new Color(0.5f, 0.1f, 0.1f, 0.4f);
+                    option.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    option.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    option.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    option.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    indicator.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    indicator.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    indicator.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    indicator.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    indicator.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+
+                    // Ajouter un label "✗" pour indiquer que c'est incorrect
+                    var crossmark = option.Q<Label>("crossmark");
+                    if (crossmark == null)
+                    {
+                        crossmark = new Label("✗");
+                        crossmark.name = "crossmark";
+                        crossmark.style.fontSize = 20;
+                        crossmark.style.color = new Color(0.8f, 0.2f, 0.2f, 1f);
+                        crossmark.style.unityFontStyleAndWeight = FontStyle.Bold;
+                        crossmark.style.marginLeft = 10;
+                        option.Add(crossmark);
+                    }
+                }
+                else
+                {
+                    // Option non sélectionnée et incorrecte - griser légèrement
+                    option.style.backgroundColor = new Color(0.15f, 0.15f, 0.18f, 0.6f);
+                    option.style.borderTopColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
+                    option.style.borderBottomColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
+                    option.style.borderLeftColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
+                    option.style.borderRightColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
+                    indicator.style.backgroundColor = Color.clear;
+                }
+            }
+        }
+
         void ValidateAnswer()
         {
             if (hasAnswered) return;
@@ -1035,9 +1136,20 @@ namespace WiseTwin.UI
                 isCorrect = selectedAnswerIndex == correctAnswerIndex;
             }
 
-            // Afficher le feedback
-            feedbackContainer.style.display = DisplayStyle.Flex;
-            feedbackLabel.text = isCorrect ? currentFeedback : currentIncorrectFeedback;
+            // Afficher le feedback visuel sur les options
+            ShowAnswerFeedback(isCorrect);
+
+            // Afficher le feedback textuel seulement s'il n'est pas vide
+            string feedbackText = isCorrect ? currentFeedback : currentIncorrectFeedback;
+            if (!string.IsNullOrWhiteSpace(feedbackText))
+            {
+                feedbackContainer.style.display = DisplayStyle.Flex;
+                feedbackLabel.text = feedbackText;
+            }
+            else
+            {
+                feedbackContainer.style.display = DisplayStyle.None;
+            }
 
             if (isCorrect)
             {
@@ -1092,60 +1204,54 @@ namespace WiseTwin.UI
             }
             else
             {
-                // En mode évaluation, ne pas afficher de feedback d'erreur
-                // et passer directement à la question suivante
-                if (evaluationMode)
+                // Réponse incorrecte - afficher feedback d'erreur et bloquer
+                hasAnswered = true;
+
+                // Terminer le tracking de cette question avec échec (mais ne pas compter comme erreur totale si retry)
+                if (currentQuestionData != null)
                 {
-                    // Marquer comme répondu pour ne pas permettre de re-validation
-                    hasAnswered = true;
-
-                    // Pas de feedback visuel - juste passer à la suite
-                    feedbackContainer.style.display = DisplayStyle.None;
-
-                    // Si on a plusieurs questions, passer à la suivante
-                    if (questionKeys != null && questionKeys.Count > 1)
+                    // Score = 0 car pas correct du premier coup
+                    currentQuestionData.finalScore = 0f;
+                    // Mettre à jour les données avant de terminer
+                    if (TrainingAnalytics.Instance != null)
                     {
-                        // Changer le bouton immédiatement
-                        validateButton.text = currentQuestionIndex < questionKeys.Count - 1
-                            ? (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Question suivante" : "Next Question")
-                            : (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Terminer" : "Finish");
-                        validateButton.clicked -= ValidateAnswer;
-                        validateButton.clicked += NextQuestion;
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("finalScore", currentQuestionData.finalScore);
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("userAnswers", currentQuestionData.userAnswers);
+                        TrainingAnalytics.Instance.AddDataToCurrentInteraction("firstAttemptCorrect", false);
+                        // On marque success = true quand même pour ne pas bloquer la progression
+                        TrainingAnalytics.Instance.EndCurrentInteraction(true);
                     }
-                    else
-                    {
-                        // Question unique - changer le bouton en "Continuer"
-                        validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
-                        validateButton.clicked -= ValidateAnswer;
-                        validateButton.clicked += () => {
-                            OnCompleted?.Invoke(currentObjectId, true);
-                            Close();
-                        };
-                    }
+                }
+
+                feedbackContainer.style.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.3f);
+                feedbackContainer.style.borderTopWidth = 2;
+                feedbackContainer.style.borderBottomWidth = 2;
+                feedbackContainer.style.borderLeftWidth = 2;
+                feedbackContainer.style.borderRightWidth = 2;
+                feedbackContainer.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                feedbackContainer.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+
+                // Changer le bouton en "Suivant" - pas de retry
+                if (questionKeys != null && questionKeys.Count > 1)
+                {
+                    // Afficher un bouton "Question suivante" au lieu de valider
+                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1
+                        ? (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Question suivante" : "Next Question")
+                        : (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Terminer" : "Finish");
+                    validateButton.clicked -= ValidateAnswer;
+                    validateButton.clicked += NextQuestion;
                 }
                 else
                 {
-                    // Mode apprentissage normal : afficher le feedback d'erreur
-                    feedbackContainer.style.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.3f);
-                    feedbackContainer.style.borderTopWidth = 2;
-                    feedbackContainer.style.borderBottomWidth = 2;
-                    feedbackContainer.style.borderLeftWidth = 2;
-                    feedbackContainer.style.borderRightWidth = 2;
-                    feedbackContainer.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    feedbackContainer.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-
-                    // Garder le bouton "Valider" - l'utilisateur peut changer sa réponse et re-valider
-                    // Pas de changement de texte ni de couleur
-
-                    // Réinitialiser le flag immédiatement pour permettre une nouvelle tentative
-                    isValidating = false;
-
-                    // Masquer automatiquement le feedback après 3 secondes
-                    feedbackContainer.schedule.Execute(() => {
-                        feedbackContainer.style.display = DisplayStyle.None;
-                    }).ExecuteLater(3000); // 3 secondes
+                    // Question unique - changer le bouton en "Continuer"
+                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+                    validateButton.clicked -= ValidateAnswer;
+                    validateButton.clicked += () => {
+                        OnCompleted?.Invoke(currentObjectId, true);
+                        Close();
+                    };
                 }
             }
         }

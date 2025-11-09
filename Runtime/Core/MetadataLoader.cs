@@ -386,7 +386,7 @@ public class MetadataLoader : MonoBehaviour
             {
                 string settingsJson = JsonConvert.SerializeObject(loadedMetadata["settings"]);
                 settings = JsonConvert.DeserializeObject<TrainingSettings>(settingsJson);
-                DebugLog($"⚙️ Settings loaded - Evaluation Mode: {settings.evaluationMode}");
+                DebugLog($"⚙️ Settings loaded");
             }
             else
             {
@@ -503,21 +503,6 @@ public class MetadataLoader : MonoBehaviour
         }
 
         return scenarios[index];
-    }
-
-    /// <summary>
-    /// Check if evaluation mode is enabled (checks scenario-specific or global setting)
-    /// </summary>
-    public bool IsEvaluationMode(ScenarioData scenario = null)
-    {
-        // Scenario-specific evaluation mode takes priority
-        if (scenario?.evaluationMode.HasValue == true)
-        {
-            return scenario.evaluationMode.Value;
-        }
-
-        // Fall back to global setting
-        return settings?.evaluationMode ?? false;
     }
 
     /// <summary>

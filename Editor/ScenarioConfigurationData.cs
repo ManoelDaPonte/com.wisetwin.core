@@ -21,7 +21,6 @@ namespace WiseTwin.Editor
     {
         public string id = "scenario_1";
         public ScenarioType type = ScenarioType.Question;
-        public bool evaluationMode = false;
 
         // Question data - now supports multiple questions per scenario
         public List<QuestionScenarioData> questions = new List<QuestionScenarioData>();

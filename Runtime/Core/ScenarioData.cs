@@ -17,9 +17,6 @@ namespace WiseTwin
         [JsonProperty("type")]
         public string type; // "question", "procedure", "text"
 
-        [JsonProperty("evaluationMode")]
-        public bool? evaluationMode; // null means use global setting
-
         [JsonProperty("question")]
         public JObject question;
 
@@ -86,9 +83,6 @@ namespace WiseTwin
     [Serializable]
     public class TrainingSettings
     {
-        [JsonProperty("evaluationMode")]
-        public bool evaluationMode = false;
-
         [JsonProperty("allowPause")]
         public bool allowPause = true;
 
