@@ -71,6 +71,7 @@ namespace WiseTwin
         private bool isSprinting, isLooking;
         private float yaw, pitch, verticalVelocity;
         private bool controlsEnabled = true; // Pour bloquer les inputs pendant les UI
+        private bool cursorWasLocked = false; // Track cursor state to avoid redundant changes
 
         // Cache for UI detection (to avoid FindObjectsByType every frame)
         private UnityEngine.UIElements.UIDocument[] cachedUIDocuments;
@@ -180,8 +181,14 @@ namespace WiseTwin
                 lookInput = Vector2.zero;
                 isSprinting = false;
                 isLooking = false;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+
+                // Only update cursor state if it changed
+                if (cursorWasLocked)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    cursorWasLocked = false;
+                }
                 return;
             }
 
@@ -190,15 +197,19 @@ namespace WiseTwin
             isSprinting = sprintAction.IsPressed();
 
             isLooking = rotateOnlyOnRightClick ? lookHoldAction.IsPressed() : true;
-            if (isLooking)
+
+            // Only update cursor state when it actually changes
+            if (isLooking && !cursorWasLocked)
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
+                cursorWasLocked = true;
             }
-            else
+            else if (!isLooking && cursorWasLocked)
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                cursorWasLocked = false;
             }
         }
 
@@ -411,9 +422,13 @@ namespace WiseTwin
                 isSprinting = false;
                 isLooking = false;
 
-                // Remettre le curseur visible
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                // Remettre le curseur visible (only if it was locked)
+                if (cursorWasLocked)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    cursorWasLocked = false;
+                }
 
                 // Arrêter les animations de mouvement
                 if (animator)

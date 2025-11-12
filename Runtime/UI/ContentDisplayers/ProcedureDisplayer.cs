@@ -51,6 +51,10 @@ namespace WiseTwin.UI
         private Label errorFeedbackLabel;
         private VisualElement progressBar;
         private VisualElement progressFill;
+        private Button validateButton; // NEW: Manual validation button
+        private VisualElement imageContainer; // NEW: Container for step image
+        private VisualElement imageElement; // NEW: The actual image element
+        private bool imageZoomed = false; // NEW: Track image zoom state
 
         // Analytics tracking
         private float stepStartTime;
@@ -69,6 +73,8 @@ namespace WiseTwin.UI
             public bool completed = false;
             public Color highlightColor = Color.yellow;
             public bool useBlinking = true;
+            public bool requireManualValidation = false; // NEW: Require manual validation for this step
+            public string imagePath; // NEW: Path to the image for this step
             public List<FakeObjectData> fakeObjects = new List<FakeObjectData>(); // NEW: Fake objects specific to this step
         }
 
@@ -352,6 +358,44 @@ namespace WiseTwin.UI
             stepLabel.style.whiteSpace = WhiteSpace.Normal;
             mainSection.Add(stepLabel);
 
+            // NEW: Image container for step images
+            imageContainer = new VisualElement();
+            imageContainer.style.marginTop = 15;
+            imageContainer.style.marginBottom = 15;
+            imageContainer.style.display = DisplayStyle.None; // Hidden by default
+            imageContainer.style.alignItems = Align.Center;
+            imageContainer.style.flexDirection = FlexDirection.Column;
+
+            imageElement = new VisualElement();
+            imageElement.style.width = Length.Percent(100);
+            imageElement.style.height = 200; // Default height
+            imageElement.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+            // Note: backgroundPosition not available in older Unity versions, using backgroundPositionX/Y
+            imageElement.style.backgroundPositionX = new BackgroundPosition(BackgroundPositionKeyword.Center);
+            imageElement.style.backgroundPositionY = new BackgroundPosition(BackgroundPositionKeyword.Center);
+            imageElement.style.borderTopLeftRadius = 8;
+            imageElement.style.borderTopRightRadius = 8;
+            imageElement.style.borderBottomLeftRadius = 8;
+            imageElement.style.borderBottomRightRadius = 8;
+            // Make the image clickable
+            imageElement.pickingMode = PickingMode.Position;
+            imageElement.RegisterCallback<ClickEvent>(OnImageClicked);
+
+            imageContainer.Add(imageElement);
+
+            // Add hint text for clickable image
+            var imageHintLabel = new Label();
+            imageHintLabel.name = "image-hint";
+            imageHintLabel.style.fontSize = 12;
+            imageHintLabel.style.color = new Color(0.7f, 0.7f, 0.7f, 0.8f);
+            imageHintLabel.style.marginTop = 5;
+            imageHintLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                ? "🔍 Cliquez sur l'image pour agrandir"
+                : "🔍 Click on image to zoom";
+            imageContainer.Add(imageHintLabel);
+
+            mainSection.Add(imageContainer);
+
             // Label de feedback d'erreur (caché par défaut)
             errorFeedbackLabel = new Label();
             errorFeedbackLabel.style.fontSize = 16;
@@ -400,6 +444,23 @@ namespace WiseTwin.UI
             infoLabel.style.borderBottomRightRadius = 8;
             buttonSection.Add(infoLabel);
 
+            // NEW: Manual validation button (hidden by default, shown when step requires it)
+            validateButton = new Button();
+            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "✓ Valider l'étape" : "✓ Validate Step";
+            validateButton.style.marginTop = 15;
+            validateButton.style.height = 45;
+            validateButton.style.fontSize = 16;
+            validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
+            validateButton.style.color = Color.white;
+            validateButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            validateButton.style.borderTopLeftRadius = 10;
+            validateButton.style.borderTopRightRadius = 10;
+            validateButton.style.borderBottomLeftRadius = 10;
+            validateButton.style.borderBottomRightRadius = 10;
+            validateButton.style.display = DisplayStyle.None; // Hidden by default
+            validateButton.clicked += OnValidateButtonClicked;
+            buttonSection.Add(validateButton);
+
             instructionPanel.Add(buttonSection);
             modalContainer.Add(instructionPanel);
 
@@ -445,6 +506,36 @@ namespace WiseTwin.UI
                 stepLabel.text += $"\n\n💡 {currentStep.hint}";
             }
 
+            // NEW: Show/hide image if available
+            if (!string.IsNullOrEmpty(currentStep.imagePath))
+            {
+                ShowStepImage(currentStep.imagePath);
+            }
+            else
+            {
+                HideStepImage();
+            }
+
+            // NEW: Show/hide manual validation button
+            if (currentStep.requireManualValidation)
+            {
+                if (validateButton != null)
+                {
+                    validateButton.style.display = DisplayStyle.Flex;
+                    // Update button text based on language
+                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                        ? "✓ Valider l'étape"
+                        : "✓ Validate Step";
+                }
+            }
+            else
+            {
+                if (validateButton != null)
+                {
+                    validateButton.style.display = DisplayStyle.None;
+                }
+            }
+
             // Mettre à jour la barre de progression
             float progress = (float)currentStepIndex / steps.Count * 100f;
             progressFill.style.width = Length.Percent(progress);
@@ -476,46 +567,57 @@ namespace WiseTwin.UI
             currentHighlightedObjects.Clear();
             currentCorrectObject = null;
 
-            // Surligner TOUS les objets de l'étape actuelle (target + fakes)
-            if (currentStep.targetObject != null)
+            // NEW: Only highlight and setup click handlers if manual validation is NOT required
+            // If manual validation is required, the user just needs to click the validate button
+            if (!currentStep.requireManualValidation)
             {
-                currentCorrectObject = currentStep.targetObject;
-
-                // Créer une liste de tous les objets à surligner
-                var objectsToHighlight = new List<GameObject> { currentStep.targetObject };
-
-                // NEW: Ajouter les fake objects spécifiques à cette étape
-                if (currentStep.fakeObjects != null && currentStep.fakeObjects.Count > 0)
+                // Surligner TOUS les objets de l'étape actuelle (target + fakes)
+                if (currentStep.targetObject != null)
                 {
-                    foreach (var fake in currentStep.fakeObjects)
+                    currentCorrectObject = currentStep.targetObject;
+
+                    // Créer une liste de tous les objets à surligner
+                    var objectsToHighlight = new List<GameObject> { currentStep.targetObject };
+
+                    // NEW: Ajouter les fake objects spécifiques à cette étape
+                    if (currentStep.fakeObjects != null && currentStep.fakeObjects.Count > 0)
                     {
-                        if (fake.gameObject != null)
+                        foreach (var fake in currentStep.fakeObjects)
                         {
-                            objectsToHighlight.Add(fake.gameObject);
+                            if (fake.gameObject != null)
+                            {
+                                objectsToHighlight.Add(fake.gameObject);
+                            }
                         }
                     }
-                }
 
-                foreach (var obj in objectsToHighlight)
-                {
-                    if (obj == null) continue;
-
-                    // Surligner l'objet si l'option est activée
-                    if (shouldHighlight)
+                    foreach (var obj in objectsToHighlight)
                     {
-                        HighlightObject(obj);
+                        if (obj == null) continue;
+
+                        // Surligner l'objet UNIQUEMENT si shouldHighlight ET useBlinking sont activés
+                        if (shouldHighlight && currentStep.useBlinking)
+                        {
+                            // Pass the useBlinking parameter from the current step
+                            HighlightObject(obj, currentStep.useBlinking);
+                        }
+
+                        currentHighlightedObjects.Add(obj);
+
+                        // Ajouter un nouveau composant pour gérer le clic
+                        // (on vient de détruire tous les anciens handlers ci-dessus)
+                        var clickHandler = obj.AddComponent<ProcedureStepClickHandler>();
+                        clickHandler.Initialize(this, currentStepIndex, obj);
                     }
 
-                    currentHighlightedObjects.Add(obj);
-
-                    // Ajouter un nouveau composant pour gérer le clic
-                    // (on vient de détruire tous les anciens handlers ci-dessus)
-                    var clickHandler = obj.AddComponent<ProcedureStepClickHandler>();
-                    clickHandler.Initialize(this, currentStepIndex, obj);
+                    // NE PAS désactiver les autres objets car ils pourraient être nécessaires pour les étapes suivantes
+                    // Le système de ProcedureStepClickHandler s'occupe déjà de gérer les clics sur les bons objets
                 }
-
-                // NE PAS désactiver les autres objets car ils pourraient être nécessaires pour les étapes suivantes
-                // Le système de ProcedureStepClickHandler s'occupe déjà de gérer les clics sur les bons objets
+            }
+            else
+            {
+                // Manual validation mode - no object highlighting or click handlers needed
+                Debug.Log("[ProcedureDisplayer] Manual validation mode - no object interaction required");
             }
         }
 
@@ -526,43 +628,56 @@ namespace WiseTwin.UI
             if (instructionLabel == null) return;
 
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-            bool hasFakeObjects = (step.fakeObjects != null && step.fakeObjects.Count > 0);
 
-            if (hasFakeObjects)
+            // NEW: Check if manual validation is required
+            if (step.requireManualValidation)
             {
-                // Il y a des fake objects - message d'avertissement
-                if (shouldHighlight)
-                {
-                    instructionLabel.text = lang == "fr"
-                        ? "⚠️ Cliquez sur le bon objet. Attention, plusieurs objets clignotent, choisissez le bon !"
-                        : "⚠️ Click on the correct object. Beware, multiple objects are blinking, choose the right one!";
-                }
-                else
-                {
-                    instructionLabel.text = lang == "fr"
-                        ? "⚠️ Cliquez sur le bon objet parmi ceux proposés."
-                        : "⚠️ Click on the correct object among those proposed.";
-                }
+                // Manual validation mode - just need to click the button
+                instructionLabel.text = lang == "fr"
+                    ? "Lisez les instructions et cliquez sur 'Valider l'étape' pour passer à la suite."
+                    : "Read the instructions and click 'Validate Step' to continue.";
             }
             else
             {
-                // Pas de fake objects - instruction simple
-                if (shouldHighlight)
+                // Original behavior - need to click on objects
+                bool hasFakeObjects = (step.fakeObjects != null && step.fakeObjects.Count > 0);
+
+                if (hasFakeObjects)
                 {
-                    instructionLabel.text = lang == "fr"
-                        ? "💡 Cliquez sur l'objet qui clignote pour valider l'étape."
-                        : "💡 Click on the blinking object to validate the step.";
+                    // Il y a des fake objects - message d'avertissement
+                    if (shouldHighlight && step.useBlinking)
+                    {
+                        instructionLabel.text = lang == "fr"
+                            ? "⚠️ Cliquez sur le bon objet. Attention, plusieurs objets clignotent, choisissez le bon !"
+                            : "⚠️ Click on the correct object. Beware, multiple objects are blinking, choose the right one!";
+                    }
+                    else
+                    {
+                        instructionLabel.text = lang == "fr"
+                            ? "⚠️ Trouvez et cliquez sur le bon objet."
+                            : "⚠️ Find and click on the correct object.";
+                    }
                 }
                 else
                 {
-                    instructionLabel.text = lang == "fr"
-                        ? "💡 Cliquez sur l'objet indiqué pour valider l'étape."
-                        : "💡 Click on the indicated object to validate the step.";
+                    // Pas de fake objects - instruction simple
+                    if (shouldHighlight && step.useBlinking)
+                    {
+                        instructionLabel.text = lang == "fr"
+                            ? "💡 Cliquez sur l'objet qui clignote pour valider l'étape."
+                            : "💡 Click on the blinking object to validate the step.";
+                    }
+                    else
+                    {
+                        instructionLabel.text = lang == "fr"
+                            ? "💡 Trouvez et cliquez sur l'objet demandé pour valider l'étape."
+                            : "💡 Find and click on the requested object to validate the step.";
+                    }
                 }
             }
         }
 
-        void HighlightObject(GameObject obj)
+        void HighlightObject(GameObject obj, bool useBlinking)
         {
             if (obj == null) return;
 
@@ -580,8 +695,8 @@ namespace WiseTwin.UI
 
             renderer.material = highlightMaterial;
 
-            // Ajouter un composant pour l'animation de pulsation si activé
-            if (pulseHighlight)
+            // Ajouter un composant pour l'animation de pulsation UNIQUEMENT si useBlinking est activé
+            if (useBlinking && pulseHighlight)
             {
                 // Détruire l'ancien PulseEffect s'il existe (peut rester d'une étape précédente)
                 var oldPulse = obj.GetComponent<PulseEffect>();
@@ -593,6 +708,11 @@ namespace WiseTwin.UI
                 // Ajouter un nouveau PulseEffect
                 var pulse = obj.AddComponent<PulseEffect>();
                 pulse.Initialize(highlightColor, highlightIntensity, pulseSpeed);
+                Debug.Log($"[ProcedureDisplayer] Blinking enabled for object: {obj.name}");
+            }
+            else
+            {
+                Debug.Log($"[ProcedureDisplayer] Blinking disabled for object: {obj.name}");
             }
         }
 
@@ -717,33 +837,42 @@ namespace WiseTwin.UI
             // Bonne réponse !
             currentStep.completed = true;
 
-            // Calculer la durée de cette étape
-            float stepDuration = Time.time - stepStartTime;
-
-            // Créer les données de cette étape pour le tracking
-            var stepData = new ProcedureStepData
+            // NEW: If manual validation is NOT required, we track and proceed automatically
+            if (!currentStep.requireManualValidation)
             {
-                stepNumber = currentStepIndex + 1,
-                stepKey = $"step_{currentStepIndex + 1}",
-                targetObjectId = currentStep.targetObjectName,
-                completed = true,
-                duration = stepDuration,
-                wrongClicksOnThisStep = wrongClicksCount
-            };
+                // Calculer la durée de cette étape
+                float stepDuration = Time.time - stepStartTime;
 
-            // Ajouter l'étape à la liste
-            completedSteps.Add(stepData);
+                // Créer les données de cette étape pour le tracking
+                var stepData = new ProcedureStepData
+                {
+                    stepNumber = currentStepIndex + 1,
+                    stepKey = $"step_{currentStepIndex + 1}",
+                    targetObjectId = currentStep.targetObjectName,
+                    completed = true,
+                    duration = stepDuration,
+                    wrongClicksOnThisStep = wrongClicksCount
+                };
 
-            // Ajouter l'étape au tracking global de la procédure
-            if (TrainingAnalytics.Instance != null)
-            {
-                TrainingAnalytics.Instance.AddProcedureStepData(stepData);
+                // Ajouter l'étape à la liste
+                completedSteps.Add(stepData);
+
+                // Ajouter l'étape au tracking global de la procédure
+                if (TrainingAnalytics.Instance != null)
+                {
+                    TrainingAnalytics.Instance.AddProcedureStepData(stepData);
+                }
+
+                Debug.Log($"[ProcedureDisplayer] Step {stepData.stepNumber} completed CORRECTLY - Duration: {stepDuration}s, Wrong clicks on this step: {wrongClicksCount}");
+
+                // Attendre un peu avant de passer à l'étape suivante
+                StartCoroutine(NextStepAfterDelay(0.5f));
             }
-
-            Debug.Log($"[ProcedureDisplayer] Step {stepData.stepNumber} completed CORRECTLY - Duration: {stepDuration}s, Wrong clicks on this step: {wrongClicksCount}");
-
-            // Attendre un peu avant de passer à l'étape suivante
-            StartCoroutine(NextStepAfterDelay(0.5f));
+            else
+            {
+                // Manual validation required - we DON'T track yet, that will be done when validate button is clicked
+                Debug.Log("[ProcedureDisplayer] Step with manual validation - object click not required, tracking will be done on validation");
+            }
         }
 
         System.Collections.IEnumerator NextStepAfterDelay(float delay)
@@ -793,6 +922,250 @@ namespace WiseTwin.UI
 
             // Redémarrer la première étape
             StartCurrentStep();
+        }
+
+        // NEW: Handle validate button click
+        void OnValidateButtonClicked()
+        {
+            if (currentStepIndex >= steps.Count) return;
+
+            var currentStep = steps[currentStepIndex];
+
+            // For manual validation, we don't need to check if an object was clicked
+            // The user just needs to press the validation button
+            Debug.Log("[ProcedureDisplayer] Manual validation button clicked, proceeding to next step");
+
+            // Mark the step as completed
+            currentStep.completed = true;
+
+            // Calculate step duration
+            float stepDuration = Time.time - stepStartTime;
+
+            // Create step data for tracking
+            var stepData = new ProcedureStepData
+            {
+                stepNumber = currentStepIndex + 1,
+                stepKey = $"step_{currentStepIndex + 1}",
+                targetObjectId = currentStep.targetObjectName,
+                completed = true,
+                duration = stepDuration,
+                wrongClicksOnThisStep = wrongClicksCount
+            };
+
+            // Add to completed steps
+            completedSteps.Add(stepData);
+
+            // Track in analytics
+            if (TrainingAnalytics.Instance != null)
+            {
+                TrainingAnalytics.Instance.AddProcedureStepData(stepData);
+            }
+
+            // Hide any feedback
+            if (errorFeedbackLabel != null)
+            {
+                errorFeedbackLabel.style.display = DisplayStyle.None;
+            }
+
+            // Proceed to the next step
+            currentStepIndex++;
+            StartCurrentStep();
+        }
+
+        // NEW: Show step image
+        void ShowStepImage(string imagePath)
+        {
+            if (imageContainer == null || imageElement == null) return;
+
+            Debug.Log($"[ProcedureDisplayer] ShowStepImage called with path: {imagePath}");
+
+            // Try to load the image from StreamingAssets or Resources
+            // For now, we'll use the path as-is (it should be a path to a Sprite asset)
+            var texture = LoadImageTexture(imagePath);
+
+            if (texture != null)
+            {
+                Debug.Log($"[ProcedureDisplayer] Image loaded successfully, setting as background");
+                imageElement.style.backgroundImage = new StyleBackground(texture);
+                imageContainer.style.display = DisplayStyle.Flex;
+
+                // Add hover effect to show it's clickable
+                imageElement.RegisterCallback<MouseEnterEvent>(evt =>
+                {
+                    if (!imageZoomed)
+                    {
+                        imageElement.style.opacity = 0.85f;
+                        imageElement.style.borderLeftWidth = 2;
+                        imageElement.style.borderRightWidth = 2;
+                        imageElement.style.borderTopWidth = 2;
+                        imageElement.style.borderBottomWidth = 2;
+                        imageElement.style.borderLeftColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
+                        imageElement.style.borderRightColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
+                        imageElement.style.borderTopColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
+                        imageElement.style.borderBottomColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
+                    }
+                });
+
+                imageElement.RegisterCallback<MouseLeaveEvent>(evt =>
+                {
+                    if (!imageZoomed)
+                    {
+                        imageElement.style.opacity = 1f;
+                        imageElement.style.borderLeftWidth = 0;
+                        imageElement.style.borderRightWidth = 0;
+                        imageElement.style.borderTopWidth = 0;
+                        imageElement.style.borderBottomWidth = 0;
+                    }
+                });
+
+                imageZoomed = false;
+            }
+            else
+            {
+                Debug.LogWarning($"[ProcedureDisplayer] Failed to load image from path: {imagePath}");
+                HideStepImage();
+            }
+        }
+
+        // NEW: Hide step image
+        void HideStepImage()
+        {
+            if (imageContainer != null)
+            {
+                imageContainer.style.display = DisplayStyle.None;
+            }
+            imageZoomed = false;
+        }
+
+        // NEW: Handle image click for zoom
+        void OnImageClicked(ClickEvent evt)
+        {
+            if (imageElement == null) return;
+
+            Debug.Log($"[ProcedureDisplayer] Image clicked, zoomed state: {imageZoomed}");
+
+            if (!imageZoomed)
+            {
+                // Zoom in - create a full-screen overlay at the root of the UI
+                Debug.Log("[ProcedureDisplayer] Zooming in image");
+
+                // Get the root visual element (full screen)
+                var uiDocument = rootElement.panel.visualTree;
+
+                // Create full-screen overlay
+                var overlay = new VisualElement();
+                overlay.name = "image-zoom-overlay";
+                overlay.style.position = Position.Absolute;
+                overlay.style.left = 0;
+                overlay.style.top = 0;
+                overlay.style.width = Length.Percent(100);
+                overlay.style.height = Length.Percent(100);
+                overlay.style.backgroundColor = new Color(0, 0, 0, 0.95f);
+                overlay.style.justifyContent = Justify.Center;
+                overlay.style.alignItems = Align.Center;
+                overlay.pickingMode = PickingMode.Position;
+
+                // Create a copy of the image for the zoom view
+                var zoomedImage = new VisualElement();
+                zoomedImage.style.width = Length.Percent(90);
+                zoomedImage.style.height = Length.Percent(90);
+                zoomedImage.style.backgroundImage = imageElement.style.backgroundImage;
+                zoomedImage.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+                zoomedImage.style.backgroundPositionX = new BackgroundPosition(BackgroundPositionKeyword.Center);
+                zoomedImage.style.backgroundPositionY = new BackgroundPosition(BackgroundPositionKeyword.Center);
+
+                // Add close instruction
+                var closeLabel = new Label();
+                closeLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "✕ Cliquez n'importe où pour fermer"
+                    : "✕ Click anywhere to close";
+                closeLabel.style.position = Position.Absolute;
+                closeLabel.style.top = 20;
+                closeLabel.style.right = 20;
+                closeLabel.style.color = Color.white;
+                closeLabel.style.fontSize = 18;
+                closeLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+
+                overlay.Add(zoomedImage);
+                overlay.Add(closeLabel);
+
+                // Add to root of UI (full screen)
+                uiDocument.Add(overlay);
+                overlay.BringToFront(); // Ensure it's on top of everything
+
+                // Click overlay to close
+                overlay.RegisterCallback<ClickEvent>(closeEvt =>
+                {
+                    Debug.Log("[ProcedureDisplayer] Closing zoomed image");
+                    uiDocument.Remove(overlay);
+                    imageZoomed = false;
+                    evt.StopPropagation(); // Prevent the click from triggering again
+                });
+
+                imageZoomed = true;
+                evt.StopPropagation(); // Prevent the click from bubbling up
+            }
+        }
+
+        // NEW: Load image texture from path
+        Texture2D LoadImageTexture(string imagePath)
+        {
+            if (string.IsNullOrEmpty(imagePath)) return null;
+
+            Debug.Log($"[ProcedureDisplayer] Attempting to load image from: {imagePath}");
+
+            // Clean up the path for Resources.Load
+            string resourcePath = imagePath;
+
+            // Remove "Assets/Resources/" prefix if present
+            if (resourcePath.StartsWith("Assets/Resources/"))
+            {
+                resourcePath = resourcePath.Substring("Assets/Resources/".Length);
+            }
+            else if (resourcePath.StartsWith("Resources/"))
+            {
+                resourcePath = resourcePath.Substring("Resources/".Length);
+            }
+
+            // Remove file extension if present
+            if (resourcePath.Contains("."))
+            {
+                resourcePath = resourcePath.Substring(0, resourcePath.LastIndexOf('.'));
+            }
+
+            Debug.Log($"[ProcedureDisplayer] Cleaned resource path: {resourcePath}");
+
+            // Try to load as Texture2D first (for PNG/JPG)
+            var texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture != null)
+            {
+                Debug.Log($"[ProcedureDisplayer] Successfully loaded texture: {resourcePath}");
+                return texture;
+            }
+
+            // Try to load as Sprite
+            var sprite = Resources.Load<Sprite>(resourcePath);
+            if (sprite != null)
+            {
+                Debug.Log($"[ProcedureDisplayer] Successfully loaded sprite: {resourcePath}");
+                return sprite.texture;
+            }
+
+            // If not in Resources, try loading from StreamingAssets
+            string streamingPath = System.IO.Path.Combine(Application.streamingAssetsPath, imagePath);
+            if (System.IO.File.Exists(streamingPath))
+            {
+                Debug.Log($"[ProcedureDisplayer] Loading from StreamingAssets: {streamingPath}");
+                byte[] imageData = System.IO.File.ReadAllBytes(streamingPath);
+                Texture2D tex = new Texture2D(2, 2);
+                if (tex.LoadImage(imageData))
+                {
+                    return tex;
+                }
+            }
+
+            Debug.LogWarning($"[ProcedureDisplayer] Could not load image from path: {imagePath} (cleaned: {resourcePath})");
+            return null;
         }
 
         void Update()
@@ -923,7 +1296,9 @@ namespace WiseTwin.UI
                             instruction = ExtractLocalizedText(stepData, "text", language),
                             hint = ExtractLocalizedText(stepData, "hint", language),
                             highlightColor = ParseColor(ExtractString(stepData, "highlightColor"), Color.yellow),
-                            useBlinking = ExtractBool(stepData, "useBlinking", true)
+                            useBlinking = ExtractBool(stepData, "useBlinking", true),
+                            requireManualValidation = ExtractBool(stepData, "requireManualValidation", false),
+                            imagePath = ExtractLocalizedText(stepData, "imagePath", language)
                         };
 
                         // NEW: Extract fake objects for this step

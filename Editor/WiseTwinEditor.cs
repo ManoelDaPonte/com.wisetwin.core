@@ -373,14 +373,6 @@ public class WiseTwinEditor : EditorWindow
             procedure.descriptionFR = GetString(descDict, "fr");
         }
 
-        // Load settings
-        if (procedureDict.ContainsKey("allowSkipSteps"))
-            procedure.allowSkipSteps = Convert.ToBoolean(procedureDict["allowSkipSteps"]);
-        if (procedureDict.ContainsKey("showStepNumbers"))
-            procedure.showStepNumbers = Convert.ToBoolean(procedureDict["showStepNumbers"]);
-        if (procedureDict.ContainsKey("requireSequentialOrder"))
-            procedure.requireSequentialOrder = Convert.ToBoolean(procedureDict["requireSequentialOrder"]);
-
         // Load steps
         if (procedureDict.ContainsKey("steps"))
         {
@@ -428,6 +420,19 @@ public class WiseTwinEditor : EditorWindow
                 // Load blinking
                 if (stepDict.ContainsKey("useBlinking"))
                     step.useBlinking = Convert.ToBoolean(stepDict["useBlinking"]);
+
+                // Load manual validation
+                if (stepDict.ContainsKey("requireManualValidation"))
+                    step.requireManualValidation = Convert.ToBoolean(stepDict["requireManualValidation"]);
+
+                // Load image paths
+                if (stepDict.ContainsKey("imagePath"))
+                {
+                    var imagePathDict = GetDictionary(stepDict["imagePath"]);
+                    step.imagePathEN = GetString(imagePathDict, "en");
+                    step.imagePathFR = GetString(imagePathDict, "fr");
+                    // Note: Actual Sprite objects need to be loaded manually in editor from these paths
+                }
 
                 // Load hint (reset to empty if not present)
                 if (stepDict.ContainsKey("hint"))
@@ -850,10 +855,7 @@ public class WiseTwinEditor : EditorWindow
                 ["en"] = procedure.descriptionEN,
                 ["fr"] = procedure.descriptionFR
             },
-            ["steps"] = ConvertProcedureStepsToJSON(procedure.steps),
-            ["allowSkipSteps"] = procedure.allowSkipSteps,
-            ["showStepNumbers"] = procedure.showStepNumbers,
-            ["requireSequentialOrder"] = procedure.requireSequentialOrder
+            ["steps"] = ConvertProcedureStepsToJSON(procedure.steps)
         };
 
         // Add fake objects if any
@@ -880,8 +882,19 @@ public class WiseTwinEditor : EditorWindow
                 },
                 ["targetObjectName"] = step.targetObjectName,
                 ["highlightColor"] = ColorToHex(step.highlightColor),
-                ["useBlinking"] = step.useBlinking
+                ["useBlinking"] = step.useBlinking,
+                ["requireManualValidation"] = step.requireManualValidation
             };
+
+            // Add image paths if they exist
+            if (!string.IsNullOrEmpty(step.imagePathEN) || !string.IsNullOrEmpty(step.imagePathFR))
+            {
+                stepDict["imagePath"] = new Dictionary<string, string>
+                {
+                    ["en"] = step.imagePathEN ?? "",
+                    ["fr"] = step.imagePathFR ?? ""
+                };
+            }
 
             // Note: Hints removed for procedures - not exported to JSON anymore
 

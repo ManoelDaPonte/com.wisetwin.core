@@ -309,14 +309,6 @@ namespace WiseTwin.Editor
 
             EditorGUILayout.Space();
 
-            // Settings
-            EditorGUILayout.LabelField("Settings", EditorStyles.miniBoldLabel);
-            procedure.allowSkipSteps = EditorGUILayout.Toggle("Allow Skip Steps", procedure.allowSkipSteps);
-            procedure.showStepNumbers = EditorGUILayout.Toggle("Show Step Numbers", procedure.showStepNumbers);
-            procedure.requireSequentialOrder = EditorGUILayout.Toggle("Require Sequential Order", procedure.requireSequentialOrder);
-
-            EditorGUILayout.Space();
-
             // Steps
             EditorGUILayout.LabelField("Steps", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox("Use arrows to reorder steps. The order will be used in the procedure execution.", MessageType.Info);
@@ -405,6 +397,29 @@ namespace WiseTwin.Editor
             // Highlight
             step.highlightColor = EditorGUILayout.ColorField("Highlight Color", step.highlightColor);
             step.useBlinking = EditorGUILayout.Toggle("Use Blinking", step.useBlinking);
+
+            // Manual validation
+            step.requireManualValidation = EditorGUILayout.Toggle("Valider Manuellement", step.requireManualValidation);
+
+            // Image support
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Images (Optional)", EditorStyles.miniBoldLabel);
+            step.imageEN = (Sprite)EditorGUILayout.ObjectField("Image EN", step.imageEN, typeof(Sprite), false);
+            step.imageFR = (Sprite)EditorGUILayout.ObjectField("Image FR", step.imageFR, typeof(Sprite), false);
+
+            // Store image paths for JSON export
+            if (step.imageEN != null)
+            {
+                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(step.imageEN);
+                step.imagePathEN = assetPath;
+                EditorGUILayout.HelpBox($"EN Image Path: {assetPath}", MessageType.None);
+            }
+            if (step.imageFR != null)
+            {
+                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(step.imageFR);
+                step.imagePathFR = assetPath;
+                EditorGUILayout.HelpBox($"FR Image Path: {assetPath}", MessageType.None);
+            }
 
             EditorGUILayout.Space();
 
@@ -776,16 +791,6 @@ namespace WiseTwin.Editor
                 procedure.descriptionFR = GetString(descDict, "fr");
             }
 
-            // Load settings
-            if (procedureDict.ContainsKey("allowSkipSteps"))
-                procedure.allowSkipSteps = System.Convert.ToBoolean(procedureDict["allowSkipSteps"]);
-
-            if (procedureDict.ContainsKey("showStepNumbers"))
-                procedure.showStepNumbers = System.Convert.ToBoolean(procedureDict["showStepNumbers"]);
-
-            if (procedureDict.ContainsKey("requireSequentialOrder"))
-                procedure.requireSequentialOrder = System.Convert.ToBoolean(procedureDict["requireSequentialOrder"]);
-
             // Load steps
             if (procedureDict.ContainsKey("steps"))
             {
@@ -816,6 +821,18 @@ namespace WiseTwin.Editor
 
                         if (stepDict.ContainsKey("useBlinking"))
                             step.useBlinking = System.Convert.ToBoolean(stepDict["useBlinking"]);
+
+                        if (stepDict.ContainsKey("requireManualValidation"))
+                            step.requireManualValidation = System.Convert.ToBoolean(stepDict["requireManualValidation"]);
+
+                        if (stepDict.ContainsKey("imagePath"))
+                        {
+                            var imagePathDict = GetDictionary(stepDict["imagePath"]);
+                            step.imagePathEN = GetString(imagePathDict, "en");
+                            step.imagePathFR = GetString(imagePathDict, "fr");
+                            // Note: We can't load Sprite objects from paths during import,
+                            // they need to be manually reassigned in the editor
+                        }
 
                         if (stepDict.ContainsKey("hint"))
                         {

@@ -66,9 +66,6 @@ namespace WiseTwin.Editor
         public string descriptionFR = "";
         public List<ProcedureStep> steps = new List<ProcedureStep>();
         public List<FakeObject> fakeObjects = new List<FakeObject>();
-        public bool allowSkipSteps = false;
-        public bool showStepNumbers = true;
-        public bool requireSequentialOrder = true;
     }
 
     [Serializable]
@@ -82,6 +79,13 @@ namespace WiseTwin.Editor
         public bool useBlinking = true;
         public string hintEN = "";
         public string hintFR = "";
+        // NEW: Manual validation for this step
+        public bool requireManualValidation = false;
+        // NEW: Image support for this step
+        public Sprite imageEN = null;  // Image for English
+        public Sprite imageFR = null;  // Image for French
+        public string imagePathEN = "";  // Path to store in JSON
+        public string imagePathFR = "";  // Path to store in JSON
         // NEW: Fake objects specific to this step
         public List<FakeObject> fakeObjects = new List<FakeObject>();
     }
