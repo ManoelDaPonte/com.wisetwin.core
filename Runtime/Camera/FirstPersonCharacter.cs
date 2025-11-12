@@ -58,6 +58,10 @@ namespace WiseTwin
         [Tooltip("Seuil sous lequel on cache les meshes (mètres)")]
         public float hideThreshold = 0.1f;
 
+        [Header("Debug")]
+        [Tooltip("Afficher les logs de debug dans la console")]
+        public bool debugMode = false;
+
         // Input
         private InputAction moveAction, lookAction, sprintAction, lookHoldAction, actionButton, scrollAction, toggleViewAction;
 
@@ -282,7 +286,7 @@ namespace WiseTwin
             {
                 cachedUIDocuments = FindObjectsByType<UnityEngine.UIElements.UIDocument>(FindObjectsSortMode.None);
                 lastUICacheTime = Time.time;
-                Debug.Log($"[FirstPersonCharacter] Cached {cachedUIDocuments.Length} UIDocuments");
+                if (debugMode) Debug.Log($"[FirstPersonCharacter] Cached {cachedUIDocuments.Length} UIDocuments");
             }
 
             // Check cached UIDocuments
@@ -295,13 +299,13 @@ namespace WiseTwin
 
                     if (pickedElement != null)
                     {
-                        Debug.Log($"[FirstPersonCharacter] Picked element: {pickedElement.GetType().Name} (name: {pickedElement.name})");
+                        if (debugMode) Debug.Log($"[FirstPersonCharacter] Picked element: {pickedElement.GetType().Name} (name: {pickedElement.name})");
 
                         // Only block animation if we're clicking on an INTERACTIVE element (Button)
                         // This allows clicking 3D objects even when modals are displayed
                         if (pickedElement is UnityEngine.UIElements.Button)
                         {
-                            Debug.Log("[FirstPersonCharacter] Blocking animation - clicked on Button!");
+                            if (debugMode) Debug.Log("[FirstPersonCharacter] Blocking animation - clicked on Button!");
                             return true; // We're clicking on an interactive UI button
                         }
                     }

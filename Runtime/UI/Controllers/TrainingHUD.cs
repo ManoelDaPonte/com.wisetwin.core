@@ -235,11 +235,11 @@ namespace WiseTwin
             var buttonSection = new VisualElement();
             buttonSection.style.alignItems = Align.Center;
 
-            // Bouton "▶" (play icon)
+            // Bouton ">" (next icon)
             nextScenarioButton = new Button(() => OnNextScenarioButtonClicked());
             nextScenarioButton.name = "next-scenario-button";
-            nextScenarioButton.text = "▶"; // Play icon
-            nextScenarioButton.style.width = 45;
+            nextScenarioButton.text = ">"; // Next arrow icon (ASCII)
+            nextScenarioButton.style.width = 38;
             nextScenarioButton.style.height = 38;
             nextScenarioButton.style.fontSize = 18;
             nextScenarioButton.style.backgroundColor = progressColor;
@@ -665,10 +665,10 @@ namespace WiseTwin
         /// </summary>
         string GetLocalizedText(string key)
         {
-            // Note: next_scenario uses play icon (▶) instead of text for better UX
+            // Note: next_scenario uses ASCII arrow (>) instead of text for better UX
             return key switch
             {
-                "next_scenario" => "▶",
+                "next_scenario" => ">",
                 _ => key
             };
         }

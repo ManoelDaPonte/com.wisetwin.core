@@ -681,7 +681,7 @@ namespace WiseTwin
             var startButton = disclaimerPanel.Q<Button>("start-button");
             if (startButton != null)
             {
-                startButton.text = lang == "fr" ? "Commencer" : "Start Training";
+                startButton.text = lang == "fr" ? "Suivant" : "Next";
             }
         }
 
