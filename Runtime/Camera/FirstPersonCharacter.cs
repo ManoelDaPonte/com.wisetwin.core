@@ -97,10 +97,10 @@ namespace WiseTwin
             // Inputs
             moveAction = new InputAction("Move");
             moveAction.AddCompositeBinding("2DVector")
-                .With("Up", "<Keyboard>/w").With("Up", "<Keyboard>/z")
-                .With("Down", "<Keyboard>/s")
-                .With("Left", "<Keyboard>/a").With("Left", "<Keyboard>/q")
-                .With("Right", "<Keyboard>/d");
+                .With("Up", "<Keyboard>/w").With("Up", "<Keyboard>/z").With("Up", "<Keyboard>/upArrow")
+                .With("Down", "<Keyboard>/s").With("Down", "<Keyboard>/downArrow")
+                .With("Left", "<Keyboard>/a").With("Left", "<Keyboard>/q").With("Left", "<Keyboard>/leftArrow")
+                .With("Right", "<Keyboard>/d").With("Right", "<Keyboard>/rightArrow");
 
             lookAction = new InputAction("Look", binding: "<Mouse>/delta");
             sprintAction = new InputAction("Sprint", binding: "<Keyboard>/leftShift");
