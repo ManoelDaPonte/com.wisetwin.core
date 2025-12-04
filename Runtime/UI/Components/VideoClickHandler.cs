@@ -67,6 +67,13 @@ namespace WiseTwin
         {
             if (!isActive || triggerData == null) return;
 
+            // Block if a video is already playing
+            if (VideoDisplayer.IsPlaying)
+            {
+                DebugLog($"Blocked click on {gameObject.name} - video already playing");
+                return;
+            }
+
             string videoUrl = triggerData.GetVideoUrl();
             if (string.IsNullOrEmpty(videoUrl))
             {

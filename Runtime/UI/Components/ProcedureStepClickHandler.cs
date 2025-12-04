@@ -139,6 +139,9 @@ namespace WiseTwin
         {
             if (!isActive) return;
 
+            // Block clicks when a video is playing (cinematic mode)
+            if (VideoDisplayer.IsPlaying) return;
+
             // Ne logger que si le debug mode est activé dans ContentDisplayManager
             if (UI.ContentDisplayManager.Instance?.DebugMode ?? false)
             {

@@ -14,6 +14,11 @@ namespace WiseTwin
     {
         public static VideoDisplayer Instance { get; private set; }
 
+        /// <summary>
+        /// Returns true if a video is currently playing - use this to block other inputs
+        /// </summary>
+        public static bool IsPlaying => Instance != null && Instance.isShowing;
+
         // UI Components
         private Canvas canvas;
         private CanvasScaler canvasScaler;
@@ -24,6 +29,7 @@ namespace WiseTwin
 
         // State
         private bool isShowing = false;
+        private FirstPersonCharacter playerController;
 
         // Debug
         private bool EnableDebugLogs => WiseTwinManager.Instance != null && WiseTwinManager.Instance.EnableDebugLogs;
@@ -137,6 +143,16 @@ namespace WiseTwin
             isShowing = true;
             canvas.enabled = true;
 
+            // Block player controls during video (like a cinematic)
+            if (playerController == null)
+                playerController = FindFirstObjectByType<FirstPersonCharacter>();
+
+            if (playerController != null)
+            {
+                playerController.SetControlsEnabled(false);
+                DebugLog("Player controls disabled");
+            }
+
             // Create RenderTexture if needed or recreate with correct size
             CreateRenderTexture();
 
@@ -192,8 +208,8 @@ namespace WiseTwin
 
         void OnVideoEnded(VideoPlayer source)
         {
-            DebugLog("Video ended");
-            // Video stays visible, user can click to close
+            DebugLog("Video ended, closing automatically");
+            HideVideo();
         }
 
         void OnVideoError(VideoPlayer source, string message)
@@ -215,6 +231,13 @@ namespace WiseTwin
             canvas.enabled = false;
 
             videoPlayer.Stop();
+
+            // Re-enable player controls
+            if (playerController != null)
+            {
+                playerController.SetControlsEnabled(true);
+                DebugLog("Player controls re-enabled");
+            }
 
             if (renderTexture != null)
             {
