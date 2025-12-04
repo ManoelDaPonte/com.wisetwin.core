@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Video;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 namespace WiseTwin
 {
@@ -140,18 +141,9 @@ namespace WiseTwin
 
             DebugLog($"Loading video: {url}");
 
-            isShowing = true;
+            // Show canvas immediately but delay input blocking
+            // This allows procedure steps to validate on the same frame before we block inputs
             canvas.enabled = true;
-
-            // Block player controls during video (like a cinematic)
-            if (playerController == null)
-                playerController = FindFirstObjectByType<FirstPersonCharacter>();
-
-            if (playerController != null)
-            {
-                playerController.SetControlsEnabled(false);
-                DebugLog("Player controls disabled");
-            }
 
             // Create RenderTexture if needed or recreate with correct size
             CreateRenderTexture();
@@ -162,6 +154,32 @@ namespace WiseTwin
 
             // Prepare and play
             videoPlayer.Prepare();
+
+            // Delay input blocking by one frame to allow procedure validation to complete
+            StartCoroutine(DelayedInputBlocking());
+        }
+
+        /// <summary>
+        /// Delays setting isShowing and blocking player controls by one frame.
+        /// This allows other click handlers (like ProcedureStepClickHandler) to process
+        /// their click events before the video blocks all inputs.
+        /// </summary>
+        IEnumerator DelayedInputBlocking()
+        {
+            // Wait one frame - this allows procedure validation to happen first
+            yield return null;
+
+            isShowing = true;
+
+            // Block player controls during video (like a cinematic)
+            if (playerController == null)
+                playerController = FindFirstObjectByType<FirstPersonCharacter>();
+
+            if (playerController != null)
+            {
+                playerController.SetControlsEnabled(false);
+                DebugLog("Player controls disabled (after 1 frame delay)");
+            }
         }
 
         void CreateRenderTexture()
