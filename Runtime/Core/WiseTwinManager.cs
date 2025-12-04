@@ -72,13 +72,6 @@ namespace WiseTwin
         {
             DebugLog("🎯 WiseTwin Manager initialized successfully");
 
-            // Subscribe to metadata loader events if available
-            if (metadataLoader != null)
-            {
-                metadataLoader.OnMetadataLoaded += OnMetadataLoaded;
-                metadataLoader.OnLoadError += OnMetadataLoadError;
-            }
-
             // Save player's initial spawn position
             SavePlayerSpawnPosition();
         }
@@ -91,14 +84,18 @@ namespace WiseTwin
             if (metadataLoader == null)
             {
                 metadataLoader = FindFirstObjectByType<MetadataLoader>();
-                if (metadataLoader != null)
-                {
-                    DebugLog("✅ MetadataLoader found and linked");
-                }
-                else
-                {
-                    DebugLog("⚠️ MetadataLoader not found in scene");
-                }
+            }
+
+            // Subscribe to events early (in Awake) to catch metadata loaded event
+            if (metadataLoader != null)
+            {
+                DebugLog("✅ MetadataLoader found and linked");
+                metadataLoader.OnMetadataLoaded += OnMetadataLoaded;
+                metadataLoader.OnLoadError += OnMetadataLoadError;
+            }
+            else
+            {
+                DebugLog("⚠️ MetadataLoader not found in scene");
             }
             
             // Find TrainingCompletionNotifier
@@ -124,7 +121,46 @@ namespace WiseTwin
             var scenarios = metadataLoader?.GetScenarios();
             int count = scenarios?.Count ?? 0;
             DebugLog($"📦 Metadata loaded successfully. Scenarios: {count}");
+
+            // Initialize video triggers if present
+            InitializeVideoTriggers();
+
             OnMetadataReady?.Invoke(metadata);
+        }
+
+        void InitializeVideoTriggers()
+        {
+            if (metadataLoader == null || !metadataLoader.HasVideoTriggers())
+            {
+                return;
+            }
+
+            DebugLog("🎬 Initializing video triggers...");
+
+            // Create VideoDisplayer if not exists
+            if (VideoDisplayer.Instance == null)
+            {
+                var displayerGO = new GameObject("VideoDisplayer");
+                displayerGO.transform.SetParent(transform);
+                displayerGO.AddComponent<VideoDisplayer>();
+                DebugLog("✅ VideoDisplayer created");
+            }
+            else
+            {
+                DebugLog("✅ VideoDisplayer already exists");
+            }
+
+            // Create VideoTriggerManager if not exists
+            if (VideoTriggerManager.Instance == null)
+            {
+                var managerGO = new GameObject("VideoTriggerManager");
+                managerGO.transform.SetParent(transform);
+                managerGO.AddComponent<VideoTriggerManager>();
+                DebugLog("✅ VideoTriggerManager created");
+            }
+
+            // Initialize triggers from metadata
+            VideoTriggerManager.Instance?.InitializeFromMetadata(metadataLoader.GetVideoTriggers());
         }
         
         void OnMetadataLoadError(string error)

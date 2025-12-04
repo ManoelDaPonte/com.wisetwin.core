@@ -42,6 +42,10 @@ namespace WiseTwin.Editor
         public int selectedScenarioIndex = -1;
         public int draggingScenarioIndex = -1; // For drag and drop reordering
 
+        // ============= VIDEO TRIGGERS =============
+        public List<VideoTriggerConfiguration> videoTriggers = new List<VideoTriggerConfiguration>();
+        public int selectedVideoTriggerIndex = -1;
+
         // ============= UI STATE =============
         public Vector2 scrollPosition;
         public Vector2 unityContentScrollPosition;
@@ -55,6 +59,7 @@ namespace WiseTwin.Editor
         public WiseTwinEditorData()
         {
             scenarios = new List<ScenarioConfiguration>();
+            videoTriggers = new List<VideoTriggerConfiguration>();
             tags = new List<string> { "training", "interactive" };
         }
     }

@@ -107,4 +107,16 @@ namespace WiseTwin.Editor
         public string contentEN = "";
         public string contentFR = "";
     }
+
+    /// <summary>
+    /// Configuration for video triggers - click on 3D object to play video
+    /// </summary>
+    [Serializable]
+    public class VideoTriggerConfiguration
+    {
+        public GameObject targetObject = null;
+        public string targetObjectName = "";
+        public string videoUrlEN = "";
+        public string videoUrlFR = "";
+    }
 }

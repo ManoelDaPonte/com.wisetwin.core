@@ -19,7 +19,7 @@ public class WiseTwinEditor : EditorWindow
 
     // UI State
     private int selectedTab = 0;
-    private string[] tabNames = { "General Settings", "Metadata Config", "Scenario Configuration" };
+    private string[] tabNames = { "General Settings", "Metadata Config", "Scenario Configuration", "Video" };
     
     
     [MenuItem("WiseTwin/WiseTwin Editor")]
@@ -204,11 +204,74 @@ public class WiseTwinEditor : EditorWindow
                 LoadScenariosFromJSON(metadata.scenarios);
                 Debug.Log($"✅ Loaded {data.scenarios.Count} scenarios from metadata");
             }
+
+            // 🎬 Load video triggers if present
+            if (metadata.videoTriggers != null && metadata.videoTriggers.Count > 0)
+            {
+                LoadVideoTriggersFromJSON(metadata.videoTriggers);
+                Debug.Log($"✅ Loaded {data.videoTriggers.Count} video triggers from metadata");
+            }
         }
         catch (System.Exception e)
         {
             Debug.LogError($"❌ Error parsing existing JSON: {e.Message}");
             InitializeUnityContent();
+        }
+    }
+
+    void LoadVideoTriggersFromJSON(List<object> videoTriggersJSON)
+    {
+        data.videoTriggers.Clear();
+
+        foreach (var triggerObj in videoTriggersJSON)
+        {
+            try
+            {
+                var triggerDict = triggerObj as Dictionary<string, object>;
+                if (triggerDict == null)
+                {
+                    var jObject = Newtonsoft.Json.Linq.JObject.FromObject(triggerObj);
+                    triggerDict = jObject.ToObject<Dictionary<string, object>>();
+                }
+
+                var trigger = new WiseTwin.Editor.VideoTriggerConfiguration();
+
+                // Load target object name
+                if (triggerDict.ContainsKey("targetObjectName"))
+                {
+                    trigger.targetObjectName = triggerDict["targetObjectName"]?.ToString() ?? "";
+                }
+
+                // Load video URLs
+                if (triggerDict.ContainsKey("videoUrl"))
+                {
+                    var urlObj = triggerDict["videoUrl"];
+                    Dictionary<string, object> urlDict = null;
+
+                    if (urlObj is Newtonsoft.Json.Linq.JObject jUrlObj)
+                    {
+                        urlDict = jUrlObj.ToObject<Dictionary<string, object>>();
+                    }
+                    else if (urlObj is Dictionary<string, object> dict)
+                    {
+                        urlDict = dict;
+                    }
+
+                    if (urlDict != null)
+                    {
+                        if (urlDict.ContainsKey("en"))
+                            trigger.videoUrlEN = urlDict["en"]?.ToString() ?? "";
+                        if (urlDict.ContainsKey("fr"))
+                            trigger.videoUrlFR = urlDict["fr"]?.ToString() ?? "";
+                    }
+                }
+
+                data.videoTriggers.Add(trigger);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"⚠️ Failed to load video trigger: {e.Message}");
+            }
         }
     }
 
@@ -611,6 +674,9 @@ public class WiseTwinEditor : EditorWindow
             case 2:
                 WiseTwin.Editor.WiseTwinEditorScenariosTab.Draw(data);
                 break;
+            case 3:
+                WiseTwin.Editor.WiseTwinEditorVideoTab.Draw(data);
+                break;
         }
 
         EditorGUILayout.EndScrollView();
@@ -741,7 +807,41 @@ public class WiseTwinEditor : EditorWindow
             };
         }
 
+        // 🎬 Convert video triggers to JSON format
+        if (data.videoTriggers != null && data.videoTriggers.Count > 0)
+        {
+            metadata.videoTriggers = ConvertVideoTriggersToJSON();
+        }
+
         return metadata;
+    }
+
+    List<object> ConvertVideoTriggersToJSON()
+    {
+        var videoTriggersJSON = new List<object>();
+
+        foreach (var trigger in data.videoTriggers)
+        {
+            // Skip if no object name
+            if (string.IsNullOrEmpty(trigger.targetObjectName))
+                continue;
+
+            // Skip if no URLs
+            if (string.IsNullOrEmpty(trigger.videoUrlEN) && string.IsNullOrEmpty(trigger.videoUrlFR))
+                continue;
+
+            videoTriggersJSON.Add(new Dictionary<string, object>
+            {
+                ["targetObjectName"] = trigger.targetObjectName,
+                ["videoUrl"] = new Dictionary<string, string>
+                {
+                    ["en"] = trigger.videoUrlEN ?? "",
+                    ["fr"] = trigger.videoUrlFR ?? ""
+                }
+            });
+        }
+
+        return videoTriggersJSON;
     }
 
     List<object> ConvertScenariosToJSON()

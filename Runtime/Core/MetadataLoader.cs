@@ -48,6 +48,7 @@ public class MetadataLoader : MonoBehaviour
     private Dictionary<string, object> unityData; // Legacy format support
     private List<ScenarioData> scenarios;
     private TrainingSettings settings;
+    private List<object> videoTriggers; // Video trigger configurations
     private bool isLoading = false;
     
     // Singleton
@@ -63,6 +64,8 @@ public class MetadataLoader : MonoBehaviour
     public TrainingSettings GetSettings() => settings;
     public int GetScenarioCount() => scenarios?.Count ?? 0;
     public bool HasScenarios() => scenarios != null && scenarios.Count > 0;
+    public List<object> GetVideoTriggers() => videoTriggers;
+    public bool HasVideoTriggers() => videoTriggers != null && videoTriggers.Count > 0;
     
     void Awake()
     {
@@ -414,6 +417,33 @@ public class MetadataLoader : MonoBehaviour
             }
 
             unityData = new Dictionary<string, object>();
+
+            // Extract video triggers
+            if (loadedMetadata.ContainsKey("videoTriggers"))
+            {
+                try
+                {
+                    var triggersObj = loadedMetadata["videoTriggers"];
+                    if (triggersObj is JArray jArray)
+                    {
+                        videoTriggers = jArray.ToObject<List<object>>();
+                    }
+                    else if (triggersObj is List<object> list)
+                    {
+                        videoTriggers = list;
+                    }
+                    DebugLog($"🎬 Video triggers loaded: {videoTriggers?.Count ?? 0} trigger(s)");
+                }
+                catch (System.Exception e)
+                {
+                    DebugLog($"⚠️ Error parsing video triggers: {e.Message}");
+                    videoTriggers = new List<object>();
+                }
+            }
+            else
+            {
+                videoTriggers = new List<object>();
+            }
 
             // Notifier le succès
             OnMetadataLoaded?.Invoke(loadedMetadata);

@@ -57,6 +57,9 @@ public class FormationMetadataComplete
 
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     public LocalizedString disclaimer; // Custom disclaimer text
+
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public List<object> videoTriggers; // Video triggers for 3D objects
 }
 
 // Classe pour la réponse API
