@@ -398,8 +398,23 @@ namespace WiseTwin.Editor
             step.highlightColor = EditorGUILayout.ColorField("Highlight Color", step.highlightColor);
             step.useBlinking = EditorGUILayout.Toggle("Use Blinking", step.useBlinking);
 
-            // Manual validation
-            step.requireManualValidation = EditorGUILayout.Toggle("Valider Manuellement", step.requireManualValidation);
+            // Validation type
+            step.validationType = (ValidationType)EditorGUILayout.EnumPopup("Validation Type", step.validationType);
+
+            // Zone object field (only shown when Zone validation is selected)
+            if (step.validationType == ValidationType.Zone)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUI.BeginChangeCheck();
+                step.zoneObject = (GameObject)EditorGUILayout.ObjectField("Zone Object", step.zoneObject, typeof(GameObject), true);
+                if (EditorGUI.EndChangeCheck() && step.zoneObject != null)
+                {
+                    step.zoneObjectName = step.zoneObject.name;
+                }
+                step.zoneObjectName = EditorGUILayout.TextField("Zone Object Name", step.zoneObjectName);
+                EditorGUILayout.HelpBox("The zone object must have a Collider set to 'Is Trigger'. Use WiseTwin > Create Validation Zone Prefab to generate one.", MessageType.Info);
+                EditorGUI.indentLevel--;
+            }
 
             // Image support
             EditorGUILayout.Space();
@@ -822,8 +837,22 @@ namespace WiseTwin.Editor
                         if (stepDict.ContainsKey("useBlinking"))
                             step.useBlinking = System.Convert.ToBoolean(stepDict["useBlinking"]);
 
-                        if (stepDict.ContainsKey("requireManualValidation"))
-                            step.requireManualValidation = System.Convert.ToBoolean(stepDict["requireManualValidation"]);
+                        // Load validation type (with backward compat for requireManualValidation)
+                        if (stepDict.ContainsKey("validationType"))
+                        {
+                            string valTypeStr = stepDict["validationType"]?.ToString();
+                            if (System.Enum.TryParse<ValidationType>(valTypeStr, true, out var valType))
+                                step.validationType = valType;
+                        }
+                        else if (stepDict.ContainsKey("requireManualValidation"))
+                        {
+                            step.validationType = System.Convert.ToBoolean(stepDict["requireManualValidation"])
+                                ? ValidationType.Manual
+                                : ValidationType.Click;
+                        }
+
+                        if (stepDict.ContainsKey("zoneObjectName"))
+                            step.zoneObjectName = stepDict["zoneObjectName"]?.ToString();
 
                         if (stepDict.ContainsKey("imagePath"))
                         {

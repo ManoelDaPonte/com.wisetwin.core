@@ -484,9 +484,23 @@ public class WiseTwinEditor : EditorWindow
                 if (stepDict.ContainsKey("useBlinking"))
                     step.useBlinking = Convert.ToBoolean(stepDict["useBlinking"]);
 
-                // Load manual validation
-                if (stepDict.ContainsKey("requireManualValidation"))
-                    step.requireManualValidation = Convert.ToBoolean(stepDict["requireManualValidation"]);
+                // Load validation type (with backward compat for requireManualValidation)
+                if (stepDict.ContainsKey("validationType"))
+                {
+                    string valTypeStr = stepDict["validationType"]?.ToString();
+                    if (Enum.TryParse<WiseTwin.Editor.ValidationType>(valTypeStr, true, out var valType))
+                        step.validationType = valType;
+                }
+                else if (stepDict.ContainsKey("requireManualValidation"))
+                {
+                    step.validationType = Convert.ToBoolean(stepDict["requireManualValidation"])
+                        ? WiseTwin.Editor.ValidationType.Manual
+                        : WiseTwin.Editor.ValidationType.Click;
+                }
+
+                // Load zone object name
+                if (stepDict.ContainsKey("zoneObjectName"))
+                    step.zoneObjectName = stepDict["zoneObjectName"]?.ToString();
 
                 // Load image paths
                 if (stepDict.ContainsKey("imagePath"))
@@ -983,8 +997,14 @@ public class WiseTwinEditor : EditorWindow
                 ["targetObjectName"] = step.targetObjectName,
                 ["highlightColor"] = ColorToHex(step.highlightColor),
                 ["useBlinking"] = step.useBlinking,
-                ["requireManualValidation"] = step.requireManualValidation
+                ["validationType"] = step.validationType.ToString().ToLower()
             };
+
+            // Add zone object name if validation type is Zone
+            if (step.validationType == WiseTwin.Editor.ValidationType.Zone && !string.IsNullOrEmpty(step.zoneObjectName))
+            {
+                stepDict["zoneObjectName"] = step.zoneObjectName;
+            }
 
             // Add image paths if they exist
             if (!string.IsNullOrEmpty(step.imagePathEN) || !string.IsNullOrEmpty(step.imagePathFR))

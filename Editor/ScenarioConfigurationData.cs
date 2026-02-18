@@ -17,6 +17,14 @@ namespace WiseTwin.Editor
     }
 
     [Serializable]
+    public enum ValidationType
+    {
+        Click,
+        Manual,
+        Zone
+    }
+
+    [Serializable]
     public class ScenarioConfiguration
     {
         public string id = "scenario_1";
@@ -79,8 +87,11 @@ namespace WiseTwin.Editor
         public bool useBlinking = true;
         public string hintEN = "";
         public string hintFR = "";
-        // NEW: Manual validation for this step
-        public bool requireManualValidation = false;
+        // Validation type for this step (Click, Manual, Zone)
+        public ValidationType validationType = ValidationType.Click;
+        // Zone trigger object (used when validationType == Zone)
+        public GameObject zoneObject = null;
+        public string zoneObjectName = "";
         // NEW: Image support for this step
         public Sprite imageEN = null;  // Image for English
         public Sprite imageFR = null;  // Image for French

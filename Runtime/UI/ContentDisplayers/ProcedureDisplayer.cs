@@ -64,18 +64,21 @@ namespace WiseTwin.UI
 
         public class ProcedureStep
         {
-            public string targetObjectName; // NEW: Object name instead of ID
+            public string targetObjectName; // Object name instead of ID
             public string title;
             public string instruction;
             public string validation;
             public string hint;
-            public GameObject targetObject; // NEW: renamed from correctObject
+            public GameObject targetObject; // renamed from correctObject
             public bool completed = false;
             public Color highlightColor = Color.yellow;
             public bool useBlinking = true;
-            public bool requireManualValidation = false; // NEW: Require manual validation for this step
-            public string imagePath; // NEW: Path to the image for this step
-            public List<FakeObjectData> fakeObjects = new List<FakeObjectData>(); // NEW: Fake objects specific to this step
+            public string validationType = "click"; // "click", "manual", "zone"
+            public string zoneObjectName; // Name of the zone trigger object (when validationType == "zone")
+            public GameObject zoneObject; // Resolved zone trigger GameObject
+            public bool requireManualValidation => validationType == "manual"; // Backward compat read-only
+            public string imagePath; // Path to the image for this step
+            public List<FakeObjectData> fakeObjects = new List<FakeObjectData>(); // Fake objects specific to this step
         }
 
         public class FakeObjectData
@@ -172,7 +175,7 @@ namespace WiseTwin.UI
                     }
                 }
 
-                // NEW: Find fake objects for this step
+                // Find fake objects for this step
                 if (step.fakeObjects != null && step.fakeObjects.Count > 0)
                 {
                     foreach (var fake in step.fakeObjects)
@@ -198,6 +201,20 @@ namespace WiseTwin.UI
                         {
                             Debug.LogWarning($"[ProcedureDisplayer] Could not find step-specific fake GameObject with name: {fake.objectName}");
                         }
+                    }
+                }
+
+                // Find zone trigger object for this step
+                if (step.validationType == "zone" && !string.IsNullOrEmpty(step.zoneObjectName))
+                {
+                    step.zoneObject = GameObject.Find(step.zoneObjectName);
+                    if (step.zoneObject != null)
+                    {
+                        Debug.Log($"[ProcedureDisplayer] Found zone object for step: {step.zoneObjectName}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[ProcedureDisplayer] Could not find zone GameObject with name: {step.zoneObjectName}");
                     }
                 }
             }
@@ -516,13 +533,12 @@ namespace WiseTwin.UI
                 HideStepImage();
             }
 
-            // NEW: Show/hide manual validation button
-            if (currentStep.requireManualValidation)
+            // Show/hide manual validation button (only for manual validation type)
+            if (currentStep.validationType == "manual")
             {
                 if (validateButton != null)
                 {
                     validateButton.style.display = DisplayStyle.Flex;
-                    // Update button text based on language
                     validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
                         ? "✓ Valider l'étape"
                         : "✓ Validate Step";
@@ -549,7 +565,7 @@ namespace WiseTwin.UI
             {
                 if (obj != null)
                 {
-                    // Retirer le handler
+                    // Retirer le handler de clic
                     var oldHandler = obj.GetComponent<ProcedureStepClickHandler>();
                     if (oldHandler != null)
                     {
@@ -564,60 +580,81 @@ namespace WiseTwin.UI
                 }
             }
 
+            // Nettoyer les zone triggers des étapes précédentes
+            CleanupZoneTriggers();
+
             currentHighlightedObjects.Clear();
             currentCorrectObject = null;
 
-            // NEW: Only highlight and setup click handlers if manual validation is NOT required
-            // If manual validation is required, the user just needs to click the validate button
-            if (!currentStep.requireManualValidation)
+            // Configurer l'étape selon le type de validation
+            switch (currentStep.validationType)
             {
-                // Surligner TOUS les objets de l'étape actuelle (target + fakes)
-                if (currentStep.targetObject != null)
-                {
-                    currentCorrectObject = currentStep.targetObject;
-
-                    // Créer une liste de tous les objets à surligner
-                    var objectsToHighlight = new List<GameObject> { currentStep.targetObject };
-
-                    // NEW: Ajouter les fake objects spécifiques à cette étape
-                    if (currentStep.fakeObjects != null && currentStep.fakeObjects.Count > 0)
+                case "click":
+                    // Surligner TOUS les objets de l'étape actuelle (target + fakes)
+                    if (currentStep.targetObject != null)
                     {
-                        foreach (var fake in currentStep.fakeObjects)
+                        currentCorrectObject = currentStep.targetObject;
+
+                        // Créer une liste de tous les objets à surligner
+                        var objectsToHighlight = new List<GameObject> { currentStep.targetObject };
+
+                        // Ajouter les fake objects spécifiques à cette étape
+                        if (currentStep.fakeObjects != null && currentStep.fakeObjects.Count > 0)
                         {
-                            if (fake.gameObject != null)
+                            foreach (var fake in currentStep.fakeObjects)
                             {
-                                objectsToHighlight.Add(fake.gameObject);
+                                if (fake.gameObject != null)
+                                {
+                                    objectsToHighlight.Add(fake.gameObject);
+                                }
                             }
                         }
-                    }
 
-                    foreach (var obj in objectsToHighlight)
-                    {
-                        if (obj == null) continue;
-
-                        // Surligner l'objet UNIQUEMENT si shouldHighlight ET useBlinking sont activés
-                        if (shouldHighlight && currentStep.useBlinking)
+                        foreach (var obj in objectsToHighlight)
                         {
-                            // Pass the useBlinking parameter from the current step
-                            HighlightObject(obj, currentStep.useBlinking);
+                            if (obj == null) continue;
+
+                            // Surligner l'objet UNIQUEMENT si shouldHighlight ET useBlinking sont activés
+                            if (shouldHighlight && currentStep.useBlinking)
+                            {
+                                HighlightObject(obj, currentStep.useBlinking);
+                            }
+
+                            currentHighlightedObjects.Add(obj);
+
+                            // Ajouter un composant pour gérer le clic
+                            var clickHandler = obj.AddComponent<ProcedureStepClickHandler>();
+                            clickHandler.Initialize(this, currentStepIndex, obj);
+                        }
+                    }
+                    break;
+
+                case "zone":
+                    // Zone trigger mode - add ProcedureZoneTrigger to the zone object
+                    if (currentStep.zoneObject != null)
+                    {
+                        var zoneTrigger = currentStep.zoneObject.AddComponent<ProcedureZoneTrigger>();
+                        zoneTrigger.Initialize(this, currentStepIndex);
+
+                        // Optionally highlight the target object if present (visual cue only, no click handler)
+                        if (currentStep.targetObject != null && shouldHighlight && currentStep.useBlinking)
+                        {
+                            HighlightObject(currentStep.targetObject, currentStep.useBlinking);
+                            currentHighlightedObjects.Add(currentStep.targetObject);
                         }
 
-                        currentHighlightedObjects.Add(obj);
-
-                        // Ajouter un nouveau composant pour gérer le clic
-                        // (on vient de détruire tous les anciens handlers ci-dessus)
-                        var clickHandler = obj.AddComponent<ProcedureStepClickHandler>();
-                        clickHandler.Initialize(this, currentStepIndex, obj);
+                        Debug.Log($"[ProcedureDisplayer] Zone trigger mode - waiting for player to enter zone: {currentStep.zoneObjectName}");
                     }
+                    else
+                    {
+                        Debug.LogWarning($"[ProcedureDisplayer] Zone object not found: {currentStep.zoneObjectName}");
+                    }
+                    break;
 
-                    // NE PAS désactiver les autres objets car ils pourraient être nécessaires pour les étapes suivantes
-                    // Le système de ProcedureStepClickHandler s'occupe déjà de gérer les clics sur les bons objets
-                }
-            }
-            else
-            {
-                // Manual validation mode - no object highlighting or click handlers needed
-                Debug.Log("[ProcedureDisplayer] Manual validation mode - no object interaction required");
+                case "manual":
+                    // Manual validation mode - no object highlighting or click handlers needed
+                    Debug.Log("[ProcedureDisplayer] Manual validation mode - no object interaction required");
+                    break;
             }
         }
 
@@ -629,51 +666,54 @@ namespace WiseTwin.UI
 
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
 
-            // NEW: Check if manual validation is required
-            if (step.requireManualValidation)
+            switch (step.validationType)
             {
-                // Manual validation mode - just need to click the button
-                instructionLabel.text = lang == "fr"
-                    ? "Lisez les instructions et cliquez sur 'Valider l'étape' pour passer à la suite."
-                    : "Read the instructions and click 'Validate Step' to continue.";
-            }
-            else
-            {
-                // Original behavior - need to click on objects
-                bool hasFakeObjects = (step.fakeObjects != null && step.fakeObjects.Count > 0);
+                case "manual":
+                    instructionLabel.text = lang == "fr"
+                        ? "Lisez les instructions et cliquez sur 'Valider l'étape' pour passer à la suite."
+                        : "Read the instructions and click 'Validate Step' to continue.";
+                    break;
 
-                if (hasFakeObjects)
-                {
-                    // Il y a des fake objects - message d'avertissement
-                    if (shouldHighlight && step.useBlinking)
+                case "zone":
+                    instructionLabel.text = lang == "fr"
+                        ? "Dirigez-vous vers la zone indiquée pour valider l'étape."
+                        : "Walk to the indicated zone to validate the step.";
+                    break;
+
+                default: // "click"
+                    bool hasFakeObjects = (step.fakeObjects != null && step.fakeObjects.Count > 0);
+
+                    if (hasFakeObjects)
                     {
-                        instructionLabel.text = lang == "fr"
-                            ? "⚠️ Cliquez sur le bon objet. Attention, plusieurs objets clignotent, choisissez le bon !"
-                            : "⚠️ Click on the correct object. Beware, multiple objects are blinking, choose the right one!";
+                        if (shouldHighlight && step.useBlinking)
+                        {
+                            instructionLabel.text = lang == "fr"
+                                ? "⚠️ Cliquez sur le bon objet. Attention, plusieurs objets clignotent, choisissez le bon !"
+                                : "⚠️ Click on the correct object. Beware, multiple objects are blinking, choose the right one!";
+                        }
+                        else
+                        {
+                            instructionLabel.text = lang == "fr"
+                                ? "⚠️ Trouvez et cliquez sur le bon objet."
+                                : "⚠️ Find and click on the correct object.";
+                        }
                     }
                     else
                     {
-                        instructionLabel.text = lang == "fr"
-                            ? "⚠️ Trouvez et cliquez sur le bon objet."
-                            : "⚠️ Find and click on the correct object.";
+                        if (shouldHighlight && step.useBlinking)
+                        {
+                            instructionLabel.text = lang == "fr"
+                                ? "💡 Cliquez sur l'objet qui clignote pour valider l'étape."
+                                : "💡 Click on the blinking object to validate the step.";
+                        }
+                        else
+                        {
+                            instructionLabel.text = lang == "fr"
+                                ? "💡 Trouvez et cliquez sur l'objet demandé pour valider l'étape."
+                                : "💡 Find and click on the requested object to validate the step.";
+                        }
                     }
-                }
-                else
-                {
-                    // Pas de fake objects - instruction simple
-                    if (shouldHighlight && step.useBlinking)
-                    {
-                        instructionLabel.text = lang == "fr"
-                            ? "💡 Cliquez sur l'objet qui clignote pour valider l'étape."
-                            : "💡 Click on the blinking object to validate the step.";
-                    }
-                    else
-                    {
-                        instructionLabel.text = lang == "fr"
-                            ? "💡 Trouvez et cliquez sur l'objet demandé pour valider l'étape."
-                            : "💡 Find and click on the requested object to validate the step.";
-                    }
-                }
+                    break;
             }
         }
 
@@ -788,6 +828,9 @@ namespace WiseTwin.UI
             if (currentStepIndex >= steps.Count) return;
 
             var currentStep = steps[currentStepIndex];
+
+            // Guard: zone steps are validated via ProcedureZoneTrigger, not clicks
+            if (currentStep.validationType == "zone") return;
 
             // Vérifier si l'objet cliqué est le bon
             if (clickedObject != currentCorrectObject)
@@ -972,7 +1015,78 @@ namespace WiseTwin.UI
             StartCurrentStep();
         }
 
-        // NEW: Show step image
+        /// <summary>
+        /// Called by ProcedureZoneTrigger when the player enters the zone
+        /// </summary>
+        public void ValidateZoneStep()
+        {
+            if (currentStepIndex >= steps.Count) return;
+
+            var currentStep = steps[currentStepIndex];
+
+            // Guard: only process if this is a zone step
+            if (currentStep.validationType != "zone") return;
+
+            Debug.Log($"[ProcedureDisplayer] Zone step {currentStepIndex + 1} validated");
+
+            // Mark the step as completed
+            currentStep.completed = true;
+
+            // Calculate step duration
+            float stepDuration = Time.time - stepStartTime;
+
+            // Create step data for tracking (zone = 0 wrong clicks)
+            var stepData = new ProcedureStepData
+            {
+                stepNumber = currentStepIndex + 1,
+                stepKey = $"step_{currentStepIndex + 1}",
+                targetObjectId = currentStep.zoneObjectName,
+                completed = true,
+                duration = stepDuration,
+                wrongClicksOnThisStep = 0
+            };
+
+            // Add to completed steps
+            completedSteps.Add(stepData);
+
+            // Track in analytics
+            if (TrainingAnalytics.Instance != null)
+            {
+                TrainingAnalytics.Instance.AddProcedureStepData(stepData);
+            }
+
+            Debug.Log($"[ProcedureDisplayer] Zone step {stepData.stepNumber} completed - Duration: {stepDuration}s");
+
+            // Hide any feedback
+            if (errorFeedbackLabel != null)
+            {
+                errorFeedbackLabel.style.display = DisplayStyle.None;
+            }
+
+            // Proceed to the next step
+            currentStepIndex++;
+            StartCurrentStep();
+        }
+
+        /// <summary>
+        /// Clean up ProcedureZoneTrigger components from all steps
+        /// </summary>
+        void CleanupZoneTriggers()
+        {
+            foreach (var step in steps)
+            {
+                if (step.zoneObject != null)
+                {
+                    var zoneTrigger = step.zoneObject.GetComponent<ProcedureZoneTrigger>();
+                    if (zoneTrigger != null)
+                    {
+                        Destroy(zoneTrigger);
+                    }
+                }
+            }
+        }
+
+        // Show step image
         void ShowStepImage(string imagePath)
         {
             if (imageContainer == null || imageElement == null) return;
@@ -1268,6 +1382,12 @@ namespace WiseTwin.UI
                 }
             }
 
+            // Nettoyer les zone triggers
+            if (steps != null)
+            {
+                CleanupZoneTriggers();
+            }
+
             // Réinitialiser l'état
             currentStepIndex = 0;
             steps = null;
@@ -1290,6 +1410,13 @@ namespace WiseTwin.UI
                 {
                     foreach (var stepData in stepsList)
                     {
+                        // Determine validationType: use "validationType" field if present, fallback to "requireManualValidation" for backward compat
+                        string valType = ExtractString(stepData, "validationType");
+                        if (string.IsNullOrEmpty(valType))
+                        {
+                            valType = ExtractBool(stepData, "requireManualValidation", false) ? "manual" : "click";
+                        }
+
                         var step = new ProcedureStep
                         {
                             targetObjectName = ExtractString(stepData, "targetObjectName"),
@@ -1297,7 +1424,8 @@ namespace WiseTwin.UI
                             hint = ExtractLocalizedText(stepData, "hint", language),
                             highlightColor = ParseColor(ExtractString(stepData, "highlightColor"), Color.yellow),
                             useBlinking = ExtractBool(stepData, "useBlinking", true),
-                            requireManualValidation = ExtractBool(stepData, "requireManualValidation", false),
+                            validationType = valType,
+                            zoneObjectName = ExtractString(stepData, "zoneObjectName"),
                             imagePath = ExtractLocalizedText(stepData, "imagePath", language)
                         };
 
