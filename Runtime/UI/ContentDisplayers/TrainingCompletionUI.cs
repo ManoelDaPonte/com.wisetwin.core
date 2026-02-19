@@ -52,7 +52,14 @@ namespace WiseTwin.UI
             {
                 if (panelSettings != null)
                 {
-                    uiDocument.panelSettings = panelSettings;
+                    try
+                    {
+                        uiDocument.panelSettings = panelSettings;
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogWarning($"[TrainingCompletionUI] Could not assign PanelSettings: {e.Message}");
+                    }
                 }
                 else
                 {

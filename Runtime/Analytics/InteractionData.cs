@@ -224,6 +224,94 @@ namespace WiseTwin.Analytics
     }
 
     /// <summary>
+    /// Données spécifiques pour les dialogues interactifs (arbre de conversation)
+    /// Tracks chaque choix fait par l'apprenant pour analyse côté SaaS
+    /// </summary>
+    [Serializable]
+    public class DialogueInteractionData
+    {
+        public string dialogueKey;
+        public string objectId;
+        public int totalChoiceNodes;
+        public int correctChoices;
+        public int incorrectChoices;
+        public List<DialogueChoiceRecord> choiceHistory;
+        public bool completedDialogue;
+        public float finalScore;
+
+        public DialogueInteractionData()
+        {
+            choiceHistory = new List<DialogueChoiceRecord>();
+            totalChoiceNodes = 0;
+            correctChoices = 0;
+            incorrectChoices = 0;
+            completedDialogue = false;
+            finalScore = 0f;
+        }
+
+        public void RecordChoice(string choiceNodeId, string selectedChoiceId, bool wasCorrect, float timestamp)
+        {
+            choiceHistory.Add(new DialogueChoiceRecord
+            {
+                choiceNodeId = choiceNodeId,
+                selectedChoiceId = selectedChoiceId,
+                wasCorrect = wasCorrect,
+                timestamp = timestamp
+            });
+
+            if (wasCorrect)
+                correctChoices++;
+            else
+                incorrectChoices++;
+        }
+
+        public void Complete()
+        {
+            completedDialogue = true;
+            int totalChoices = correctChoices + incorrectChoices;
+            finalScore = totalChoices > 0 ? (float)correctChoices / totalChoices * 100f : 100f;
+        }
+
+        public Dictionary<string, object> ToDictionary()
+        {
+            return new Dictionary<string, object>
+            {
+                ["dialogueKey"] = dialogueKey,
+                ["objectId"] = objectId,
+                ["totalChoiceNodes"] = totalChoiceNodes,
+                ["correctChoices"] = correctChoices,
+                ["incorrectChoices"] = incorrectChoices,
+                ["choiceHistory"] = choiceHistory.ConvertAll(c => c.ToDictionary()),
+                ["completedDialogue"] = completedDialogue,
+                ["finalScore"] = finalScore
+            };
+        }
+    }
+
+    /// <summary>
+    /// Enregistrement d'un choix individuel dans un dialogue
+    /// </summary>
+    [Serializable]
+    public class DialogueChoiceRecord
+    {
+        public string choiceNodeId;
+        public string selectedChoiceId;
+        public bool wasCorrect;
+        public float timestamp;
+
+        public Dictionary<string, object> ToDictionary()
+        {
+            return new Dictionary<string, object>
+            {
+                ["choiceNodeId"] = choiceNodeId,
+                ["selectedChoiceId"] = selectedChoiceId,
+                ["wasCorrect"] = wasCorrect,
+                ["timestamp"] = timestamp
+            };
+        }
+    }
+
+    /// <summary>
     /// Données spécifiques pour l'affichage de texte
     /// Utilise des clés au lieu de texte pour permettre la jointure avec les métadonnées
     /// </summary>

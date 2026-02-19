@@ -96,10 +96,9 @@ namespace WiseTwin.UI
             textDisplayer.transform.SetParent(transform);
             contentDisplayers[ContentType.Text] = textDisplayer;
 
-            // TODO: Ajouter d'autres types d'afficheurs
-            // contentDisplayers[ContentType.Media] = new MediaDisplayer();
-            // contentDisplayers[ContentType.Dialogue] = new DialogueDisplayer();
-            // contentDisplayers[ContentType.Instruction] = new InstructionDisplayer();
+            var dialogueDisplayer = new GameObject("DialogueDisplayer").AddComponent<DialogueDisplayer>();
+            dialogueDisplayer.transform.SetParent(transform);
+            contentDisplayers[ContentType.Dialogue] = dialogueDisplayer;
 
             if (debugMode) Debug.Log($"[ContentDisplayManager] Initialized {contentDisplayers.Count} displayers");
         }
@@ -173,6 +172,9 @@ namespace WiseTwin.UI
                     break;
                 case "text":
                     contentType = ContentType.Text;
+                    break;
+                case "dialogue":
+                    contentType = ContentType.Dialogue;
                     break;
                 default:
                     Debug.LogError($"[ContentDisplayManager] Unknown scenario type: {scenario.type}");

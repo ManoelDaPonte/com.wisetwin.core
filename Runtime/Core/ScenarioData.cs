@@ -29,6 +29,9 @@ namespace WiseTwin
         [JsonProperty("text")]
         public JObject text;
 
+        [JsonProperty("dialogue")]
+        public JObject dialogue;
+
         /// <summary>
         /// Get content data based on scenario type
         /// </summary>
@@ -52,6 +55,8 @@ namespace WiseTwin
                     return procedure;
                 case "text":
                     return text;
+                case "dialogue":
+                    return dialogue;
                 default:
                     return null;
             }

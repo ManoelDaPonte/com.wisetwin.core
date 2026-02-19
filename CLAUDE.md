@@ -2,7 +2,7 @@
 
 ## Package Overview
 
-**WiseTwin Core** (`com.wisetwin.core`) is a Unity package for creating interactive training/learning experiences. It supports questions, step-by-step procedures, text content, video triggers, and multi-language (EN/FR). The package integrates with Azure for metadata loading in production and provides comprehensive analytics tracking.
+**WiseTwin Core** (`com.wisetwin.core`) is a Unity package for creating interactive training/learning experiences. It supports questions, step-by-step procedures, text content, interactive dialogues (branching conversation trees), video triggers, and multi-language (EN/FR). The package integrates with Azure for metadata loading in production and provides comprehensive analytics tracking.
 
 - **Unity Version**: 2021.3+
 - **Package Format**: Unity Package Manager (UPM)
@@ -36,7 +36,7 @@ MetadataLoader → loads at runtime (local or Azure)
                     ↓
 ContentDisplayManager → dispatches to displayers
                     ↓
-QuestionDisplayer / ProcedureDisplayer / TextDisplayer / VideoDisplayer
+QuestionDisplayer / ProcedureDisplayer / TextDisplayer / DialogueDisplayer / VideoDisplayer
                     ↓
 TrainingAnalytics → tracks all interactions → exports JSON
 ```
@@ -55,7 +55,8 @@ TrainingAnalytics → tracks all interactions → exports JSON
 ### Core Runtime (`Runtime/Core/`)
 - `WiseTwinManager.cs` - Main manager singleton, events: `OnMetadataReady`, `OnMetadataError`, `OnTrainingCompleted`
 - `MetadataLoader.cs` - Loads metadata from local/Azure, supports legacy + scenario formats
-- `ScenarioData.cs` - `ScenarioData` class (id, type, question/procedure/text JObjects), `TrainingSettings`
+- `ScenarioData.cs` - `ScenarioData` class (id, type, question/procedure/text/dialogue JObjects), `TrainingSettings`
+- `DialogueData.cs` - Runtime dialogue structures: `DialogueTreeData`, `DialogueNodeRuntime`, `DialogueChoiceRuntime` (parsed from JSON at runtime)
 - `LocalizationManager.cs` - Language singleton, `CurrentLanguage`, `OnLanguageChanged` event
 - `VideoTriggerData.cs` - Runtime data for video triggers, language-aware URL selection
 - `VideoTriggerManager.cs` - Sets up `VideoClickHandler` on target GameObjects
@@ -63,11 +64,11 @@ TrainingAnalytics → tracks all interactions → exports JSON
 
 ### Analytics (`Runtime/Analytics/`)
 - `TrainingAnalytics.cs` - Singleton, tracks interactions, procedure steps, exports JSON
-- `InteractionData.cs` - Data structures: `InteractionData`, `QuestionInteractionData`, `ProcedureInteractionData`, `ProcedureStepData`, `TextInteractionData`
+- `InteractionData.cs` - Data structures: `InteractionData`, `QuestionInteractionData`, `ProcedureInteractionData`, `ProcedureStepData`, `TextInteractionData`, `DialogueInteractionData`, `DialogueChoiceRecord`
 
 ### Data (`Runtime/Data/`)
 - `MetadataClasses.cs` - `FormationMetadataComplete`, `LocalizedString`, `ApiResponse`
-- `ContentTypes.cs` - Enums: `ContentType`, `QuestionType`, `MediaType`, `DifficultyLevel`, `ProgressState`
+- `ContentTypes.cs` - Enums: `ContentType` (Question, Procedure, Text, Dialogue), `QuestionType`, `MediaType`, `DifficultyLevel`, `ProgressState`
 - `TrainingAnalyticsData.cs` - Export data format
 
 ### UI Displayers (`Runtime/UI/ContentDisplayers/`)
@@ -75,6 +76,7 @@ TrainingAnalytics → tracks all interactions → exports JSON
 - `QuestionDisplayer.cs` - Question rendering with single/multiple choice, validation, feedback
 - `ProcedureDisplayer.cs` - Step-by-step procedure with 3 validation types (click, manual, zone)
 - `TextDisplayer.cs` - Simple text/information display
+- `DialogueDisplayer.cs` - Interactive branching dialogue with chat-bubble UI, evaluated/neutral choices, analytics
 - `VideoDisplayer.cs` - Fullscreen video player overlay
 - `TrainingCompletionUI.cs` - Training completion screen
 
@@ -98,15 +100,23 @@ TrainingAnalytics → tracks all interactions → exports JSON
 - `WiseTwinAuthManager.cs` - Authentication manager
 
 ### Editor (`Editor/`)
-- `WiseTwinEditor.cs` - Main editor window (Window > WiseTwin > WiseTwin Editor), 4 tabs
+- `WiseTwinEditor.cs` - Main editor window (Window > WiseTwin > WiseTwin Editor), 5 tabs
 - `WiseTwinEditorData.cs` - Editor data container
 - `WiseTwinEditorGeneralTab.cs` - General settings tab
 - `WiseTwinEditorMetadataTab.cs` - Metadata config tab
 - `WiseTwinEditorScenariosTab.cs` - Scenario editor + `ScenarioImportWindow`
+- `WiseTwinEditorDialogueTab.cs` - Dialogue management tab (create, edit, delete dialogues, open graph editor)
 - `WiseTwinEditorVideoTab.cs` - Video triggers tab
-- `ScenarioConfigurationData.cs` - Editor data classes: `ScenarioConfiguration`, `ProcedureStep`, `ValidationType` enum, `FakeObject`, etc.
+- `ScenarioConfigurationData.cs` - Editor data classes: `ScenarioConfiguration`, `DialogueScenarioData`, `ProcedureStep`, `ValidationType` enum, `FakeObject`, etc.
 - `ValidationZonePrefabCreator.cs` - Menu item to create validation zone prefab
 - `WiseTwinBuildProcessor.cs` - Auto-configures settings for WebGL builds
+
+### Editor - Dialogue Graph Editor (`Editor/DialogueEditor/`)
+- `DialogueGraphData.cs` - Editor data model: `DialogueGraphEditorData`, `DialogueNodeEditorData`, `DialogueChoiceEditorData`, `DialogueEdgeData`
+- `DialogueEditorWindow.cs` - EditorWindow with toolbar (add nodes, save). Access via `WiseTwin > Dialogue Graph Editor` or from Dialogue tab
+- `DialogueGraphView.cs` - GraphView canvas with zoom, pan (middle/right mouse), grid, minimap
+- `DialogueNodeView.cs` - Visual nodes (Start/Dialogue/Choice/End) with inline EN/FR text fields, dynamic choice ports
+- `DialogueGraphSerializer.cs` - Serialization: editor format (with positions) <-> runtime JSON format, custom `Vector2Converter` for Newtonsoft.Json
 
 ### Plugins
 - `Plugins/WebGL/WiseTwinWebGL.jslib` - JS interop (`NotifyFormationCompleted`, `GetUrlParameter`)
@@ -126,6 +136,26 @@ TrainingAnalytics → tracks all interactions → exports JSON
 | `question` | `QuestionDisplayer` | Single/multiple choice with feedback, hints, sequential questions |
 | `procedure` | `ProcedureDisplayer` | Ordered steps with 3D object interaction |
 | `text` | `TextDisplayer` | Information display with title + content |
+| `dialogue` | `DialogueDisplayer` | Branching conversation tree with NPC, evaluated or neutral choices |
+
+### Dialogue System
+
+Interactive branching conversations built with a visual node graph editor. Supports 4 node types:
+
+| Node | Input Ports | Output Ports | Content |
+|------|------------|-------------|---------|
+| **Start** | 0 | 1 | Entry point (1 per graph) |
+| **Dialogue** | 1 (Multi) | 1 | Speaker name EN/FR + text EN/FR |
+| **Choice** | 1 (Multi) | N (1 per option) | Prompt EN/FR + N options with text EN/FR + optional `isCorrect` flag |
+| **End** | 1 (Multi) | 0 | Exit point |
+
+**Evaluated vs Neutral choices:**
+- If at least one choice has `isCorrect = true` → **evaluated**: green/red feedback (800ms delay), tracked in analytics
+- If no choice has `isCorrect = true` → **neutral**: blue highlight (300ms), no correct/incorrect judgment
+
+**Context display:** When showing a Choice node, the previous Dialogue node's speaker and text are displayed above the choices in a quote-style box, so the user remembers the NPC's question.
+
+**Loops:** Supported naturally - a Dialogue node can point back to a previous Choice node (hub-and-spoke pattern).
 
 ### Procedure Validation Types
 
@@ -180,6 +210,11 @@ Zone validation uses `ProcedureZoneTrigger` component added at runtime to the zo
       "id": "scenario_3",
       "type": "text",
       "text": { ... }
+    },
+    {
+      "id": "scenario_4",
+      "type": "dialogue",
+      "dialogue": { ... }
     }
   ],
   "videoTriggers": [
@@ -276,6 +311,62 @@ Multiple questions in one scenario use `"questions": [...]` array instead of `"q
 }
 ```
 
+### Dialogue Scenario
+
+```json
+{
+  "id": "dialogue_1",
+  "type": "dialogue",
+  "dialogue": {
+    "title": { "en": "Safety Briefing", "fr": "Briefing sécurité" },
+    "startNodeId": "node_001",
+    "nodes": [
+      {
+        "id": "node_001",
+        "type": "start",
+        "nextNodeId": "node_002"
+      },
+      {
+        "id": "node_002",
+        "type": "dialogue",
+        "speaker": { "en": "Safety Officer", "fr": "Agent de sécurité" },
+        "text": { "en": "Are you ready?", "fr": "Êtes-vous prêt ?" },
+        "nextNodeId": "node_003"
+      },
+      {
+        "id": "node_003",
+        "type": "choice",
+        "text": { "en": "How do you respond?", "fr": "Comment répondez-vous ?" },
+        "choices": [
+          {
+            "id": "choice_a",
+            "text": { "en": "Yes, ready!", "fr": "Oui, prêt !" },
+            "isCorrect": true,
+            "nextNodeId": "node_004"
+          },
+          {
+            "id": "choice_b",
+            "text": { "en": "I don't care", "fr": "Je m'en fiche" },
+            "isCorrect": false,
+            "nextNodeId": "node_005"
+          }
+        ]
+      },
+      { "id": "node_004", "type": "end" },
+      {
+        "id": "node_005",
+        "type": "dialogue",
+        "speaker": { "en": "Safety Officer", "fr": "Agent de sécurité" },
+        "text": { "en": "Let me ask again...", "fr": "Laissez-moi reposer la question..." },
+        "nextNodeId": "node_003"
+      }
+    ]
+  }
+}
+```
+
+For **neutral choices** (no evaluation), omit `isCorrect` or set all choices to `false`.
+
 ---
 
 ## Public API
@@ -353,6 +444,8 @@ All text uses localized dictionaries: `{"en": "English text", "fr": "Texte fran�
 - Each retry increments `attempts` but preserves initial correctness state
 - Zone validation steps always report 0 wrong clicks
 - Procedure tracks per-step and total wrong clicks, duration, and perfect completion
+- Dialogue tracks every choice made (`choiceHistory`), including wrong answers, with timestamps and `wasCorrect` flags
+- Neutral dialogue choices (no `isCorrect` set) are recorded but don't affect the score
 
 ### Data Export Structure
 ```json
@@ -384,7 +477,17 @@ Accessed via `Window > WiseTwin > WiseTwin Editor` (or `WiseTwin > WiseTwin Edit
 1. **General Settings** - Title, description, version, difficulty, duration, tags, image URL
 2. **Metadata Config** - Local/Production mode, Azure API URL, container ID, build type
 3. **Scenario Configuration** - Add/edit/reorder scenarios, import from JSON
-4. **Video** - Add video triggers (drag GameObject + set URLs)
+4. **Dialogue** - Create/edit/delete dialogues, open visual graph editor
+5. **Video** - Add video triggers (drag GameObject + set URLs)
+
+### Dialogue Graph Editor
+Accessed via `WiseTwin > Dialogue Graph Editor` menu or "Open Graph Editor" button in Dialogue tab.
+
+- **Toolbar**: Colored buttons to add Start (green), Dialogue (blue), Choice (orange), End (red) nodes + Save button
+- **Canvas**: Zoom (scroll), pan (middle mouse or right mouse drag), grid background, minimap
+- **Nodes**: Inline editable fields for speaker, text, choices (EN/FR). Choice nodes support dynamic add/remove of options with correct toggle
+- **Save**: Converts graph to runtime JSON format stored in `DialogueScenarioData.graphDataJSON`
+- **Import**: Automatically imports runtime JSON format back into editor graph with auto-layout
 
 ### Bottom Actions
 - **Preview JSON** - Opens preview window with generated JSON
@@ -415,7 +518,8 @@ Accessed via `Window > WiseTwin > WiseTwin Editor` (or `WiseTwin > WiseTwin Edit
 ### Debug Logging
 All logs are prefixed with component name:
 - `[WiseTwinManager]`, `[MetadataLoader]`, `[TrainingAnalytics]`
-- `[ProcedureDisplayer]`, `[QuestionDisplayer]`, `[VideoDisplayer]`
+- `[ProcedureDisplayer]`, `[QuestionDisplayer]`, `[DialogueDisplayer]`, `[VideoDisplayer]`
+- `[DialogueEditor]`, `[DialogueGraphView]`, `[DialogueGraphSerializer]`
 - `[ProcedureZoneTrigger]`, `[VideoTriggerManager]`, `[VideoClickHandler]`
 
 ### Singleton Pattern

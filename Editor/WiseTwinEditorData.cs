@@ -42,6 +42,10 @@ namespace WiseTwin.Editor
         public int selectedScenarioIndex = -1;
         public int draggingScenarioIndex = -1; // For drag and drop reordering
 
+        // ============= DIALOGUES =============
+        public List<DialogueScenarioData> dialogues = new List<DialogueScenarioData>();
+        public int selectedDialogueIndex = -1;
+
         // ============= VIDEO TRIGGERS =============
         public List<VideoTriggerConfiguration> videoTriggers = new List<VideoTriggerConfiguration>();
         public int selectedVideoTriggerIndex = -1;
@@ -59,6 +63,7 @@ namespace WiseTwin.Editor
         public WiseTwinEditorData()
         {
             scenarios = new List<ScenarioConfiguration>();
+            dialogues = new List<DialogueScenarioData>();
             videoTriggers = new List<VideoTriggerConfiguration>();
             tags = new List<string> { "training", "interactive" };
         }

@@ -11,7 +11,8 @@ namespace WiseTwin
     {
         Question,    // Questions QCM, Vrai/Faux, etc.
         Procedure,   // Procédures séquentielles
-        Text         // Affichage de texte informatif
+        Text,        // Affichage de texte informatif
+        Dialogue     // Dialogue interactif avec PNJ (arbre de conversation)
     }
 
     /// <summary>

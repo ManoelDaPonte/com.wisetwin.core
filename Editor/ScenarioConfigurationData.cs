@@ -13,7 +13,8 @@ namespace WiseTwin.Editor
     {
         Question,
         Procedure,
-        Text
+        Text,
+        Dialogue
     }
 
     [Serializable]
@@ -39,12 +40,16 @@ namespace WiseTwin.Editor
         // Text data
         public TextScenarioData textData = new TextScenarioData();
 
+        // Dialogue data
+        public DialogueScenarioData dialogueData = new DialogueScenarioData();
+
         public ScenarioConfiguration()
         {
             // Initialize with one empty question by default
             questions = new List<QuestionScenarioData> { new QuestionScenarioData() };
             procedureData = new ProcedureScenarioData();
             textData = new TextScenarioData();
+            dialogueData = new DialogueScenarioData();
         }
     }
 
@@ -117,6 +122,16 @@ namespace WiseTwin.Editor
         public string titleFR = "";
         public string contentEN = "";
         public string contentFR = "";
+    }
+
+    [Serializable]
+    public class DialogueScenarioData
+    {
+        public string dialogueId = "";
+        public string titleEN = "";
+        public string titleFR = "";
+        // Serialized graph data JSON from the visual editor
+        public string graphDataJSON = "";
     }
 
     /// <summary>

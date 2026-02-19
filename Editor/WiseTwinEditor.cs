@@ -19,7 +19,7 @@ public class WiseTwinEditor : EditorWindow
 
     // UI State
     private int selectedTab = 0;
-    private string[] tabNames = { "General Settings", "Metadata Config", "Scenario Configuration", "Video" };
+    private string[] tabNames = { "General Settings", "Metadata Config", "Scenario Configuration", "Dialogue", "Video" };
     
     
     [MenuItem("WiseTwin/WiseTwin Editor")]
@@ -340,6 +340,11 @@ public class WiseTwinEditor : EditorWindow
                         if (scenarioDict.ContainsKey("text"))
                             LoadTextDataFromJSON(scenario.textData, scenarioDict["text"]);
                         break;
+
+                    case WiseTwin.Editor.ScenarioType.Dialogue:
+                        if (scenarioDict.ContainsKey("dialogue"))
+                            LoadDialogueDataFromJSON(scenario.dialogueData, scenarioDict["dialogue"]);
+                        break;
                 }
 
                 data.scenarios.Add(scenario);
@@ -585,6 +590,54 @@ public class WiseTwinEditor : EditorWindow
         }
     }
 
+    void LoadDialogueDataFromJSON(WiseTwin.Editor.DialogueScenarioData dialogue, object dialogueObj)
+    {
+        var jObject = Newtonsoft.Json.Linq.JObject.FromObject(dialogueObj);
+        var dialogueDict = jObject.ToObject<Dictionary<string, object>>();
+
+        // Load title
+        if (dialogueDict.ContainsKey("title"))
+        {
+            var titleDict = GetDictionary(dialogueDict["title"]);
+            dialogue.titleEN = GetString(titleDict, "en");
+            dialogue.titleFR = GetString(titleDict, "fr");
+        }
+
+        // Store the entire dialogue JSON for the graph editor
+        dialogue.graphDataJSON = jObject.ToString(Formatting.Indented);
+
+        // Generate a dialogue ID if not already set
+        if (string.IsNullOrEmpty(dialogue.dialogueId))
+        {
+            dialogue.dialogueId = $"dialogue_{data.dialogues.Count + 1}";
+        }
+
+        // Also add to the dialogues list if not already there
+        bool exists = false;
+        foreach (var d in data.dialogues)
+        {
+            if (d.dialogueId == dialogue.dialogueId)
+            {
+                exists = true;
+                // Update existing
+                d.titleEN = dialogue.titleEN;
+                d.titleFR = dialogue.titleFR;
+                d.graphDataJSON = dialogue.graphDataJSON;
+                break;
+            }
+        }
+        if (!exists)
+        {
+            data.dialogues.Add(new WiseTwin.Editor.DialogueScenarioData
+            {
+                dialogueId = dialogue.dialogueId,
+                titleEN = dialogue.titleEN,
+                titleFR = dialogue.titleFR,
+                graphDataJSON = dialogue.graphDataJSON
+            });
+        }
+    }
+
     // Helper methods for JSON parsing
     Dictionary<string, object> GetDictionary(object obj)
     {
@@ -689,6 +742,9 @@ public class WiseTwinEditor : EditorWindow
                 WiseTwin.Editor.WiseTwinEditorScenariosTab.Draw(data);
                 break;
             case 3:
+                WiseTwin.Editor.WiseTwinEditorDialogueTab.Draw(data);
+                break;
+            case 4:
                 WiseTwin.Editor.WiseTwinEditorVideoTab.Draw(data);
                 break;
         }
@@ -897,6 +953,10 @@ public class WiseTwinEditor : EditorWindow
                 case WiseTwin.Editor.ScenarioType.Text:
                     scenarioDict["text"] = ConvertTextDataToJSON(scenario.textData);
                     break;
+
+                case WiseTwin.Editor.ScenarioType.Dialogue:
+                    scenarioDict["dialogue"] = ConvertDialogueDataToJSON(scenario.dialogueData);
+                    break;
             }
 
             scenariosJSON.Add(scenarioDict);
@@ -1066,6 +1126,49 @@ public class WiseTwinEditor : EditorWindow
             {
                 ["en"] = text.contentEN,
                 ["fr"] = text.contentFR
+            }
+        };
+    }
+
+    Dictionary<string, object> ConvertDialogueDataToJSON(WiseTwin.Editor.DialogueScenarioData dialogue)
+    {
+        // If we have graph data JSON from the visual editor, parse and use it
+        if (!string.IsNullOrEmpty(dialogue.graphDataJSON))
+        {
+            try
+            {
+                var graphData = JsonConvert.DeserializeObject<Dictionary<string, object>>(dialogue.graphDataJSON);
+                if (graphData != null)
+                    return graphData;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[WiseTwinEditor] Failed to parse dialogue graph JSON: {e.Message}");
+            }
+        }
+
+        // Fallback: create a minimal dialogue structure
+        return new Dictionary<string, object>
+        {
+            ["title"] = new Dictionary<string, string>
+            {
+                ["en"] = dialogue.titleEN,
+                ["fr"] = dialogue.titleFR
+            },
+            ["startNodeId"] = "node_001",
+            ["nodes"] = new List<object>
+            {
+                new Dictionary<string, object>
+                {
+                    ["id"] = "node_001",
+                    ["type"] = "start",
+                    ["nextNodeId"] = "node_002"
+                },
+                new Dictionary<string, object>
+                {
+                    ["id"] = "node_002",
+                    ["type"] = "end"
+                }
             }
         };
     }

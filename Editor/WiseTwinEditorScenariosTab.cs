@@ -15,7 +15,7 @@ namespace WiseTwin.Editor
         public static void Draw(WiseTwinEditorData data)
         {
             EditorGUILayout.LabelField("🎬 Scenario Configuration", EditorStyles.largeLabel);
-            EditorGUILayout.HelpBox("Configure your training scenarios visually. Choose type (Question/Procedure/Text), configure parameters, and export to metadata.json.", MessageType.Info);
+            EditorGUILayout.HelpBox("Configure your training scenarios visually. Choose type (Question/Procedure/Text/Dialogue), configure parameters, and export to metadata.json.", MessageType.Info);
             EditorGUILayout.Space();
 
             // Add scenario button
@@ -143,6 +143,9 @@ namespace WiseTwin.Editor
                     break;
                 case ScenarioType.Text:
                     DrawTextEditor(scenario.textData);
+                    break;
+                case ScenarioType.Dialogue:
+                    DrawDialogueEditor(scenario.dialogueData, data);
                     break;
             }
         }
@@ -515,6 +518,83 @@ namespace WiseTwin.Editor
             EditorGUILayout.Space();
         }
 
+        private static void DrawDialogueEditor(DialogueScenarioData dialogue, WiseTwinEditorData data)
+        {
+            EditorGUILayout.LabelField("Dialogue Configuration", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Configure a branching dialogue tree. Use the Dialogue tab to create/edit dialogues in the visual graph editor.", MessageType.Info);
+
+            EditorGUILayout.Space();
+
+            // Select existing dialogue or create inline
+            if (data.dialogues.Count > 0)
+            {
+                // Build dropdown options
+                string[] dialogueOptions = new string[data.dialogues.Count + 1];
+                dialogueOptions[0] = "(None - configure inline)";
+                int currentSelection = 0;
+
+                for (int i = 0; i < data.dialogues.Count; i++)
+                {
+                    var d = data.dialogues[i];
+                    string title = !string.IsNullOrEmpty(d.titleEN) ? d.titleEN : d.dialogueId;
+                    dialogueOptions[i + 1] = $"{d.dialogueId} - {title}";
+
+                    if (d.dialogueId == dialogue.dialogueId)
+                        currentSelection = i + 1;
+                }
+
+                int newSelection = EditorGUILayout.Popup("Link to Dialogue", currentSelection, dialogueOptions);
+                if (newSelection != currentSelection)
+                {
+                    if (newSelection == 0)
+                    {
+                        dialogue.dialogueId = "";
+                        dialogue.graphDataJSON = "";
+                    }
+                    else
+                    {
+                        var selected = data.dialogues[newSelection - 1];
+                        dialogue.dialogueId = selected.dialogueId;
+                        dialogue.titleEN = selected.titleEN;
+                        dialogue.titleFR = selected.titleFR;
+                        dialogue.graphDataJSON = selected.graphDataJSON;
+                    }
+                }
+            }
+
+            EditorGUILayout.Space();
+
+            // Title
+            EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
+            dialogue.titleEN = EditorGUILayout.TextField("  EN", dialogue.titleEN);
+            dialogue.titleFR = EditorGUILayout.TextField("  FR", dialogue.titleFR);
+
+            EditorGUILayout.Space();
+
+            // Dialogue ID
+            dialogue.dialogueId = EditorGUILayout.TextField("Dialogue ID", dialogue.dialogueId);
+
+            EditorGUILayout.Space();
+
+            // Open graph editor button
+            GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
+            if (GUILayout.Button("Open Graph Editor", GUILayout.Height(30)))
+            {
+                WiseTwin.Editor.DialogueEditor.DialogueEditorWindow.OpenWithDialogue(dialogue);
+            }
+            GUI.backgroundColor = Color.white;
+
+            // Show status
+            if (!string.IsNullOrEmpty(dialogue.graphDataJSON))
+            {
+                EditorGUILayout.HelpBox("Graph data is configured. Open the Graph Editor to modify.", MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("No graph data yet. Open the Graph Editor to create a dialogue tree.", MessageType.Warning);
+            }
+        }
+
         private static void DrawTextEditor(TextScenarioData text)
         {
             EditorGUILayout.LabelField("Text/Information Configuration", EditorStyles.boldLabel);
@@ -691,6 +771,15 @@ namespace WiseTwin.Editor
                                 if (scenarioDict.ContainsKey("text"))
                                 {
                                     LoadTextDataFromJSON(scenario.textData, scenarioDict["text"]);
+                                    targetData.scenarios.Add(scenario);
+                                    importedCount++;
+                                }
+                                break;
+
+                            case ScenarioType.Dialogue:
+                                if (scenarioDict.ContainsKey("dialogue"))
+                                {
+                                    LoadDialogueDataFromJSON(scenario.dialogueData, scenarioDict["dialogue"]);
                                     targetData.scenarios.Add(scenario);
                                     importedCount++;
                                 }
@@ -952,6 +1041,29 @@ namespace WiseTwin.Editor
                 var contentDict = GetDictionary(textDict["content"]);
                 text.contentEN = GetString(contentDict, "en");
                 text.contentFR = GetString(contentDict, "fr");
+            }
+        }
+
+        private void LoadDialogueDataFromJSON(DialogueScenarioData dialogue, object dialogueObj)
+        {
+            var jObject = Newtonsoft.Json.Linq.JObject.FromObject(dialogueObj);
+            var dialogueDict = jObject.ToObject<Dictionary<string, object>>();
+
+            // Load title
+            if (dialogueDict.ContainsKey("title"))
+            {
+                var titleDict = GetDictionary(dialogueDict["title"]);
+                dialogue.titleEN = GetString(titleDict, "en");
+                dialogue.titleFR = GetString(titleDict, "fr");
+            }
+
+            // Store the entire dialogue JSON for the graph editor
+            dialogue.graphDataJSON = jObject.ToString(Newtonsoft.Json.Formatting.Indented);
+
+            // Generate a dialogue ID if not already set
+            if (string.IsNullOrEmpty(dialogue.dialogueId))
+            {
+                dialogue.dialogueId = $"dialogue_{targetData.dialogues.Count + 1}";
             }
         }
 
