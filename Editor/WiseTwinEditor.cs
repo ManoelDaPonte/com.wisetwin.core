@@ -30,6 +30,9 @@ public class WiseTwinEditor : EditorWindow
         window.Show();
     }
     
+    // Static callback for graph editor to trigger dialogue persistence
+    public static System.Action OnRequestDialogueSave;
+
     void OnEnable()
     {
         // Initialize data container
@@ -37,7 +40,11 @@ public class WiseTwinEditor : EditorWindow
 
         settingsFilePath = Path.Combine(Application.persistentDataPath, "WiseTwinSettings.json");
         LoadSettings();
+        LoadDialogueData();
         InitializeSceneId();
+
+        // Register callback for graph editor saves
+        OnRequestDialogueSave = SaveDialogueData;
 
         // Synchroniser automatiquement avec WiseTwinManager au chargement
         EditorApplication.delayCall += () =>
@@ -45,9 +52,10 @@ public class WiseTwinEditor : EditorWindow
             SyncWithSceneManager();
         };
         LoadExistingJSONContent();
+        MergeDialogueDataFromMetadata();
         InitializeUnityContent();
     }
-    
+
     void LoadSettings()
     {
         if (File.Exists(settingsFilePath))
@@ -93,6 +101,89 @@ public class WiseTwinEditor : EditorWindow
         catch (System.Exception e)
         {
             Debug.LogError($"[WiseTwin] Could not save settings: {e.Message}");
+        }
+    }
+
+    string dialogueDataFilePath => Path.Combine(Application.persistentDataPath, "WiseTwinDialogues.json");
+
+    void SaveDialogueData()
+    {
+        try
+        {
+            var dialoguesList = new List<Dictionary<string, string>>();
+            foreach (var d in data.dialogues)
+            {
+                dialoguesList.Add(new Dictionary<string, string>
+                {
+                    ["dialogueId"] = d.dialogueId ?? "",
+                    ["titleEN"] = d.titleEN ?? "",
+                    ["titleFR"] = d.titleFR ?? "",
+                    ["graphDataJSON"] = d.graphDataJSON ?? ""
+                });
+            }
+            string json = JsonConvert.SerializeObject(dialoguesList, Formatting.Indented);
+            File.WriteAllText(dialogueDataFilePath, json);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[WiseTwin] Could not save dialogue data: {e.Message}");
+        }
+    }
+
+    void LoadDialogueData()
+    {
+        if (!File.Exists(dialogueDataFilePath)) return;
+
+        try
+        {
+            string json = File.ReadAllText(dialogueDataFilePath);
+            var dialoguesList = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(json);
+            if (dialoguesList == null) return;
+
+            foreach (var dict in dialoguesList)
+            {
+                var dialogue = new WiseTwin.Editor.DialogueScenarioData
+                {
+                    dialogueId = dict.ContainsKey("dialogueId") ? dict["dialogueId"] : "",
+                    titleEN = dict.ContainsKey("titleEN") ? dict["titleEN"] : "",
+                    titleFR = dict.ContainsKey("titleFR") ? dict["titleFR"] : "",
+                    graphDataJSON = dict.ContainsKey("graphDataJSON") ? dict["graphDataJSON"] : ""
+                };
+                data.dialogues.Add(dialogue);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[WiseTwin] Could not load dialogue data: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// After loading metadata JSON, merge any dialogue data from scenarios
+    /// into the existing dialogues list (loaded from persistent file).
+    /// </summary>
+    void MergeDialogueDataFromMetadata()
+    {
+        // Build lookup of existing dialogues by ID
+        var existing = new HashSet<string>();
+        foreach (var d in data.dialogues)
+        {
+            if (!string.IsNullOrEmpty(d.dialogueId))
+                existing.Add(d.dialogueId);
+        }
+
+        // Check scenarios for dialogue type that might have loaded from metadata
+        // and add any missing dialogues
+        foreach (var scenario in data.scenarios)
+        {
+            if (scenario.type == WiseTwin.Editor.ScenarioType.Dialogue &&
+                scenario.dialogueData != null &&
+                !string.IsNullOrEmpty(scenario.dialogueData.dialogueId) &&
+                !existing.Contains(scenario.dialogueData.dialogueId))
+            {
+                data.dialogues.Add(scenario.dialogueData);
+                existing.Add(scenario.dialogueData.dialogueId);
+            }
         }
     }
     
@@ -1422,6 +1513,9 @@ public class WiseTwinEditor : EditorWindow
     void OnDisable()
     {
         SaveSettings();
+        SaveDialogueData();
+        if (OnRequestDialogueSave == SaveDialogueData)
+            OnRequestDialogueSave = null;
     }
 }
 

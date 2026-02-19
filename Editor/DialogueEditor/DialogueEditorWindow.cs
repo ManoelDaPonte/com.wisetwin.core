@@ -236,6 +236,9 @@ namespace WiseTwin.Editor.DialogueEditor
             // Runtime conversion happens only at metadata export time
             currentDialogue.graphDataJSON = DialogueGraphSerializer.SerializeEditorData(graphData);
 
+            // Persist to disk so data survives domain reloads
+            WiseTwinEditor.OnRequestDialogueSave?.Invoke();
+
             isDirty = false;
 
             Debug.Log($"[DialogueEditor] Saved dialogue graph: {currentDialogue.dialogueId}");

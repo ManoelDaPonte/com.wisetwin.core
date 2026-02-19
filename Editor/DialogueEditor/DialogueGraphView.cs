@@ -144,8 +144,11 @@ namespace WiseTwin.Editor.DialogueEditor
         /// </summary>
         public void LoadGraph(DialogueGraphEditorData graphData)
         {
-            // Clear existing
-            DeleteElements(graphElements.ToList());
+            // Clear existing - collect edges and nodes separately for reliable deletion
+            var elementsToDelete = new List<GraphElement>();
+            edges.ForEach(e => elementsToDelete.Add(e));
+            nodes.ForEach(n => elementsToDelete.Add(n));
+            DeleteElements(elementsToDelete);
             nodeCounter = 0;
 
             if (graphData == null) return;
@@ -209,37 +212,34 @@ namespace WiseTwin.Editor.DialogueEditor
         {
             var graphData = new DialogueGraphEditorData();
 
-            // Save nodes
-            foreach (var element in graphElements)
+            // Save nodes - use nodes property for reliable enumeration
+            nodes.ForEach(node =>
             {
-                if (element is DialogueNodeView nodeView)
+                if (node is DialogueNodeView nodeView)
                 {
                     var nodeData = nodeView.SaveData();
                     nodeData.position = nodeView.GetPosition().position;
                     graphData.nodes.Add(nodeData);
                 }
-            }
+            });
 
-            // Save edges
-            foreach (var element in graphElements)
+            // Save edges - use edges property (graphElements may not include edges in all Unity versions)
+            edges.ForEach(edge =>
             {
-                if (element is Edge edge)
-                {
-                    var fromNode = edge.output?.node as DialogueNodeView;
-                    var toNode = edge.input?.node as DialogueNodeView;
+                var fromNode = edge.output?.node as DialogueNodeView;
+                var toNode = edge.input?.node as DialogueNodeView;
 
-                    if (fromNode != null && toNode != null)
+                if (fromNode != null && toNode != null)
+                {
+                    graphData.edges.Add(new DialogueEdgeData
                     {
-                        graphData.edges.Add(new DialogueEdgeData
-                        {
-                            fromNodeId = fromNode.NodeId,
-                            fromPortName = edge.output.portName,
-                            toNodeId = toNode.NodeId,
-                            toPortName = "input"
-                        });
-                    }
+                        fromNodeId = fromNode.NodeId,
+                        fromPortName = edge.output.portName,
+                        toNodeId = toNode.NodeId,
+                        toPortName = "input"
+                    });
                 }
-            }
+            });
 
             return graphData;
         }
@@ -257,12 +257,13 @@ namespace WiseTwin.Editor.DialogueEditor
         /// </summary>
         public bool HasStartNode()
         {
-            foreach (var element in graphElements)
+            bool found = false;
+            nodes.ForEach(node =>
             {
-                if (element is DialogueNodeView nodeView && nodeView.NodeType == "start")
-                    return true;
-            }
-            return false;
+                if (node is DialogueNodeView nodeView && nodeView.NodeType == "start")
+                    found = true;
+            });
+            return found;
         }
     }
 }

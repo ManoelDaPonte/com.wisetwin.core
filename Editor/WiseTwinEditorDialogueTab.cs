@@ -29,6 +29,7 @@ namespace WiseTwin.Editor
                 };
                 data.dialogues.Add(newDialogue);
                 data.selectedDialogueIndex = data.dialogues.Count - 1;
+                WiseTwinEditor.OnRequestDialogueSave?.Invoke();
             }
 
             EditorGUILayout.Space();
@@ -76,6 +77,7 @@ namespace WiseTwin.Editor
                         data.dialogues.RemoveAt(i);
                         if (data.selectedDialogueIndex >= data.dialogues.Count)
                             data.selectedDialogueIndex = data.dialogues.Count - 1;
+                        WiseTwinEditor.OnRequestDialogueSave?.Invoke();
                     }
                 }
                 GUI.backgroundColor = Color.white;
@@ -98,12 +100,17 @@ namespace WiseTwin.Editor
             EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 1), Color.gray);
             EditorGUILayout.Space();
 
+            EditorGUI.BeginChangeCheck();
             dialogue.dialogueId = EditorGUILayout.TextField("Dialogue ID", dialogue.dialogueId);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
             dialogue.titleEN = EditorGUILayout.TextField("  EN", dialogue.titleEN);
             dialogue.titleFR = EditorGUILayout.TextField("  FR", dialogue.titleFR);
+            if (EditorGUI.EndChangeCheck())
+            {
+                WiseTwinEditor.OnRequestDialogueSave?.Invoke();
+            }
 
             EditorGUILayout.Space();
 

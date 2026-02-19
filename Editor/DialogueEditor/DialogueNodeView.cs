@@ -141,11 +141,6 @@ namespace WiseTwin.Editor.DialogueEditor
             var port = InstantiatePort(Orientation.Horizontal, Direction.Input, Port.Capacity.Multi, typeof(bool));
             port.portName = portName;
             port.portColor = new Color(0.7f, 0.9f, 1f, 1f);
-
-            var portLabel = port.Q<Label>();
-            if (portLabel != null)
-                portLabel.text = label;
-
             inputContainer.Add(port);
             return port;
         }
@@ -155,11 +150,6 @@ namespace WiseTwin.Editor.DialogueEditor
             var port = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Single, typeof(bool));
             port.portName = portName;
             port.portColor = new Color(1f, 0.9f, 0.7f, 1f);
-
-            var portLabel = port.Q<Label>();
-            if (portLabel != null)
-                portLabel.text = label;
-
             outputContainer.Add(port);
             return port;
         }
@@ -375,13 +365,8 @@ namespace WiseTwin.Editor.DialogueEditor
             port.portName = portName;
             port.portColor = choice.isCorrect ? new Color(0.3f, 0.9f, 0.4f, 1f) : new Color(1f, 0.5f, 0.3f, 1f);
 
-            var portLabel = port.Q<Label>();
-            if (portLabel != null)
-            {
-                string label = !string.IsNullOrEmpty(choice.textEN) ? choice.textEN : portName;
-                if (label.Length > 20) label = label.Substring(0, 17) + "...";
-                portLabel.text = label;
-            }
+            // Note: do NOT override port.Q<Label>().text - it breaks port.portName
+            // which is needed for edge save/load. The portName IS the display text.
 
             // Update port color when correct toggle changes
             correctToggle.RegisterValueChangedCallback(evt =>
