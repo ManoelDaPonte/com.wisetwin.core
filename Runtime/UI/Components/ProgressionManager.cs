@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 using System.Collections.Generic;
 using System;
 using WiseTwin.UI;
@@ -33,6 +34,7 @@ namespace WiseTwin
         // References
         private MetadataLoader metadataLoader;
         private ContentDisplayManager contentDisplayManager;
+        private ScenarioTransitionPanel transitionPanel;
 
         // Singleton
         public static ProgressionManager Instance { get; private set; }
@@ -119,6 +121,11 @@ namespace WiseTwin
             {
                 metadataLoader.OnMetadataLoaded -= OnMetadataLoaded;
             }
+
+            if (transitionPanel != null)
+            {
+                transitionPanel.OnActionButtonClicked -= OnTransitionPanelClicked;
+            }
         }
 
         void OnMetadataLoaded(Dictionary<string, object> metadata)
@@ -148,6 +155,9 @@ namespace WiseTwin
                 TrainingHUD.Instance.InitializeForScenarios();
             }
 
+            // Créer le panneau de transition
+            EnsureTransitionPanel();
+
             // Start progression if auto-start is enabled
             if (autoStartFirstScenario)
             {
@@ -155,8 +165,8 @@ namespace WiseTwin
             }
             else
             {
-                // If not auto-starting, user needs to click button to begin
-                if (debugMode) Debug.Log("[ProgressionManager] Waiting for user to click Next Scenario button");
+                // Le démarrage initial est géré par LanguageSelectionUI → Tutorial → TrainingHUD
+                if (debugMode) Debug.Log("[ProgressionManager] Waiting for user to start via existing UI flow");
             }
         }
 
@@ -188,7 +198,11 @@ namespace WiseTwin
                 TrainingHUD.Instance.UpdateProgress(0);
             }
 
-            // Start first scenario
+            // Créer le panneau de transition (pour les transitions entre scénarios)
+            EnsureTransitionPanel();
+
+            // Lancer le premier scénario directement
+            // Le démarrage initial est géré par le flow existant (langue → infos → tuto)
             MoveToNextScenario();
         }
 
@@ -306,10 +320,18 @@ namespace WiseTwin
             }
             else
             {
-                // Notify TrainingHUD to enable next button
+                // Incrémenter la progression dans le HUD
                 if (TrainingHUD.Instance != null)
                 {
                     TrainingHUD.Instance.OnScenarioCompleted();
+                    TrainingHUD.Instance.SetNextButtonVisible(false);
+                }
+
+                // Afficher le panneau de transition
+                if (transitionPanel != null)
+                {
+                    transitionPanel.ShowTransitionPanel(currentScenarioIndex, scenarios.Count);
+                    if (debugMode) Debug.Log($"[ProgressionManager] Showing transition panel: scenario {currentScenarioIndex + 1}/{scenarios.Count}");
                 }
             }
         }
@@ -369,6 +391,57 @@ namespace WiseTwin
             if (debugMode) Debug.Log("[ProgressionManager] Resetting progression");
             StartProgression();
         }
+
+        #region Transition Panel
+
+        /// <summary>
+        /// Crée le panneau de transition s'il n'existe pas encore
+        /// </summary>
+        void EnsureTransitionPanel()
+        {
+            if (transitionPanel != null) return;
+
+            // Vérifier s'il existe déjà dans la scène
+            transitionPanel = ScenarioTransitionPanel.Instance;
+            if (transitionPanel != null)
+            {
+                transitionPanel.OnActionButtonClicked += OnTransitionPanelClicked;
+                return;
+            }
+
+            // Créer le GameObject avec UIDocument
+            var panelGO = new GameObject("ScenarioTransitionPanel");
+            transitionPanel = panelGO.AddComponent<ScenarioTransitionPanel>();
+
+            // Assigner le PanelSettings depuis le TrainingHUD s'il existe
+            var hudDoc = TrainingHUD.Instance?.GetComponent<UIDocument>();
+            if (hudDoc != null && hudDoc.panelSettings != null)
+            {
+                transitionPanel.SetPanelSettings(hudDoc.panelSettings);
+                if (debugMode) Debug.Log("[ProgressionManager] PanelSettings assigned to ScenarioTransitionPanel from TrainingHUD");
+            }
+
+            transitionPanel.OnActionButtonClicked += OnTransitionPanelClicked;
+
+            if (debugMode) Debug.Log("[ProgressionManager] ScenarioTransitionPanel created");
+        }
+
+        /// <summary>
+        /// Appelé quand l'utilisateur clique sur le bouton du panneau de transition
+        /// </summary>
+        void OnTransitionPanelClicked()
+        {
+            if (transitionPanel != null)
+            {
+                transitionPanel.Hide();
+            }
+
+            if (debugMode) Debug.Log("[ProgressionManager] Transition panel clicked - moving to next scenario");
+
+            MoveToNextScenario();
+        }
+
+        #endregion
 
         #region Editor Helpers
 

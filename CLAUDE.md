@@ -85,12 +85,14 @@ TrainingAnalytics → tracks all interactions → exports JSON
 - `TrainingHUD.cs` - HUD overlay (timer, progress bar)
 - `LanguageSelectionUI.cs` - Language picker
 - `TutorialUI.cs` - Tutorial display
+- `ScenarioTransitionPanel.cs` - Centered transition panel between scenarios (title, subtitle, action button, fade animations)
 
 ### UI Components (`Runtime/UI/Components/`)
 - `ProcedureStepClickHandler.cs` - Temporary component for click-based step validation (raycast + hover feedback)
 - `ProcedureZoneTrigger.cs` - Temporary component for zone-based step validation (OnTriggerEnter with CharacterController)
 - `VideoClickHandler.cs` - Click detection for video-enabled 3D objects
 - `ProgressionManager.cs` - Scenario progression tracking
+- `ZoneCollectEffect.cs` - Visual collect animation (flash → implode → deactivate) on zone validation
 
 ### Camera (`Runtime/Camera/`)
 - `FirstPersonCharacter.cs` - First-person character controller
@@ -167,7 +169,7 @@ Each procedure step has a `validationType`:
 | `manual` | Player clicks "Validate Step" button | `ValidationType.Manual` |
 | `zone` | Player walks into a trigger zone (CharacterController) | `ValidationType.Zone` |
 
-Zone validation uses `ProcedureZoneTrigger` component added at runtime to the zone GameObject. The zone object must have a Collider set to `isTrigger`. Use menu `WiseTwin > Create Validation Zone Prefab` to generate a prefab with:
+Zone validation uses `ProcedureZoneTrigger` component added at runtime to the zone GameObject. When validated, `ZoneCollectEffect.Play()` triggers a 3-phase animation (white flash → cubic ease-in implosion → deactivate). The zone auto-reactivates if the step is replayed. The zone object must have a Collider set to `isTrigger`. Use menu `WiseTwin > Create Validation Zone Prefab` to generate a prefab with:
 - **SphereCollider** (isTrigger, radius 1.5m, centered at Y=1)
 - **GroundDisc** - Flat transparent green cylinder (URP/Built-in compatible)
 - **GlowRing** - LineRenderer drawing a 64-segment glowing green circle on the perimeter (additive material)

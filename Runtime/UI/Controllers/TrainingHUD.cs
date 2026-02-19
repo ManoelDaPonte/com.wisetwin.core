@@ -523,6 +523,23 @@ namespace WiseTwin
         }
 
         /// <summary>
+        /// Affiche ou cache le bouton next scenario. Stoppe le pulse quand on cache.
+        /// </summary>
+        public void SetNextButtonVisible(bool visible)
+        {
+            if (nextScenarioButton == null) return;
+
+            nextScenarioButton.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (!visible)
+            {
+                StopPulseEffect();
+            }
+
+            if (debugMode) Debug.Log($"[TrainingHUD] Next button visible: {visible}");
+        }
+
+        /// <summary>
         /// Called when all scenarios are completed - hides the next button
         /// </summary>
         public void OnAllScenariosCompleted()

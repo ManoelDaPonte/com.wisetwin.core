@@ -2,6 +2,28 @@
 
 All notable changes to the WiseTwin Core Package will be documented in this file.
 
+## [1.3.0] - 2026-02-19
+
+### Added
+- **Zone Collect Effect** - Visual feedback when the player enters a validation zone during a procedure
+  - `ZoneCollectEffect.cs` plays a 3-phase animation: white flash (0.15s) → cubic ease-in implosion to zero scale (0.35s) → deactivation
+  - Affects all child Renderers (emission + base color) and ParticleSystems (startColor)
+  - Static `ZoneCollectEffect.Play(GameObject)` convenience method
+  - Zone auto-reactivates when the procedure step is replayed (reset support)
+- **Scenario Transition Panel** - Prominent centered UI panel shown between scenarios
+  - `ScenarioTransitionPanel.cs` singleton with full-screen dark backdrop and centered panel (500px, accent border)
+  - Shows completed scenario count ("Scenario X/Y Complete") and "Continue" button
+  - Fade in/out animations (0.3s)
+  - Blocks player controls while visible via `FirstPersonCharacter.SetControlsEnabled()`
+  - Full EN/FR localization
+- **TrainingHUD.SetNextButtonVisible()** - New method to show/hide the next scenario button programmatically
+
+### Changed
+- `ProcedureZoneTrigger.cs` - Triggers `ZoneCollectEffect.Play()` after zone step validation
+- `ProcedureDisplayer.cs` - Cleans up `ZoneCollectEffect` components in `CleanupZoneTriggers()`; re-enables and resets zone scale in `StartCurrentStep()` if deactivated by a previous collect effect
+- `ProgressionManager.cs` - Creates `ScenarioTransitionPanel` between scenarios instead of relying on the small HUD ">" button; hides HUD next button during transitions; existing start flow (language → tutorial) unchanged
+- `TrainingHUD.cs` - Added `SetNextButtonVisible(bool)` that hides/shows button and stops pulse animation
+
 ## [1.2.0] - 2026-02-19
 
 ### Added

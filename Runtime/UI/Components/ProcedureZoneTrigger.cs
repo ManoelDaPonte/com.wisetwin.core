@@ -36,6 +36,9 @@ namespace WiseTwin
 
                 // Validate the zone step
                 procedureDisplayer.ValidateZoneStep();
+
+                // Jouer l'effet de collecte
+                ZoneCollectEffect.Play(gameObject);
             }
         }
 

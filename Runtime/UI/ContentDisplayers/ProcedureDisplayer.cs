@@ -633,6 +633,13 @@ namespace WiseTwin.UI
                     // Zone trigger mode - add ProcedureZoneTrigger to the zone object
                     if (currentStep.zoneObject != null)
                     {
+                        // Réactiver la zone si elle a été désactivée par un effet de collecte précédent
+                        if (!currentStep.zoneObject.activeSelf)
+                        {
+                            currentStep.zoneObject.SetActive(true);
+                            currentStep.zoneObject.transform.localScale = Vector3.one;
+                        }
+
                         var zoneTrigger = currentStep.zoneObject.AddComponent<ProcedureZoneTrigger>();
                         zoneTrigger.Initialize(this, currentStepIndex);
 
@@ -1081,6 +1088,13 @@ namespace WiseTwin.UI
                     if (zoneTrigger != null)
                     {
                         Destroy(zoneTrigger);
+                    }
+
+                    // Détruire l'effet de collecte s'il est en cours
+                    var collectEffect = step.zoneObject.GetComponent<ZoneCollectEffect>();
+                    if (collectEffect != null)
+                    {
+                        Destroy(collectEffect);
                     }
                 }
             }
