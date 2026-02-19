@@ -1132,14 +1132,23 @@ public class WiseTwinEditor : EditorWindow
 
     Dictionary<string, object> ConvertDialogueDataToJSON(WiseTwin.Editor.DialogueScenarioData dialogue)
     {
-        // If we have graph data JSON from the visual editor, parse and use it
         if (!string.IsNullOrEmpty(dialogue.graphDataJSON))
         {
             try
             {
-                var graphData = JsonConvert.DeserializeObject<Dictionary<string, object>>(dialogue.graphDataJSON);
-                if (graphData != null)
-                    return graphData;
+                // Try to parse as editor format first (has "nodes" with "position" fields and "edges" array)
+                var editorData = WiseTwin.Editor.DialogueEditor.DialogueGraphSerializer.DeserializeEditorData(dialogue.graphDataJSON);
+                if (editorData != null && editorData.nodes.Count > 0)
+                {
+                    // Convert editor format to runtime format for metadata export
+                    return WiseTwin.Editor.DialogueEditor.DialogueGraphSerializer.ConvertToRuntimeFormat(
+                        editorData, dialogue.titleEN, dialogue.titleFR);
+                }
+
+                // Fallback: try as raw runtime format (backward compatibility)
+                var rawData = JsonConvert.DeserializeObject<Dictionary<string, object>>(dialogue.graphDataJSON);
+                if (rawData != null && rawData.ContainsKey("startNodeId"))
+                    return rawData;
             }
             catch (System.Exception e)
             {

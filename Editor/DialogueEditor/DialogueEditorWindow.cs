@@ -232,15 +232,9 @@ namespace WiseTwin.Editor.DialogueEditor
 
             var graphData = graphView.SaveGraph();
 
-            // Save as editor format (preserves positions)
-            string editorJson = DialogueGraphSerializer.SerializeEditorData(graphData);
-
-            // Also convert to runtime format and store that
-            var runtimeData = DialogueGraphSerializer.ConvertToRuntimeFormat(
-                graphData, currentDialogue.titleEN, currentDialogue.titleFR);
-
-            // Store the runtime format as the graphDataJSON (this is what gets exported to metadata)
-            currentDialogue.graphDataJSON = Newtonsoft.Json.JsonConvert.SerializeObject(runtimeData, Newtonsoft.Json.Formatting.Indented);
+            // Store editor format (preserves positions + explicit edges)
+            // Runtime conversion happens only at metadata export time
+            currentDialogue.graphDataJSON = DialogueGraphSerializer.SerializeEditorData(graphData);
 
             isDirty = false;
 
