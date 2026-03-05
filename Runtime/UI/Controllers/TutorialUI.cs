@@ -296,7 +296,7 @@ namespace WiseTwin
                     "questions_title" => "Questions",
                     "questions_desc" => "Lisez attentivement les questions. L'indication sous les réponses vous précise s'il s'agit d'un choix unique (une seule réponse) ou d'un choix multiple (plusieurs réponses possibles).",
                     "interface_title" => "Interface & Résultats",
-                    "interface_desc" => "Le chronomètre en haut suit votre temps de formation. La barre de progression montre votre avancement. Cliquez sur le bouton '>' pour passer au prochain scénario. Le bouton '?' vous permet de rouvrir ce tutoriel à tout moment. Le bouton '↻' vous ramène à votre position de départ si vous êtes bloqué. Votre score détaillé s'affichera à la fin de la formation.",
+                    "interface_desc" => "La barre de progression en haut montre votre avancement. Le bouton '?' (à droite) vous permet de rouvrir ce tutoriel à tout moment. Le bouton '↻' (à gauche, en rouge) permet de recommencer la formation depuis le début. Votre score détaillé s'affichera à la fin de la formation.",
                     "start_button" => "Suivant",
                     _ => key
                 };
@@ -313,7 +313,7 @@ namespace WiseTwin
                     "questions_title" => "Questions",
                     "questions_desc" => "Read the questions carefully. The instruction below the answers tells you if it's a single choice (one answer) or multiple choice (several answers possible).",
                     "interface_title" => "Interface & Results",
-                    "interface_desc" => "The timer at the top tracks your training time. The progress bar shows your advancement. Click the '>' button to move to the next scenario. The '?' button allows you to reopen this tutorial at any time. The '↻' button resets your position to the starting point if you get stuck. Your detailed score will be displayed at the end of the training.",
+                    "interface_desc" => "The progress bar at the top shows your advancement. The '?' button (on the right) allows you to reopen this tutorial at any time. The '↻' button (on the left, in red) lets you restart the training from the beginning. Your detailed score will be displayed at the end of the training.",
                     "start_button" => "Next",
                     _ => key
                 };

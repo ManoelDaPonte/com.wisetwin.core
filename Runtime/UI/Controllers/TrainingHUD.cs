@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -7,6 +8,7 @@ namespace WiseTwin
 {
     /// <summary>
     /// HUD minimaliste pour afficher le timer et la progression pendant la formation
+    /// Layout: [restart (rouge)] [barre de progression] [help (?)]
     /// </summary>
     public class TrainingHUD : MonoBehaviour
     {
@@ -30,12 +32,9 @@ namespace WiseTwin
         private Label progressLabel;
         private VisualElement progressBar;
         private VisualElement progressFill;
-        private Button nextScenarioButton;
         private Button helpButton;
         private Button resetButton;
-
-        // Pulse effect
-        private Coroutine pulseCoroutine;
+        private VisualElement confirmationOverlay;
 
         // State
         private float startTime;
@@ -83,6 +82,11 @@ namespace WiseTwin
             {
                 LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
             }
+
+            if (Instance == this)
+            {
+                Instance = null;
+            }
         }
 
         void Start()
@@ -122,7 +126,7 @@ namespace WiseTwin
             root.Clear();
             root.pickingMode = PickingMode.Ignore; // Ne pas bloquer les clics
 
-            // Container principal - barre horizontale en haut (plus large et haute)
+            // Container principal - barre horizontale en haut
             hudContainer = new VisualElement();
             hudContainer.name = "training-hud";
             hudContainer.style.position = Position.Absolute;
@@ -139,45 +143,18 @@ namespace WiseTwin
             hudContainer.style.flexDirection = FlexDirection.Row;
             hudContainer.style.alignItems = Align.Center;
             hudContainer.style.paddingLeft = 12;
-            hudContainer.style.paddingRight = 20;
+            hudContainer.style.paddingRight = 12;
             hudContainer.style.display = DisplayStyle.None;
             hudContainer.pickingMode = PickingMode.Position; // Allow picking buttons inside
 
-            // ===== Section 1: Boutons utilitaires (help et reset) =====
-            var utilitySection = new VisualElement();
-            utilitySection.style.flexDirection = FlexDirection.Row;
-            utilitySection.style.alignItems = Align.Center;
-            utilitySection.style.marginRight = 12;
-
-            // Bouton Help (?)
-            helpButton = new Button(() => OnHelpButtonClicked());
-            helpButton.text = "?";
-            helpButton.name = "help-button";
-            helpButton.style.width = 38;
-            helpButton.style.height = 38;
-            helpButton.style.fontSize = 20;
-            helpButton.style.backgroundColor = new Color(0.2f, 0.3f, 0.5f, 0.8f);
-            helpButton.style.color = Color.white;
-            helpButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            helpButton.style.borderTopLeftRadius = 19;
-            helpButton.style.borderTopRightRadius = 19;
-            helpButton.style.borderBottomLeftRadius = 19;
-            helpButton.style.borderBottomRightRadius = 19;
-            helpButton.style.marginRight = 6;
-            helpButton.style.paddingTop = 0;
-            helpButton.style.paddingBottom = 0;
-            helpButton.style.paddingLeft = 0;
-            helpButton.style.paddingRight = 0;
-            utilitySection.Add(helpButton);
-
-            // Bouton Reset (↻)
+            // ===== Section 1: Bouton Restart (gauche, rouge) =====
             resetButton = new Button(() => OnResetButtonClicked());
-            resetButton.text = "↻";
+            resetButton.text = "\u21BB";
             resetButton.name = "reset-button";
             resetButton.style.width = 38;
             resetButton.style.height = 38;
             resetButton.style.fontSize = 22;
-            resetButton.style.backgroundColor = new Color(0.5f, 0.3f, 0.2f, 0.8f);
+            resetButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.9f);
             resetButton.style.color = Color.white;
             resetButton.style.unityFontStyleAndWeight = FontStyle.Bold;
             resetButton.style.borderTopLeftRadius = 19;
@@ -188,17 +165,14 @@ namespace WiseTwin
             resetButton.style.paddingBottom = 0;
             resetButton.style.paddingLeft = 0;
             resetButton.style.paddingRight = 0;
-            utilitySection.Add(resetButton);
+            resetButton.style.marginRight = 12;
+            hudContainer.Add(resetButton);
 
-            hudContainer.Add(utilitySection);
-
-            // ===== Section 2: Barre de progression (plus large) =====
+            // ===== Section 2: Barre de progression (centre, flex grow) =====
             var progressSection = new VisualElement();
             progressSection.style.flexGrow = 1;
             progressSection.style.flexDirection = FlexDirection.Column;
             progressSection.style.justifyContent = Justify.Center;
-            progressSection.style.marginLeft = 5;
-            progressSection.style.marginRight = 18;
 
             // Label de progression
             progressLabel = new Label("0 / 0");
@@ -231,40 +205,148 @@ namespace WiseTwin
             progressSection.Add(progressBar);
             hudContainer.Add(progressSection);
 
-            // ===== Section 3: Bouton "Next Scenario" avec icône play =====
-            var buttonSection = new VisualElement();
-            buttonSection.style.alignItems = Align.Center;
-
-            // Bouton ">" (next icon)
-            nextScenarioButton = new Button(() => OnNextScenarioButtonClicked());
-            nextScenarioButton.name = "next-scenario-button";
-            nextScenarioButton.text = ">"; // Next arrow icon (ASCII)
-            nextScenarioButton.style.width = 38;
-            nextScenarioButton.style.height = 38;
-            nextScenarioButton.style.fontSize = 18;
-            nextScenarioButton.style.backgroundColor = progressColor;
-            nextScenarioButton.style.color = Color.white;
-            nextScenarioButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            nextScenarioButton.style.borderTopLeftRadius = 19;
-            nextScenarioButton.style.borderTopRightRadius = 19;
-            nextScenarioButton.style.borderBottomLeftRadius = 19;
-            nextScenarioButton.style.borderBottomRightRadius = 19;
-            nextScenarioButton.style.paddingTop = 0;
-            nextScenarioButton.style.paddingBottom = 0;
-            nextScenarioButton.style.paddingLeft = 0;
-            nextScenarioButton.style.paddingRight = 0;
-            nextScenarioButton.SetEnabled(false); // Disabled by default
-
-            // Style for disabled state
-            nextScenarioButton.style.opacity = 0.5f;
-
-            buttonSection.Add(nextScenarioButton);
-
-            hudContainer.Add(buttonSection);
+            // ===== Section 3: Bouton Help (droite) =====
+            helpButton = new Button(() => OnHelpButtonClicked());
+            helpButton.text = "?";
+            helpButton.name = "help-button";
+            helpButton.style.width = 38;
+            helpButton.style.height = 38;
+            helpButton.style.fontSize = 20;
+            helpButton.style.backgroundColor = new Color(0.2f, 0.3f, 0.5f, 0.8f);
+            helpButton.style.color = Color.white;
+            helpButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            helpButton.style.borderTopLeftRadius = 19;
+            helpButton.style.borderTopRightRadius = 19;
+            helpButton.style.borderBottomLeftRadius = 19;
+            helpButton.style.borderBottomRightRadius = 19;
+            helpButton.style.paddingTop = 0;
+            helpButton.style.paddingBottom = 0;
+            helpButton.style.paddingLeft = 0;
+            helpButton.style.paddingRight = 0;
+            helpButton.style.marginLeft = 12;
+            hudContainer.Add(helpButton);
 
             root.Add(hudContainer);
 
-            if (debugMode) Debug.Log("[TrainingHUD] HUD created with new design");
+            // Confirmation dialog (hidden by default)
+            CreateRestartConfirmationDialog();
+
+            if (debugMode) Debug.Log("[TrainingHUD] HUD created");
+        }
+
+        void CreateRestartConfirmationDialog()
+        {
+            confirmationOverlay = new VisualElement();
+            confirmationOverlay.name = "restart-confirmation";
+            confirmationOverlay.style.position = Position.Absolute;
+            confirmationOverlay.style.width = Length.Percent(100);
+            confirmationOverlay.style.height = Length.Percent(100);
+            confirmationOverlay.style.backgroundColor = new Color(0, 0, 0, 0.7f);
+            confirmationOverlay.style.alignItems = Align.Center;
+            confirmationOverlay.style.justifyContent = Justify.Center;
+            confirmationOverlay.style.display = DisplayStyle.None;
+            confirmationOverlay.pickingMode = PickingMode.Position;
+
+            var dialog = new VisualElement();
+            dialog.style.width = 420;
+            dialog.style.paddingTop = 30;
+            dialog.style.paddingBottom = 30;
+            dialog.style.paddingLeft = 40;
+            dialog.style.paddingRight = 40;
+            dialog.style.backgroundColor = new Color(0.15f, 0.15f, 0.18f, 0.98f);
+            dialog.style.borderTopLeftRadius = 15;
+            dialog.style.borderTopRightRadius = 15;
+            dialog.style.borderBottomLeftRadius = 15;
+            dialog.style.borderBottomRightRadius = 15;
+            dialog.style.borderTopWidth = 2;
+            dialog.style.borderBottomWidth = 2;
+            dialog.style.borderLeftWidth = 2;
+            dialog.style.borderRightWidth = 2;
+            dialog.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
+            dialog.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
+            dialog.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
+            dialog.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
+            dialog.style.alignItems = Align.Center;
+
+            var warningIcon = new Label("\u26A0");
+            warningIcon.style.fontSize = 40;
+            warningIcon.style.unityTextAlign = TextAnchor.MiddleCenter;
+            warningIcon.style.marginBottom = 15;
+            dialog.Add(warningIcon);
+
+            var messageLabel = new Label();
+            messageLabel.name = "restart-message";
+            messageLabel.style.fontSize = 18;
+            messageLabel.style.color = Color.white;
+            messageLabel.style.whiteSpace = WhiteSpace.Normal;
+            messageLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            messageLabel.style.marginBottom = 25;
+            dialog.Add(messageLabel);
+
+            var buttonRow = new VisualElement();
+            buttonRow.style.flexDirection = FlexDirection.Row;
+            buttonRow.style.justifyContent = Justify.Center;
+
+            var cancelButton = new Button(() => HideRestartConfirmation());
+            cancelButton.name = "cancel-restart-button";
+            cancelButton.style.width = 140;
+            cancelButton.style.height = 45;
+            cancelButton.style.fontSize = 16;
+            cancelButton.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f, 0.9f);
+            cancelButton.style.color = Color.white;
+            cancelButton.style.borderTopLeftRadius = 8;
+            cancelButton.style.borderTopRightRadius = 8;
+            cancelButton.style.borderBottomLeftRadius = 8;
+            cancelButton.style.borderBottomRightRadius = 8;
+            cancelButton.style.marginRight = 15;
+            buttonRow.Add(cancelButton);
+
+            var restartButton = new Button(() => ConfirmRestart());
+            restartButton.name = "confirm-restart-button";
+            restartButton.style.width = 140;
+            restartButton.style.height = 45;
+            restartButton.style.fontSize = 16;
+            restartButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.9f);
+            restartButton.style.color = Color.white;
+            restartButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            restartButton.style.borderTopLeftRadius = 8;
+            restartButton.style.borderTopRightRadius = 8;
+            restartButton.style.borderBottomLeftRadius = 8;
+            restartButton.style.borderBottomRightRadius = 8;
+            buttonRow.Add(restartButton);
+
+            dialog.Add(buttonRow);
+            confirmationOverlay.Add(dialog);
+            root.Add(confirmationOverlay);
+
+            UpdateConfirmationTexts();
+        }
+
+        void UpdateConfirmationTexts()
+        {
+            if (confirmationOverlay == null) return;
+
+            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+
+            var messageLabel = confirmationOverlay.Q<Label>("restart-message");
+            if (messageLabel != null)
+            {
+                messageLabel.text = lang == "fr"
+                    ? "Voulez-vous vraiment recommencer ?\nToute la progression sera perdue."
+                    : "Are you sure you want to restart?\nAll progress will be lost.";
+            }
+
+            var cancelBtn = confirmationOverlay.Q<Button>("cancel-restart-button");
+            if (cancelBtn != null)
+            {
+                cancelBtn.text = lang == "fr" ? "Annuler" : "Cancel";
+            }
+
+            var restartBtn = confirmationOverlay.Q<Button>("confirm-restart-button");
+            if (restartBtn != null)
+            {
+                restartBtn.text = lang == "fr" ? "Recommencer" : "Restart";
+            }
         }
 
         public void Show()
@@ -477,26 +559,18 @@ namespace WiseTwin
             }
         }
 
-        // New scenario-based methods
+        #region Scenario Methods
+
         /// <summary>
-        /// Called when a scenario starts - disables the next button and stops pulse
+        /// Called when a scenario starts
         /// </summary>
         public void OnScenarioStarted()
         {
-            // Stop pulse effect while scenario is active
-            StopPulseEffect();
-
-            if (nextScenarioButton != null)
-            {
-                nextScenarioButton.SetEnabled(false);
-                nextScenarioButton.style.opacity = 0.5f;
-
-                if (debugMode) Debug.Log("[TrainingHUD] Next scenario button disabled (scenario in progress)");
-            }
+            if (debugMode) Debug.Log("[TrainingHUD] Scenario started");
         }
 
         /// <summary>
-        /// Called when a scenario is completed - increments progress, enables the next button, and starts pulse
+        /// Called when a scenario is completed - increments progress
         /// </summary>
         public void OnScenarioCompleted()
         {
@@ -508,80 +582,45 @@ namespace WiseTwin
 
                 if (debugMode) Debug.Log($"[TrainingHUD] Progress incremented: {currentProgress}/{totalObjects}");
             }
-
-            // Activer le bouton "Next Scenario"
-            if (nextScenarioButton != null)
-            {
-                nextScenarioButton.SetEnabled(true);
-                nextScenarioButton.style.opacity = 1f;
-
-                // Start pulse effect to draw attention
-                StartPulseEffect();
-
-                if (debugMode) Debug.Log("[TrainingHUD] Next scenario button enabled with pulse effect");
-            }
         }
 
         /// <summary>
-        /// Affiche ou cache le bouton next scenario. Stoppe le pulse quand on cache.
+        /// Legacy method - no-op since next button was removed.
+        /// Transitions between scenarios are handled by ScenarioTransitionPanel.
         /// </summary>
         public void SetNextButtonVisible(bool visible)
         {
-            if (nextScenarioButton == null) return;
-
-            nextScenarioButton.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-
-            if (!visible)
-            {
-                StopPulseEffect();
-            }
-
-            if (debugMode) Debug.Log($"[TrainingHUD] Next button visible: {visible}");
+            // No-op
         }
 
         /// <summary>
-        /// Called when all scenarios are completed - hides the next button
+        /// Called when all scenarios are completed
         /// </summary>
         public void OnAllScenariosCompleted()
         {
-            if (nextScenarioButton != null)
-            {
-                nextScenarioButton.style.display = DisplayStyle.None;
-
-                if (debugMode) Debug.Log("[TrainingHUD] All scenarios completed - button hidden");
-            }
+            if (debugMode) Debug.Log("[TrainingHUD] All scenarios completed");
 
             // Show completion UI
             OnTrainingCompleted();
         }
 
         /// <summary>
-        /// Called when next scenario button is clicked
+        /// Initialize for scenario-based progression
         /// </summary>
-        void OnNextScenarioButtonClicked()
+        public void InitializeForScenarios()
         {
-            if (debugMode) Debug.Log("[TrainingHUD] Next scenario button clicked");
-
-            // Stop pulse effect
-            StopPulseEffect();
-
-            // Disable button until next scenario is completed
-            if (nextScenarioButton != null)
-            {
-                nextScenarioButton.SetEnabled(false);
-                nextScenarioButton.style.opacity = 0.5f;
-            }
-
-            // Tell progression manager to move to next scenario
             if (ProgressionManager.Instance != null)
             {
-                ProgressionManager.Instance.MoveToNextScenario();
-            }
-            else
-            {
-                Debug.LogError("[TrainingHUD] ProgressionManager.Instance is null!");
+                int totalScenarios = ProgressionManager.Instance.TotalScenarios;
+                SetTotalObjects(totalScenarios);
+
+                if (debugMode) Debug.Log($"[TrainingHUD] Initialized for {totalScenarios} scenarios");
             }
         }
+
+        #endregion
+
+        #region Button Handlers
 
         /// <summary>
         /// Called when help button (?) is clicked
@@ -602,139 +641,71 @@ namespace WiseTwin
         }
 
         /// <summary>
-        /// Called when reset button (↻) is clicked
+        /// Called when restart button is clicked - shows confirmation dialog
         /// </summary>
         void OnResetButtonClicked()
         {
-            if (debugMode) Debug.Log("[TrainingHUD] Reset button clicked");
-
-            // Reset player position via WiseTwinManager
-            if (WiseTwinManager.Instance != null)
-            {
-                WiseTwinManager.Instance.ResetPlayerPosition();
-            }
-            else
-            {
-                Debug.LogWarning("[TrainingHUD] WiseTwinManager.Instance is null - cannot reset position");
-            }
+            if (debugMode) Debug.Log("[TrainingHUD] Restart button clicked - showing confirmation");
+            ShowRestartConfirmation();
         }
 
-        /// <summary>
-        /// Start pulse effect on the next scenario button
-        /// </summary>
-        void StartPulseEffect()
+        void ShowRestartConfirmation()
         {
-            if (nextScenarioButton == null) return;
+            UpdateConfirmationTexts();
 
-            // Stop existing pulse if any
-            StopPulseEffect();
-
-            // Start new pulse coroutine
-            pulseCoroutine = StartCoroutine(PulseCoroutine());
-
-            if (debugMode) Debug.Log("[TrainingHUD] Pulse effect started");
-        }
-
-        /// <summary>
-        /// Stop pulse effect on the next scenario button
-        /// </summary>
-        void StopPulseEffect()
-        {
-            if (pulseCoroutine != null)
+            if (confirmationOverlay != null)
             {
-                StopCoroutine(pulseCoroutine);
-                pulseCoroutine = null;
+                confirmationOverlay.style.display = DisplayStyle.Flex;
+            }
 
-                // Reset scale to normal
-                if (nextScenarioButton != null)
-                {
-                    nextScenarioButton.style.scale = new Scale(Vector3.one);
-                }
-
-                if (debugMode) Debug.Log("[TrainingHUD] Pulse effect stopped");
+            // Bloquer les contrôles du personnage
+            var character = FindFirstObjectByType<FirstPersonCharacter>();
+            if (character != null)
+            {
+                character.SetControlsEnabled(false);
             }
         }
 
-        /// <summary>
-        /// Coroutine that animates the pulse effect
-        /// </summary>
-        IEnumerator PulseCoroutine()
+        void HideRestartConfirmation()
         {
-            float pulseSpeed = 1f; // 1 second per cycle
-            float pulseAmount = 0.08f; // ±8% scale
-
-            while (true)
+            if (confirmationOverlay != null)
             {
-                float time = Time.time * pulseSpeed;
-                float scale = 1f + Mathf.Sin(time * Mathf.PI * 2f) * pulseAmount;
+                confirmationOverlay.style.display = DisplayStyle.None;
+            }
 
-                if (nextScenarioButton != null)
-                {
-                    nextScenarioButton.style.scale = new Scale(new Vector3(scale, scale, 1f));
-                }
-
-                yield return null;
+            // Réactiver les contrôles du personnage
+            var character = FindFirstObjectByType<FirstPersonCharacter>();
+            if (character != null)
+            {
+                character.SetControlsEnabled(true);
             }
         }
 
-        /// <summary>
-        /// Get localized text for the UI
-        /// </summary>
-        string GetLocalizedText(string key)
+        void ConfirmRestart()
         {
-            // Note: next_scenario uses ASCII arrow (>) instead of text for better UX
-            return key switch
-            {
-                "next_scenario" => ">",
-                _ => key
-            };
+            if (debugMode) Debug.Log("[TrainingHUD] Restart confirmed - reloading scene");
+
+            // Destroy the entire WiseTwinSystem hierarchy (includes this TrainingHUD and all singletons)
+            var rootGO = transform.root.gameObject;
+            Destroy(rootGO);
+
+            // Destroy any other persistent objects not under WiseTwinSystem
+            var transitionPanel = FindFirstObjectByType<ScenarioTransitionPanel>();
+            if (transitionPanel != null) Destroy(transitionPanel.gameObject);
+
+            // Reload the current scene for a clean restart
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
-        /// <summary>
-        /// Initialize for scenario-based progression
-        /// </summary>
-        public void InitializeForScenarios()
-        {
-            if (ProgressionManager.Instance != null)
-            {
-                int totalScenarios = ProgressionManager.Instance.TotalScenarios;
-                SetTotalObjects(totalScenarios);
-
-                // Enable the button at the start so user can begin the first scenario
-                if (nextScenarioButton != null)
-                {
-                    nextScenarioButton.SetEnabled(true);
-                    nextScenarioButton.style.opacity = 1f;
-
-                    // Start pulse effect to indicate user can begin
-                    StartPulseEffect();
-                }
-
-                // Update button text with current language
-                UpdateButtonText();
-
-                if (debugMode) Debug.Log($"[TrainingHUD] Initialized for {totalScenarios} scenarios");
-            }
-        }
+        #endregion
 
         /// <summary>
-        /// Called when language changes - updates UI text
+        /// Called when language changes - updates confirmation dialog texts
         /// </summary>
         void OnLanguageChanged(string newLanguage)
         {
-            UpdateButtonText();
-            if (debugMode) Debug.Log($"[TrainingHUD] Language changed to: {newLanguage}, button text updated");
-        }
-
-        /// <summary>
-        /// Update button text based on current language
-        /// </summary>
-        void UpdateButtonText()
-        {
-            if (nextScenarioButton != null)
-            {
-                nextScenarioButton.text = GetLocalizedText("next_scenario");
-            }
+            UpdateConfirmationTexts();
+            if (debugMode) Debug.Log($"[TrainingHUD] Language changed to: {newLanguage}");
         }
     }
 }

@@ -31,6 +31,7 @@ namespace WiseTwin
         // Panels
         private VisualElement languageSelectionPanel;
         private VisualElement disclaimerPanel;
+        private VisualElement startPanel;
 
         // Références
         private LocalizationManager localizationManager;
@@ -268,6 +269,9 @@ namespace WiseTwin
 
             // Créer le panel de disclaimer
             CreateDisclaimerPanel();
+
+            // Créer le panel Start (gros bouton rond après le tutorial)
+            CreateStartPanel();
 
             if (debugMode) Debug.Log($"[LanguageSelectionUI] UI structure created. Root has {root.childCount} children");
         }
@@ -545,6 +549,93 @@ namespace WiseTwin
             root.Add(disclaimerPanel);
         }
 
+        void CreateStartPanel()
+        {
+            startPanel = new VisualElement();
+            startPanel.name = "start-panel";
+            startPanel.style.position = Position.Absolute;
+            startPanel.style.width = Length.Percent(100);
+            startPanel.style.height = Length.Percent(100);
+            startPanel.style.backgroundColor = new Color(0, 0, 0, 0.85f);
+            startPanel.style.alignItems = Align.Center;
+            startPanel.style.justifyContent = Justify.Center;
+            startPanel.style.display = DisplayStyle.None;
+            startPanel.pickingMode = PickingMode.Position;
+
+            var startButton = new Button(() => OnStartButtonClicked());
+            startButton.text = "Start";
+            startButton.style.width = 200;
+            startButton.style.height = 200;
+            startButton.style.fontSize = 36;
+            startButton.style.backgroundColor = accentColor;
+            startButton.style.color = Color.white;
+            startButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            startButton.style.borderTopLeftRadius = 100;
+            startButton.style.borderTopRightRadius = 100;
+            startButton.style.borderBottomLeftRadius = 100;
+            startButton.style.borderBottomRightRadius = 100;
+            startButton.style.borderTopWidth = 3;
+            startButton.style.borderBottomWidth = 3;
+            startButton.style.borderLeftWidth = 3;
+            startButton.style.borderRightWidth = 3;
+            startButton.style.borderTopColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
+            startButton.style.borderBottomColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
+            startButton.style.borderLeftColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
+            startButton.style.borderRightColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
+
+            startPanel.Add(startButton);
+            root.Add(startPanel);
+
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Start panel created");
+        }
+
+        void OnStartButtonClicked()
+        {
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Start button clicked - starting training");
+
+            // Déclencher l'événement
+            OnTrainingStarted?.Invoke();
+
+            // Masquer les panels et désactiver l'UIDocument
+            StartCoroutine(HideAllPanelsAndStart());
+        }
+
+        IEnumerator HideAllPanelsAndStart()
+        {
+            // Fade out start panel
+            if (startPanel != null)
+            {
+                yield return FadeOut(startPanel);
+                startPanel.style.display = DisplayStyle.None;
+            }
+
+            // Désactiver complètement l'UIDocument pour ne plus intercepter aucun clic
+            if (root != null)
+            {
+                root.style.display = DisplayStyle.None;
+                root.pickingMode = PickingMode.Ignore;
+            }
+
+            if (uiDocument != null)
+            {
+                uiDocument.enabled = false;
+            }
+
+            IsDisplaying = false;
+
+            if (debugMode) Debug.Log("[LanguageSelectionUI] UIDocument disabled, showing HUD");
+
+            // Afficher le HUD de formation
+            ShowTrainingHUD();
+
+            // Lancer la progression des scénarios
+            if (ProgressionManager.Instance != null)
+            {
+                ProgressionManager.Instance.StartProgression();
+                if (debugMode) Debug.Log("[LanguageSelectionUI] Progression started");
+            }
+        }
+
         void OnLanguageButtonClicked(string langCode)
         {
             selectedLanguage = langCode;
@@ -791,21 +882,13 @@ namespace WiseTwin
 
         void OnTutorialCompleted()
         {
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Tutorial completed, starting training");
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Tutorial completed, showing start button");
 
-            // Déclencher l'événement
-            OnTrainingStarted?.Invoke();
-
-            // Masquer les panels
-            StartCoroutine(HideAllPanels());
-
-            // Afficher le HUD de formation
-            ShowTrainingHUD();
-
-            // Démarrer la formation dans le UIManager (optionnel, selon tes besoins)
-            if (uiManager != null)
+            // Afficher le panneau Start (gros bouton rond)
+            if (startPanel != null)
             {
-                // uiManager.StartTraining(); // Commenté car on utilise notre nouveau HUD
+                startPanel.style.display = DisplayStyle.Flex;
+                startPanel.style.opacity = 1;
             }
         }
 
@@ -930,18 +1013,30 @@ namespace WiseTwin
                 languageSelectionPanel.style.display = DisplayStyle.None;
             }
 
-            // IMPORTANT: Hide the root element too to remove the background
+            // Hide start panel if visible
+            if (startPanel != null && startPanel.style.display == DisplayStyle.Flex)
+            {
+                yield return FadeOut(startPanel);
+                startPanel.style.display = DisplayStyle.None;
+            }
+
+            // IMPORTANT: Hide the root element and disable picking
             if (root != null)
             {
                 root.style.display = DisplayStyle.None;
-                if (debugMode) Debug.Log("[LanguageSelectionUI] Root element hidden");
+                root.pickingMode = PickingMode.Ignore;
+                if (debugMode) Debug.Log("[LanguageSelectionUI] Root element hidden + picking disabled");
+            }
+
+            // Disable UIDocument entirely to prevent any event interception
+            if (uiDocument != null)
+            {
+                uiDocument.enabled = false;
+                if (debugMode) Debug.Log("[LanguageSelectionUI] UIDocument disabled");
             }
 
             // IMPORTANT : Marquer comme non affiché pour permettre les clics 3D
             IsDisplaying = false;
-
-            // Or alternatively, clear the root entirely
-            // root?.Clear();
         }
 
         IEnumerator FadeIn(VisualElement element)
