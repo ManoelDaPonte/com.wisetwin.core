@@ -59,7 +59,8 @@ namespace WiseTwin
                 return;
             }
 
-            // Activate only the first model, deactivate the rest
+            // Find which model is already active, default to index 0
+            currentIndex = 0;
             for (int i = 0; i < characterModels.Length; i++)
             {
                 if (characterModels[i].modelRoot == null)
@@ -67,9 +68,21 @@ namespace WiseTwin
                     Debug.LogWarning($"[CharacterSwapper] Model entry '{characterModels[i].modelName}' has no modelRoot assigned.");
                     continue;
                 }
-                characterModels[i].modelRoot.SetActive(i == 0);
+                if (characterModels[i].modelRoot.activeSelf)
+                    currentIndex = i;
             }
-            currentIndex = 0;
+
+            // Deactivate all except the active one (don't toggle the active model)
+            for (int i = 0; i < characterModels.Length; i++)
+            {
+                if (characterModels[i].modelRoot != null && i != currentIndex)
+                    characterModels[i].modelRoot.SetActive(false);
+            }
+
+            // Disable root motion on the initial model
+            var initialAnimator = characterModels[currentIndex].modelRoot?.GetComponentInChildren<Animator>();
+            if (initialAnimator != null)
+                initialAnimator.applyRootMotion = false;
 
             DebugLog($"Initialized with {characterModels.Length} models. Active: {CurrentModelName}");
         }
