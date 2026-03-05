@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__UnityMCP__read_console",
+      "mcp__UnityMCP__execute_menu_item"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
