@@ -242,11 +242,7 @@ namespace WiseTwin
 
         void SetPlayerControlsEnabled(bool enabled)
         {
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(enabled);
-            }
+            PlayerControls.SetEnabled(enabled);
         }
 
         void OnLanguageChanged(string newLanguage)

@@ -2,6 +2,31 @@
 
 All notable changes to the WiseTwin Core Package will be documented in this file.
 
+## [1.4.0] - 2026-03-05
+
+### Added
+- **Mouse-only control mode** - Users can choose between keyboard+mouse or mouse-only (click-to-move) navigation during the tutorial
+  - `ControlModeSettings.cs` - Static manager for control mode preference, persisted via PlayerPrefs, applies NavMeshAgent/CapsuleCollider/Rigidbody setup at runtime
+  - `ClickToMoveCharacter.cs` - NavMeshAgent-based click-to-move controller with ground detection, click indicator, body rotation, and animator integration
+  - `ControlMode` enum (`KeyboardMouse`, `MouseOnly`) for mode selection
+- **PlayerControls utility** - Centralized static class to enable/disable all player controls (both FPC and ClickToMoveCharacter) from any UI component
+- **Camera-only mode for FPC** - `FirstPersonCharacter.cameraOnly` flag keeps camera (orbit, zoom, collision, head tracking) active while disabling movement and body rotation, ensuring identical camera behavior in both control modes
+
+### Changed
+- **TrainingHUD** - Removed "?" help button; uses `PlayerControls.SetEnabled()` for centralized control blocking; `ConfirmRestart()` resets `ControlModeSettings` and destroys `TutorialUI` to prevent DontDestroyOnLoad persistence bugs
+- **TutorialUI** - Simplified tutorial text; control mode selection cards streamlined (icon + title only); fixed cards not responding after restart; uses `PlayerControls.SetEnabled()`
+- **LanguageSelectionUI** - Uses `PlayerControls.SetEnabled()` and calls `ControlModeSettings.ApplyToPlayer()` on start
+- **ProcedureZoneTrigger** - Now detects both `CharacterController` and `NavMeshAgent` for player identification; added `OnTriggerStay` alongside `OnTriggerEnter` for reliable NavMeshAgent detection
+- **FirstPersonCharacter** - Scroll/zoom blocked when controls are disabled (fixes zoom through UI); camera pivot smoothed in cameraOnly mode to reduce jitter; animator guarded against missing RuntimeAnimatorController
+- **All UI displayers** (`QuestionDisplayer`, `DialogueDisplayer`, `VideoDisplayer`, `TrainingCompletionUI`, `ScenarioTransitionPanel`) - Replaced direct `FirstPersonCharacter.SetControlsEnabled()` calls with `PlayerControls.SetEnabled()`
+
+### Fixed
+- Zoom/scroll passing through UI panels when controls should be blocked
+- Tutorial control mode cards not responding after training restart (DontDestroyOnLoad persistence)
+- Zone validation not working in mouse-only mode (missing Rigidbody for OnTriggerEnter/Stay)
+- Camera jitter in mouse-only mode (smoothed pivot follow)
+- Animator errors at startup when no RuntimeAnimatorController is assigned
+
 ## [1.3.0] - 2026-02-19
 
 ### Added

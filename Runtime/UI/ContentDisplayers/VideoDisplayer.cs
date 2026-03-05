@@ -172,14 +172,8 @@ namespace WiseTwin
             isShowing = true;
 
             // Block player controls during video (like a cinematic)
-            if (playerController == null)
-                playerController = FindFirstObjectByType<FirstPersonCharacter>();
-
-            if (playerController != null)
-            {
-                playerController.SetControlsEnabled(false);
-                DebugLog("Player controls disabled (after 1 frame delay)");
-            }
+            PlayerControls.SetEnabled(false);
+            DebugLog("Player controls disabled (after 1 frame delay)");
         }
 
         void CreateRenderTexture()
@@ -251,11 +245,8 @@ namespace WiseTwin
             videoPlayer.Stop();
 
             // Re-enable player controls
-            if (playerController != null)
-            {
-                playerController.SetControlsEnabled(true);
-                DebugLog("Player controls re-enabled");
-            }
+            PlayerControls.SetEnabled(true);
+            DebugLog("Player controls re-enabled");
 
             if (renderTexture != null)
             {

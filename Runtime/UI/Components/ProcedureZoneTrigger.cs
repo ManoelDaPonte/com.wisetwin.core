@@ -1,11 +1,13 @@
 using UnityEngine;
+using UnityEngine.AI;
 using WiseTwin.UI;
 
 namespace WiseTwin
 {
     /// <summary>
-    /// Composant temporaire ajouté aux objets zone pendant une procédure.
-    /// Quand le joueur (CharacterController) entre dans le trigger, l'étape est validée.
+    /// Composant temporaire ajoute aux objets zone pendant une procedure.
+    /// Quand le joueur entre dans le trigger, l'etape est validee.
+    /// Supporte les deux modes: CharacterController (clavier) et NavMeshAgent (souris).
     /// </summary>
     public class ProcedureZoneTrigger : MonoBehaviour
     {
@@ -24,22 +26,35 @@ namespace WiseTwin
 
         void OnTriggerEnter(Collider other)
         {
+            TryValidate(other);
+        }
+
+        // NavMeshAgent moves the transform directly without a Rigidbody,
+        // so OnTriggerEnter may not fire. OnTriggerStay catches the agent
+        // if it was already inside the zone or entered between physics ticks.
+        void OnTriggerStay(Collider other)
+        {
+            TryValidate(other);
+        }
+
+        void TryValidate(Collider other)
+        {
             if (!isActive || procedureDisplayer == null) return;
 
-            // Check if the entering object is the player (CharacterController)
-            if (other.GetComponent<CharacterController>() != null)
-            {
-                Debug.Log($"[ProcedureZoneTrigger] Player entered zone {gameObject.name} - validating step {stepIndex + 1}");
+            // Accept player with CharacterController (keyboard mode)
+            // or NavMeshAgent (mouse-only mode)
+            bool isPlayer = other.GetComponent<CharacterController>() != null
+                         || other.GetComponent<NavMeshAgent>() != null;
 
-                // Deactivate immediately to prevent double-trigger
-                isActive = false;
+            if (!isPlayer) return;
 
-                // Validate the zone step
-                procedureDisplayer.ValidateZoneStep();
+            Debug.Log($"[ProcedureZoneTrigger] Player entered zone {gameObject.name} - validating step {stepIndex + 1}");
 
-                // Jouer l'effet de collecte
-                ZoneCollectEffect.Play(gameObject);
-            }
+            // Deactivate immediately to prevent double-trigger
+            isActive = false;
+
+            procedureDisplayer.ValidateZoneStep();
+            ZoneCollectEffect.Play(gameObject);
         }
 
         void OnDisable()

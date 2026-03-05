@@ -623,7 +623,10 @@ namespace WiseTwin
 
             IsDisplaying = false;
 
-            if (debugMode) Debug.Log("[LanguageSelectionUI] UIDocument disabled, showing HUD");
+            if (debugMode) Debug.Log("[LanguageSelectionUI] UIDocument disabled, applying control mode and showing HUD");
+
+            // Appliquer le mode de contrôle choisi dans le tutoriel
+            ControlModeSettings.ApplyToPlayer();
 
             // Afficher le HUD de formation
             ShowTrainingHUD();
@@ -920,12 +923,8 @@ namespace WiseTwin
                 Initialize();
             }
 
-            // Bloquer les contrôles du personnage pendant la sélection de langue
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(false);
-            }
+            // Block all player controls during language selection
+            PlayerControls.SetEnabled(false);
 
             if (languageSelectionPanel != null)
             {

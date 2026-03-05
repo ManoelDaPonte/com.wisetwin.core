@@ -32,7 +32,6 @@ namespace WiseTwin
         private Label progressLabel;
         private VisualElement progressBar;
         private VisualElement progressFill;
-        private Button helpButton;
         private Button resetButton;
         private VisualElement confirmationOverlay;
 
@@ -204,27 +203,6 @@ namespace WiseTwin
 
             progressSection.Add(progressBar);
             hudContainer.Add(progressSection);
-
-            // ===== Section 3: Bouton Help (droite) =====
-            helpButton = new Button(() => OnHelpButtonClicked());
-            helpButton.text = "?";
-            helpButton.name = "help-button";
-            helpButton.style.width = 38;
-            helpButton.style.height = 38;
-            helpButton.style.fontSize = 20;
-            helpButton.style.backgroundColor = new Color(0.2f, 0.3f, 0.5f, 0.8f);
-            helpButton.style.color = Color.white;
-            helpButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            helpButton.style.borderTopLeftRadius = 19;
-            helpButton.style.borderTopRightRadius = 19;
-            helpButton.style.borderBottomLeftRadius = 19;
-            helpButton.style.borderBottomRightRadius = 19;
-            helpButton.style.paddingTop = 0;
-            helpButton.style.paddingBottom = 0;
-            helpButton.style.paddingLeft = 0;
-            helpButton.style.paddingRight = 0;
-            helpButton.style.marginLeft = 12;
-            hudContainer.Add(helpButton);
 
             root.Add(hudContainer);
 
@@ -623,24 +601,6 @@ namespace WiseTwin
         #region Button Handlers
 
         /// <summary>
-        /// Called when help button (?) is clicked
-        /// </summary>
-        void OnHelpButtonClicked()
-        {
-            if (debugMode) Debug.Log("[TrainingHUD] Help button clicked");
-
-            // Show tutorial UI
-            if (TutorialUI.Instance != null)
-            {
-                TutorialUI.Instance.Show();
-            }
-            else
-            {
-                Debug.LogWarning("[TrainingHUD] TutorialUI.Instance is null - cannot show tutorial");
-            }
-        }
-
-        /// <summary>
         /// Called when restart button is clicked - shows confirmation dialog
         /// </summary>
         void OnResetButtonClicked()
@@ -658,12 +618,7 @@ namespace WiseTwin
                 confirmationOverlay.style.display = DisplayStyle.Flex;
             }
 
-            // Bloquer les contrôles du personnage
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(false);
-            }
+            PlayerControls.SetEnabled(false);
         }
 
         void HideRestartConfirmation()
@@ -673,25 +628,26 @@ namespace WiseTwin
                 confirmationOverlay.style.display = DisplayStyle.None;
             }
 
-            // Réactiver les contrôles du personnage
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(true);
-            }
+            PlayerControls.SetEnabled(true);
         }
 
         void ConfirmRestart()
         {
             if (debugMode) Debug.Log("[TrainingHUD] Restart confirmed - reloading scene");
 
+            // Reset static state that persists across scene loads
+            ControlModeSettings.Reset();
+
             // Destroy the entire WiseTwinSystem hierarchy (includes this TrainingHUD and all singletons)
             var rootGO = transform.root.gameObject;
             Destroy(rootGO);
 
-            // Destroy any other persistent objects not under WiseTwinSystem
+            // Destroy all standalone DontDestroyOnLoad objects not under WiseTwinSystem
             var transitionPanel = FindFirstObjectByType<ScenarioTransitionPanel>();
             if (transitionPanel != null) Destroy(transitionPanel.gameObject);
+
+            var tutorialUI = FindFirstObjectByType<TutorialUI>();
+            if (tutorialUI != null) Destroy(tutorialUI.gameObject);
 
             // Reload the current scene for a clean restart
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

@@ -60,12 +60,8 @@ namespace WiseTwin.UI
             currentObjectId = objectId;
             rootElement = root;
 
-            // Bloquer les contrôles du personnage pendant l'affichage de la question
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(false);
-            }
+            // Block player controls during question display
+            PlayerControls.SetEnabled(false);
 
             // Store content data for language changes
             storedContentData = contentData;
@@ -1357,12 +1353,8 @@ namespace WiseTwin.UI
             isValidating = false;
             hasAnswered = false;
 
-            // Débloquer les contrôles du personnage
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(true);
-            }
+            // Re-enable player controls
+            PlayerControls.SetEnabled(true);
 
             rootElement?.Clear();
             OnClosed?.Invoke(currentObjectId);

@@ -42,10 +42,8 @@ namespace WiseTwin.UI
             currentObjectId = objectId;
             rootElement = root;
 
-            // Block character controls
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-                character.SetControlsEnabled(false);
+            // Block player controls
+            PlayerControls.SetEnabled(false);
 
             // Subscribe to language changes
             if (LocalizationManager.Instance != null)
@@ -518,10 +516,8 @@ namespace WiseTwin.UI
         {
             isProcessing = false;
 
-            // Unblock character controls
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-                character.SetControlsEnabled(true);
+            // Unblock player controls
+            PlayerControls.SetEnabled(true);
 
             // Unsubscribe from language changes
             if (LocalizationManager.Instance != null)

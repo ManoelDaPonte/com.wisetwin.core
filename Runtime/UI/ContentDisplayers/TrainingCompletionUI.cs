@@ -93,17 +93,9 @@ namespace WiseTwin.UI
                 Debug.Log($"[TrainingCompletionUI] Forced HUD to 100%: {modulesCompleted}/{modulesCompleted}");
             }
 
-            // Bloquer les contrôles du personnage pendant l'écran de fin
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(false);
-                Debug.Log("[TrainingCompletionUI] Player controls disabled - cannot move or look around");
-            }
-            else
-            {
-                Debug.LogWarning("[TrainingCompletionUI] FirstPersonCharacter not found - controls may not be blocked!");
-            }
+            // Block player controls during completion screen
+            PlayerControls.SetEnabled(false);
+            Debug.Log("[TrainingCompletionUI] Player controls disabled");
 
             CreateCompletionUI();
 
@@ -430,12 +422,8 @@ namespace WiseTwin.UI
         {
             Debug.Log("[TrainingCompletionUI] Closing completion UI - User can now explore");
 
-            // Réactiver les contrôles du personnage
-            var character = FindFirstObjectByType<FirstPersonCharacter>();
-            if (character != null)
-            {
-                character.SetControlsEnabled(true);
-            }
+            // Re-enable player controls
+            PlayerControls.SetEnabled(true);
 
             // Nettoyer l'UI
             rootElement?.Clear();

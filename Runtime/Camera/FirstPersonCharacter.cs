@@ -58,6 +58,10 @@ namespace WiseTwin
         [Tooltip("Seuil sous lequel on cache les meshes (mètres)")]
         public float hideThreshold = 0.1f;
 
+        [Header("Camera Only Mode")]
+        [Tooltip("When true, only camera works (orbit, zoom, collision). Movement and body rotation are disabled. Used by mouse-only control mode.")]
+        public bool cameraOnly = false;
+
         [Header("Debug")]
         [Tooltip("Afficher les logs de debug dans la console")]
         public bool debugMode = false;
@@ -159,8 +163,11 @@ namespace WiseTwin
         {
             ReadInput();
             HandleLook();
-            HandleMove();
-            UpdateAnimator();
+            if (!cameraOnly)
+            {
+                HandleMove();
+                UpdateAnimator();
+            }
             UpdateZoomTargetFromScroll();
             UpdateHideInFirstPerson();
         }
@@ -192,9 +199,9 @@ namespace WiseTwin
                 return;
             }
 
-            moveInput = moveAction.ReadValue<Vector2>();
+            moveInput = cameraOnly ? Vector2.zero : moveAction.ReadValue<Vector2>();
             lookInput = lookAction.ReadValue<Vector2>();
-            isSprinting = sprintAction.IsPressed();
+            isSprinting = cameraOnly ? false : sprintAction.IsPressed();
 
             isLooking = rotateOnlyOnRightClick ? lookHoldAction.IsPressed() : true;
 
@@ -224,13 +231,27 @@ namespace WiseTwin
                 pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
             }
 
-            // Rotation yaw du corps
-            Quaternion yRot = Quaternion.Euler(0f, yaw, 0f);
-            transform.rotation = Quaternion.Slerp(transform.rotation, yRot, rotationLerp * Time.deltaTime);
+            // In cameraOnly mode, don't rotate the character body (ClickToMoveCharacter handles that).
+            // Camera pivot still orbits independently via yaw/pitch.
+            if (!cameraOnly)
+            {
+                Quaternion yRot = Quaternion.Euler(0f, yaw, 0f);
+                transform.rotation = Quaternion.Slerp(transform.rotation, yRot, rotationLerp * Time.deltaTime);
+            }
 
-            // Pitch sur le pivot caméra
+            // Pitch sur le pivot camera
             if (cameraPivot)
-                cameraPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+            {
+                if (cameraOnly)
+                {
+                    // In cameraOnly mode, pivot handles both yaw and pitch independently of character body
+                    cameraPivot.rotation = Quaternion.Euler(pitch, yaw, 0f);
+                }
+                else
+                {
+                    cameraPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+                }
+            }
         }
 
         void HandleMove()
@@ -339,6 +360,8 @@ namespace WiseTwin
 
         void UpdateZoomTargetFromScroll()
         {
+            if (!controlsEnabled) return;
+
             // Molette : +Y = vers toi sur beaucoup de souris -> on choisit un sens agréable
             Vector2 scroll = scrollAction.ReadValue<Vector2>();
             if (Mathf.Abs(scroll.y) > 0.01f)
@@ -358,7 +381,12 @@ namespace WiseTwin
 
             if (headBone)
             {
-                cameraPivot.position = headBone.TransformPoint(headLocalOffset);
+                Vector3 targetPos = headBone.TransformPoint(headLocalOffset);
+                // Smooth pivot follow in cameraOnly mode to avoid jitter from NavMeshAgent movement
+                if (cameraOnly)
+                    cameraPivot.position = Vector3.Lerp(cameraPivot.position, targetPos, 25f * Time.deltaTime);
+                else
+                    cameraPivot.position = targetPos;
             }
             else
             {
@@ -430,8 +458,8 @@ namespace WiseTwin
                     cursorWasLocked = false;
                 }
 
-                // Arrêter les animations de mouvement
-                if (animator)
+                // Stop movement animations (guard against missing AnimatorController)
+                if (animator && animator.runtimeAnimatorController != null)
                 {
                     animator.SetFloat(hashMoveX, 0f);
                     animator.SetFloat(hashMoveY, 0f);
