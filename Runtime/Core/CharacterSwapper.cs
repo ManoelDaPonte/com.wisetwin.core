@@ -79,10 +79,8 @@ namespace WiseTwin
                     characterModels[i].modelRoot.SetActive(false);
             }
 
-            // Disable root motion on the initial model
-            var initialAnimator = characterModels[currentIndex].modelRoot?.GetComponentInChildren<Animator>();
-            if (initialAnimator != null)
-                initialAnimator.applyRootMotion = false;
+            // Re-wire FPC to the active model (handles case where active model isn't index 0)
+            RewireFirstPersonCharacter(characterModels[currentIndex]);
 
             DebugLog($"Initialized with {characterModels.Length} models. Active: {CurrentModelName}");
         }
