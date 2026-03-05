@@ -60,6 +60,7 @@ TrainingAnalytics → tracks all interactions → exports JSON
 - `LocalizationManager.cs` - Language singleton, `CurrentLanguage`, `OnLanguageChanged` event
 - `VideoTriggerData.cs` - Runtime data for video triggers, language-aware URL selection
 - `VideoTriggerManager.cs` - Sets up `VideoClickHandler` on target GameObjects
+- `CharacterSwapper.cs` - Singleton on Player, manages character model swapping at runtime (pre-placed children)
 - `WiseTwinSystemManager.cs` - Optional system manager
 
 ### Analytics (`Runtime/Analytics/`)
@@ -93,6 +94,7 @@ TrainingAnalytics → tracks all interactions → exports JSON
 - `VideoClickHandler.cs` - Click detection for video-enabled 3D objects
 - `ProgressionManager.cs` - Scenario progression tracking
 - `ZoneCollectEffect.cs` - Visual collect animation (flash → implode → deactivate) on zone validation
+- `CharacterSwapTrigger.cs` - Click trigger on 3D objects to swap player character model
 
 ### Camera (`Runtime/Camera/`)
 - `FirstPersonCharacter.cs` - First-person character controller
@@ -411,6 +413,14 @@ TrainingAnalytics.Instance.CompleteProcedureInteraction(perfect, wrongClicks, du
 TrainingAnalytics.Instance.ExportAnalytics()       // JSON string
 ```
 
+### CharacterSwapper
+```csharp
+CharacterSwapper.Instance.SwapTo("equipped")       // Swap by model name
+CharacterSwapper.Instance.SwapTo(1)                 // Swap by index
+CharacterSwapper.Instance.CurrentModelName           // Current active model name
+CharacterSwapper.Instance.OnCharacterSwapped += (name) => { ... };
+```
+
 ### ContentDisplayManager
 ```csharp
 ContentDisplayManager.Instance.DisplayScenario(scenarioIndex)
@@ -523,6 +533,7 @@ All logs are prefixed with component name:
 - `[ProcedureDisplayer]`, `[QuestionDisplayer]`, `[DialogueDisplayer]`, `[VideoDisplayer]`
 - `[DialogueEditor]`, `[DialogueGraphView]`, `[DialogueGraphSerializer]`
 - `[ProcedureZoneTrigger]`, `[VideoTriggerManager]`, `[VideoClickHandler]`
+- `[CharacterSwapper]`, `[CharacterSwapTrigger]`
 
 ### Singleton Pattern
 ```csharp
