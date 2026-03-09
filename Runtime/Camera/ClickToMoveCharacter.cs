@@ -182,8 +182,23 @@ namespace WiseTwin
 
             if (debugMode) Debug.Log($"[ClickToMove] Click at screen {mousePos}");
 
-            if (Physics.Raycast(ray, out RaycastHit hit, 100f, groundLayerMask, QueryTriggerInteraction.Ignore))
+            // Use RaycastAll and filter out hits on the player itself
+            RaycastHit[] hits = Physics.RaycastAll(ray, 100f, groundLayerMask, QueryTriggerInteraction.Ignore);
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            RaycastHit? validHit = null;
+            foreach (var h in hits)
             {
+                if (!h.collider.transform.IsChildOf(transform))
+                {
+                    validHit = h;
+                    break;
+                }
+            }
+
+            if (validHit.HasValue)
+            {
+                var hit = validHit.Value;
                 if (debugMode) Debug.Log($"[ClickToMove] Hit '{hit.collider.gameObject.name}' at {hit.point} (layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)})");
 
                 if (NavMesh.SamplePosition(hit.point, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
@@ -202,7 +217,7 @@ namespace WiseTwin
             }
             else if (debugMode)
             {
-                Debug.Log("[ClickToMove] Raycast hit nothing");
+                Debug.Log("[ClickToMove] Raycast hit nothing (or only hit player)");
             }
         }
 
