@@ -2,29 +2,27 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections;
 using System.Collections.Generic;
+using WiseTwin.UI;
 
 namespace WiseTwin
 {
     /// <summary>
-    /// Gère l'UI de sélection de langue et l'écran de disclaimer
+    /// Gère l'UI de sélection de langue et l'écran d'informations de formation.
     /// Étape 1 : Choix de la langue
     /// Étape 2 : Informations de formation et disclaimer
+    /// Étape 3 : Tutorial (via TutorialUI)
+    /// Étape 4 : Start button
     /// </summary>
     public class LanguageSelectionUI : MonoBehaviour
     {
         [Header("Configuration")]
-        [SerializeField] private bool showOnStart = true; // Affichage automatique au démarrage
+        [SerializeField] private bool showOnStart = true;
         [SerializeField] private float animationDuration = 0.3f;
-
-        [Header("Colors")]
-        [SerializeField] private Color primaryColor = new Color(0.2f, 0.4f, 0.8f);
-        [SerializeField] private Color accentColor = new Color(0.1f, 0.8f, 0.6f);
-        [SerializeField] private Color backgroundColor = new Color(0.05f, 0.05f, 0.05f, 0.95f);
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
 
-        // UI Document reference
+        // UI Document
         private UIDocument uiDocument;
         private VisualElement root;
 
@@ -53,7 +51,6 @@ namespace WiseTwin
 
         void Awake()
         {
-            // Récupérer ou ajouter UIDocument
             uiDocument = GetComponent<UIDocument>();
             if (uiDocument == null)
             {
@@ -65,31 +62,24 @@ namespace WiseTwin
                 Debug.LogWarning("[LanguageSelectionUI] PanelSettings is null! Please assign it in the inspector.");
             }
 
-            // NE PAS charger le UXML - on crée tout programmatiquement
-            // Forcer visualTreeAsset à null pour éviter les conflits
             if (uiDocument.visualTreeAsset != null)
             {
-                if (debugMode) Debug.LogWarning("[LanguageSelectionUI] Clearing UXML to avoid conflicts with programmatic creation");
                 uiDocument.visualTreeAsset = null;
             }
         }
 
         void Start()
         {
-            // Récupérer les références
             localizationManager = LocalizationManager.Instance;
             wiseTwinManager = WiseTwinManager.Instance;
             uiManager = WiseTwinUIManager.Instance;
 
-            // Find or create TutorialUI
             tutorialUI = FindAnyObjectByType<TutorialUI>();
             if (tutorialUI == null)
             {
-                // Create a new GameObject for TutorialUI if it doesn't exist
                 var tutorialGO = new GameObject("TutorialUI");
                 tutorialUI = tutorialGO.AddComponent<TutorialUI>();
 
-                // Pass our PanelSettings to the TutorialUI
                 if (uiDocument != null && uiDocument.panelSettings != null)
                 {
                     tutorialUI.SetPanelSettings(uiDocument.panelSettings);
@@ -98,7 +88,6 @@ namespace WiseTwin
                 if (debugMode) Debug.Log("[LanguageSelectionUI] TutorialUI created");
             }
 
-            // Subscribe to tutorial completion event
             if (tutorialUI != null)
             {
                 tutorialUI.OnTutorialCompleted += OnTutorialCompleted;
@@ -106,24 +95,19 @@ namespace WiseTwin
 
             if (showOnStart)
             {
-                // Initialiser et afficher immédiatement
                 Initialize();
                 ShowLanguageSelection();
-
-                // Charger les métadonnées si disponibles
                 StartCoroutine(LoadMetadataWhenReady());
             }
         }
 
         IEnumerator LoadMetadataWhenReady()
         {
-            // Désactiver les boutons de langue pendant le chargement
             SetLanguageButtonsEnabled(false);
 
             int waitFrames = 0;
-            const int maxWaitFrames = 300; // 5 seconds at 60fps
+            const int maxWaitFrames = 300;
 
-            // Attendre que WiseTwinManager soit prêt
             while (wiseTwinManager == null || !wiseTwinManager.IsMetadataLoaded)
             {
                 yield return null;
@@ -142,14 +126,7 @@ namespace WiseTwin
                 }
             }
 
-            // Récupérer les métadonnées
             trainingMetadata = wiseTwinManager.MetadataLoader.GetMetadata();
-            if (trainingMetadata == null)
-            {
-                Debug.LogError("[LanguageSelectionUI] Metadata is NULL after loading!");
-            }
-
-            // Réactiver les boutons de langue
             SetLanguageButtonsEnabled(true);
         }
 
@@ -160,24 +137,13 @@ namespace WiseTwin
             var englishButton = languageSelectionPanel.Q<Button>("lang-button-en");
             var frenchButton = languageSelectionPanel.Q<Button>("lang-button-fr");
 
-            if (englishButton != null)
-            {
-                englishButton.SetEnabled(enabled);
-            }
-            if (frenchButton != null)
-            {
-                frenchButton.SetEnabled(enabled);
-            }
+            if (englishButton != null) englishButton.SetEnabled(enabled);
+            if (frenchButton != null) frenchButton.SetEnabled(enabled);
         }
-
 
         void Initialize()
         {
-            if (isInitialized)
-            {
-                Debug.LogWarning("[LanguageSelectionUI] Already initialized!");
-                return;
-            }
+            if (isInitialized) return;
 
             if (uiDocument == null)
             {
@@ -185,7 +151,6 @@ namespace WiseTwin
                 return;
             }
 
-            // Créer la structure UI
             root = uiDocument.rootVisualElement;
             if (root == null)
             {
@@ -193,451 +158,253 @@ namespace WiseTwin
                 return;
             }
 
-            // IMPORTANT: Configurer le pickingMode pour que l'UI reçoive les événements de clic
             root.pickingMode = PickingMode.Position;
             root.style.flexGrow = 1;
             root.style.width = Length.Percent(100);
             root.style.height = Length.Percent(100);
-
-            if (debugMode) Debug.Log($"[LanguageSelectionUI] Root configured. PickingMode: {root.pickingMode}. Current children: {root.childCount}");
-
-            // Clear everything first
             root.Clear();
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Root cleared");
 
-            // Créer directement la structure UI (plus fiable)
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Creating UI structure");
-            SetupUIStructure();
-
-            isInitialized = true;
-            if (debugMode) Debug.Log($"[LanguageSelectionUI] Initialized successfully. Root now has {root.childCount} children");
-        }
-
-        void SetupUIFromUXML()
-        {
-            // Récupérer les panels depuis le UXML
-            languageSelectionPanel = root.Q<VisualElement>("language-selection-panel");
-            disclaimerPanel = root.Q<VisualElement>("disclaimer-panel");
-
-            if (languageSelectionPanel == null || disclaimerPanel == null)
-            {
-                Debug.LogError("[LanguageSelectionUI] Could not find panels in UXML! Creating programmatically...");
-                // Fallback to programmatic creation
-                SetupUIStructure();
-                return;
-            }
-
-            Debug.Log("[LanguageSelectionUI] UXML panels found successfully");
-
-            // Configurer les boutons de langue
-            var englishBtn = root.Q<Button>("btn-english");
-            var frenchBtn = root.Q<Button>("btn-french");
-
-            if (englishBtn != null)
-            {
-                englishBtn.clicked += () => OnLanguageButtonClicked("en");
-            }
-
-            if (frenchBtn != null)
-            {
-                frenchBtn.clicked += () => OnLanguageButtonClicked("fr");
-            }
-
-            // Configurer les boutons du disclaimer
-            var backBtn = root.Q<Button>("back-button");
-            var startBtn = root.Q<Button>("start-button");
-
-            if (backBtn != null)
-            {
-                backBtn.clicked += OnBackToLanguageSelection;
-            }
-
-            if (startBtn != null)
-            {
-                startBtn.clicked += OnStartTraining;
-            }
-
-            Debug.Log("[LanguageSelectionUI] UI configured from UXML");
-        }
-
-        void SetupUIStructure()
-        {
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Setting up UI structure");
-
-            // Créer le panel de sélection de langue
             CreateLanguageSelectionPanel();
-
-            // Créer le panel de disclaimer
             CreateDisclaimerPanel();
-
-            // Créer le panel Start (gros bouton rond après le tutorial)
             CreateStartPanel();
 
-            if (debugMode) Debug.Log($"[LanguageSelectionUI] UI structure created. Root has {root.childCount} children");
+            isInitialized = true;
         }
+
+        // =====================================================================
+        // PANEL 1: Language Selection
+        // =====================================================================
 
         void CreateLanguageSelectionPanel()
         {
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Creating language selection panel");
-
-            // Container principal - directement sur root
             languageSelectionPanel = new VisualElement();
             languageSelectionPanel.name = "language-selection-panel";
-            languageSelectionPanel.style.position = Position.Absolute;
-            languageSelectionPanel.style.width = Length.Percent(100);
-            languageSelectionPanel.style.height = Length.Percent(100);
-            languageSelectionPanel.style.backgroundColor = new Color(0, 0, 0, 0.95f); // Noir opaque
+            UIStyles.ApplyBackdropHeavyStyle(languageSelectionPanel);
             languageSelectionPanel.style.display = DisplayStyle.None;
-            languageSelectionPanel.style.alignItems = Align.Center;
-            languageSelectionPanel.style.justifyContent = Justify.Center;
-            // IMPORTANT : Bloquer les raycasts pour ne pas cliquer à travers
-            languageSelectionPanel.pickingMode = PickingMode.Position;
 
-            // Container pour le contenu avec style épuré
-            var contentContainer = new VisualElement();
-            contentContainer.style.width = 500;
-            contentContainer.style.maxWidth = Length.Percent(90);
-            contentContainer.style.paddingTop = 40;
-            contentContainer.style.paddingBottom = 40;
-            contentContainer.style.paddingLeft = 40;
-            contentContainer.style.paddingRight = 40;
-            // Fond gris foncé avec légère transparence
-            contentContainer.style.backgroundColor = new Color(0.12f, 0.12f, 0.15f, 0.98f);
-            contentContainer.style.borderTopLeftRadius = 15;
-            contentContainer.style.borderTopRightRadius = 15;
-            contentContainer.style.borderBottomLeftRadius = 15;
-            contentContainer.style.borderBottomRightRadius = 15;
-            // Bordure subtile
-            contentContainer.style.borderTopWidth = 1;
-            contentContainer.style.borderBottomWidth = 1;
-            contentContainer.style.borderLeftWidth = 1;
-            contentContainer.style.borderRightWidth = 1;
-            contentContainer.style.borderTopColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
-            contentContainer.style.borderBottomColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
-            contentContainer.style.borderLeftColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
-            contentContainer.style.borderRightColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
+            var card = new VisualElement();
+            card.style.width = 460;
+            card.style.maxWidth = Length.Percent(90);
+            UIStyles.ApplyCardStyle(card, UIStyles.RadiusXL);
+            UIStyles.SetPadding(card, UIStyles.Space3XL);
 
-            // Container pour les boutons de langue - en colonne
-            var languageButtons = new VisualElement();
-            languageButtons.style.flexDirection = FlexDirection.Column;
-            languageButtons.style.width = Length.Percent(100);
+            // Language buttons
+            var buttonsContainer = new VisualElement();
+            buttonsContainer.style.width = Length.Percent(100);
 
-            // Bouton Français
-            var frenchButton = CreateLanguageButton("Français", "FR", "fr");
-            languageButtons.Add(frenchButton);
+            buttonsContainer.Add(CreateLanguageButton("Français", "fr"));
 
-            // Espacement entre les boutons
             var spacer = new VisualElement();
-            spacer.style.height = 15;
-            languageButtons.Add(spacer);
+            spacer.style.height = UIStyles.SpaceMD;
+            buttonsContainer.Add(spacer);
 
-            // Bouton Anglais
-            var englishButton = CreateLanguageButton("English", "GB", "en");
-            languageButtons.Add(englishButton);
+            buttonsContainer.Add(CreateLanguageButton("English", "en"));
 
-            contentContainer.Add(languageButtons);
-            languageSelectionPanel.Add(contentContainer);
+            card.Add(buttonsContainer);
+            languageSelectionPanel.Add(card);
             root.Add(languageSelectionPanel);
-
-            if (debugMode) Debug.Log($"[LanguageSelectionUI] Language panel created with {languageButtons.childCount} buttons");
         }
 
-        Button CreateLanguageButton(string label, string flag, string langCode)
+        Button CreateLanguageButton(string label, string langCode)
         {
             var button = new Button(() => OnLanguageButtonClicked(langCode));
             button.name = $"lang-button-{langCode}";
 
-            // Style liste conventionnel - pleine largeur
             button.style.width = Length.Percent(100);
-            button.style.height = 60;
-            button.style.backgroundColor = new Color(0.18f, 0.18f, 0.22f, 1f);
-            button.style.borderTopLeftRadius = 8;
-            button.style.borderTopRightRadius = 8;
-            button.style.borderBottomLeftRadius = 8;
-            button.style.borderBottomRightRadius = 8;
-            button.style.borderTopWidth = 2;
-            button.style.borderBottomWidth = 2;
-            button.style.borderLeftWidth = 2;
-            button.style.borderRightWidth = 2;
-            button.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-            button.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-            button.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-            button.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            button.style.height = 58;
+            button.style.backgroundColor = UIStyles.BgInput;
+            UIStyles.SetBorderRadius(button, UIStyles.RadiusMD);
+            UIStyles.SetBorderWidth(button, 2);
+            UIStyles.SetBorderColor(button, UIStyles.BorderDefault);
             button.style.flexDirection = FlexDirection.Row;
             button.style.alignItems = Align.Center;
-            button.style.paddingLeft = 20;
-            button.style.paddingRight = 20;
+            button.style.paddingLeft = UIStyles.SpaceXL;
+            button.style.paddingRight = UIStyles.SpaceXL;
 
-            // Language name - aligné à gauche
             var langLabel = new Label(label);
-            langLabel.style.fontSize = 20;
-            langLabel.style.color = new Color(0.95f, 0.95f, 0.95f, 1f);
-            langLabel.style.unityFontStyleAndWeight = FontStyle.Normal;
+            langLabel.style.fontSize = UIStyles.FontLG;
+            langLabel.style.color = UIStyles.TextPrimary;
             langLabel.style.flexGrow = 1;
+            langLabel.pickingMode = PickingMode.Ignore;
             button.Add(langLabel);
 
-            // Hover effect - subtil
+            // Arrow indicator
+            var arrow = new Label("\u203A");
+            arrow.style.fontSize = UIStyles.FontXL;
+            arrow.style.color = UIStyles.TextMuted;
+            arrow.pickingMode = PickingMode.Ignore;
+            button.Add(arrow);
+
             button.RegisterCallback<MouseEnterEvent>((evt) =>
             {
-                button.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
-                button.style.borderTopColor = accentColor;
-                button.style.borderBottomColor = accentColor;
-                button.style.borderLeftColor = accentColor;
-                button.style.borderRightColor = accentColor;
+                button.style.backgroundColor = UIStyles.BgInputHover;
+                UIStyles.SetBorderColor(button, UIStyles.Accent);
+                arrow.style.color = UIStyles.Accent;
             });
 
             button.RegisterCallback<MouseLeaveEvent>((evt) =>
             {
-                button.style.backgroundColor = new Color(0.18f, 0.18f, 0.22f, 1f);
-                button.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-                button.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-                button.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-                button.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+                button.style.backgroundColor = UIStyles.BgInput;
+                UIStyles.SetBorderColor(button, UIStyles.BorderDefault);
+                arrow.style.color = UIStyles.TextMuted;
             });
 
             return button;
         }
 
+        // =====================================================================
+        // PANEL 2: Disclaimer / Info
+        // =====================================================================
+
         void CreateDisclaimerPanel()
         {
-            // Container principal
             disclaimerPanel = new VisualElement();
             disclaimerPanel.name = "disclaimer-panel";
-            disclaimerPanel.style.position = Position.Absolute;
-            disclaimerPanel.style.width = Length.Percent(100);
-            disclaimerPanel.style.height = Length.Percent(100);
-            disclaimerPanel.style.backgroundColor = backgroundColor;
+            UIStyles.ApplyBackdropHeavyStyle(disclaimerPanel);
+            disclaimerPanel.style.backgroundColor = UIStyles.BgDeep;
             disclaimerPanel.style.display = DisplayStyle.None;
-            disclaimerPanel.style.alignItems = Align.Center;
-            disclaimerPanel.style.justifyContent = Justify.Center;
-            // IMPORTANT : Bloquer les raycasts pour ne pas cliquer à travers
-            disclaimerPanel.pickingMode = PickingMode.Position;
 
-            // Container pour le contenu
-            var contentContainer = new VisualElement();
-            contentContainer.style.width = 900;
-            contentContainer.style.maxWidth = Length.Percent(90);
-            contentContainer.style.maxHeight = Length.Percent(90);
-            contentContainer.style.paddingTop = 50;
-            contentContainer.style.paddingBottom = 50;
-            contentContainer.style.paddingLeft = 50;
-            contentContainer.style.paddingRight = 50;
-            contentContainer.style.backgroundColor = new Color(0.1f, 0.1f, 0.1f, 1f);
-            contentContainer.style.borderTopLeftRadius = 20;
-            contentContainer.style.borderTopRightRadius = 20;
-            contentContainer.style.borderBottomLeftRadius = 20;
-            contentContainer.style.borderBottomRightRadius = 20;
+            var card = new VisualElement();
+            card.style.width = 850;
+            card.style.maxWidth = Length.Percent(90);
+            card.style.maxHeight = Length.Percent(90);
+            UIStyles.ApplyCardStyle(card, UIStyles.RadiusXL);
+            card.style.paddingTop = UIStyles.Space4XL;
+            card.style.paddingBottom = UIStyles.Space2XL;
+            card.style.paddingLeft = UIStyles.Space4XL;
+            card.style.paddingRight = UIStyles.Space4XL;
 
-            // ScrollView pour le contenu - masquer la scrollbar
+            // ScrollView
             var scrollView = new ScrollView(ScrollViewMode.Vertical);
             scrollView.style.flexGrow = 1;
-            scrollView.verticalScrollerVisibility = ScrollerVisibility.Hidden; // Masquer la scrollbar mais garder le scroll
+            scrollView.verticalScrollerVisibility = ScrollerVisibility.Auto;
             scrollView.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
 
-            // Titre de la formation (sera mis à jour dynamiquement)
-            var titleLabel = new Label("Formation Title");
+            scrollView.RegisterCallback<AttachToPanelEvent>(evt => UIStyles.ApplyMinimalScrollbar(scrollView));
+            scrollView.RegisterCallback<GeometryChangedEvent>(evt => UIStyles.ApplyMinimalScrollbar(scrollView));
+
+            // Title
+            var titleLabel = UIStyles.CreateTitle("", UIStyles.Font3XL);
             titleLabel.name = "training-title";
-            titleLabel.style.fontSize = 36;
-            titleLabel.style.color = accentColor;
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.marginBottom = 20;
-            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            // Gérer le débordement du texte
-            titleLabel.style.whiteSpace = WhiteSpace.Normal; // Permet au texte de passer à la ligne
-            titleLabel.style.width = Length.Percent(100); // Utilise toute la largeur disponible
-            titleLabel.style.overflow = Overflow.Hidden; // Cache le débordement si nécessaire
+            titleLabel.style.marginBottom = UIStyles.SpaceLG;
             scrollView.Add(titleLabel);
 
             // Description
-            var descLabel = new Label("Formation description");
+            var descLabel = UIStyles.CreateBodyText("", UIStyles.FontMD);
             descLabel.name = "training-description";
-            descLabel.style.fontSize = 18;
-            descLabel.style.color = Color.white;
-            descLabel.style.marginBottom = 30;
-            descLabel.style.whiteSpace = WhiteSpace.Normal;
+            descLabel.style.color = UIStyles.TextSecondary;
             descLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            descLabel.style.marginBottom = UIStyles.SpaceXL;
             scrollView.Add(descLabel);
 
-            // Informations (durée, difficulté)
-            var infoContainer = new VisualElement();
-            infoContainer.style.flexDirection = FlexDirection.Row;
-            infoContainer.style.justifyContent = Justify.Center;
-            infoContainer.style.marginBottom = 30;
+            // Info badges row
+            var infoRow = new VisualElement();
+            infoRow.style.flexDirection = FlexDirection.Row;
+            infoRow.style.justifyContent = Justify.Center;
+            infoRow.style.marginBottom = UIStyles.SpaceXL;
 
-            var durationLabel = new Label("Duration: 30 min");
+            var durationLabel = UIStyles.CreateMutedText("", UIStyles.FontBase);
             durationLabel.name = "training-duration";
-            durationLabel.style.fontSize = 16;
-            durationLabel.style.color = Color.white;
-            durationLabel.style.marginRight = 30;
-            infoContainer.Add(durationLabel);
+            durationLabel.style.color = UIStyles.TextSecondary;
+            durationLabel.style.marginRight = UIStyles.Space2XL;
+            infoRow.Add(durationLabel);
 
-            var difficultyLabel = new Label("Difficulty: Intermediate");
+            var difficultyLabel = UIStyles.CreateMutedText("", UIStyles.FontBase);
             difficultyLabel.name = "training-difficulty";
-            difficultyLabel.style.fontSize = 16;
-            difficultyLabel.style.color = Color.white;
-            infoContainer.Add(difficultyLabel);
+            difficultyLabel.style.color = UIStyles.TextSecondary;
+            infoRow.Add(difficultyLabel);
 
-            scrollView.Add(infoContainer);
+            scrollView.Add(infoRow);
 
-            // Séparateur
-            var separator = new VisualElement();
-            separator.style.height = 2;
-            separator.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f);
-            separator.style.marginTop = 20;
-            separator.style.marginBottom = 20;
-            scrollView.Add(separator);
+            // Separator
+            scrollView.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
 
-            // Disclaimer
-            var disclaimerTitle = new Label("Important Information");
+            // Disclaimer title
+            var disclaimerTitle = new Label();
             disclaimerTitle.name = "disclaimer-title";
-            disclaimerTitle.style.fontSize = 24;
-            disclaimerTitle.style.color = primaryColor;
+            disclaimerTitle.style.fontSize = UIStyles.FontXL;
+            disclaimerTitle.style.color = UIStyles.Info;
             disclaimerTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-            disclaimerTitle.style.marginBottom = 15;
+            disclaimerTitle.style.marginBottom = UIStyles.SpaceMD;
             scrollView.Add(disclaimerTitle);
 
-            var disclaimerText = new Label();
+            // Disclaimer text
+            var disclaimerText = UIStyles.CreateBodyText("", UIStyles.FontBase);
             disclaimerText.name = "disclaimer-text";
-            disclaimerText.style.fontSize = 16;
-            disclaimerText.style.color = new Color(0.9f, 0.9f, 0.9f);
-            disclaimerText.style.whiteSpace = WhiteSpace.Normal;
-            disclaimerText.style.marginBottom = 20;
+            disclaimerText.style.color = UIStyles.TextSecondary;
+            disclaimerText.style.marginBottom = UIStyles.SpaceLG;
             scrollView.Add(disclaimerText);
 
-            contentContainer.Add(scrollView);
+            card.Add(scrollView);
 
-            // Boutons
-            var buttonContainer = new VisualElement();
-            buttonContainer.style.flexDirection = FlexDirection.Row;
-            buttonContainer.style.justifyContent = Justify.Center;
-            buttonContainer.style.marginTop = 30;
+            // Buttons
+            var buttonRow = new VisualElement();
+            buttonRow.style.flexDirection = FlexDirection.Row;
+            buttonRow.style.justifyContent = Justify.Center;
+            buttonRow.style.marginTop = UIStyles.SpaceXL;
+            buttonRow.style.flexShrink = 0;
 
-            // Bouton Retour
-            var backButton = new Button(() => OnBackToLanguageSelection());
-            backButton.text = "Back";
+            var backButton = UIStyles.CreateSecondaryButton("Back", () => OnBackToLanguageSelection());
             backButton.name = "back-button";
             backButton.style.width = 150;
-            backButton.style.height = 50;
-            backButton.style.fontSize = 18;
-            backButton.style.marginRight = 20;
-            backButton.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f);
-            backButton.style.color = Color.white;
-            backButton.style.borderTopLeftRadius = 10;
-            backButton.style.borderTopRightRadius = 10;
-            backButton.style.borderBottomLeftRadius = 10;
-            backButton.style.borderBottomRightRadius = 10;
-            buttonContainer.Add(backButton);
+            backButton.style.marginRight = UIStyles.SpaceLG;
+            buttonRow.Add(backButton);
 
-            // Bouton Commencer
-            var startButton = new Button(() => OnStartTraining());
-            startButton.text = "Start Training";
-            startButton.name = "start-button";
-            startButton.style.width = 200;
-            startButton.style.height = 50;
-            startButton.style.fontSize = 18;
-            startButton.style.backgroundColor = accentColor;
-            startButton.style.color = Color.white;
-            startButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            startButton.style.borderTopLeftRadius = 10;
-            startButton.style.borderTopRightRadius = 10;
-            startButton.style.borderBottomLeftRadius = 10;
-            startButton.style.borderBottomRightRadius = 10;
-            buttonContainer.Add(startButton);
+            var nextButton = UIStyles.CreatePrimaryButton("Next", () => OnStartTraining());
+            nextButton.name = "start-button";
+            nextButton.style.width = 200;
+            buttonRow.Add(nextButton);
 
-            contentContainer.Add(buttonContainer);
-            disclaimerPanel.Add(contentContainer);
+            card.Add(buttonRow);
+            disclaimerPanel.Add(card);
             root.Add(disclaimerPanel);
         }
+
+        // =====================================================================
+        // PANEL 3: Start Button
+        // =====================================================================
 
         void CreateStartPanel()
         {
             startPanel = new VisualElement();
             startPanel.name = "start-panel";
-            startPanel.style.position = Position.Absolute;
-            startPanel.style.width = Length.Percent(100);
-            startPanel.style.height = Length.Percent(100);
-            startPanel.style.backgroundColor = new Color(0, 0, 0, 0.85f);
-            startPanel.style.alignItems = Align.Center;
-            startPanel.style.justifyContent = Justify.Center;
+            UIStyles.ApplyBackdropStyle(startPanel);
             startPanel.style.display = DisplayStyle.None;
-            startPanel.pickingMode = PickingMode.Position;
 
+            // Big round start button
             var startButton = new Button(() => OnStartButtonClicked());
-            startButton.text = "Start";
-            startButton.style.width = 200;
-            startButton.style.height = 200;
-            startButton.style.fontSize = 36;
-            startButton.style.backgroundColor = accentColor;
-            startButton.style.color = Color.white;
+            startButton.style.width = 180;
+            startButton.style.height = 180;
+            startButton.style.fontSize = UIStyles.Font3XL;
+            startButton.style.backgroundColor = UIStyles.Accent;
+            startButton.style.color = UIStyles.TextOnAccent;
             startButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            startButton.style.borderTopLeftRadius = 100;
-            startButton.style.borderTopRightRadius = 100;
-            startButton.style.borderBottomLeftRadius = 100;
-            startButton.style.borderBottomRightRadius = 100;
-            startButton.style.borderTopWidth = 3;
-            startButton.style.borderBottomWidth = 3;
-            startButton.style.borderLeftWidth = 3;
-            startButton.style.borderRightWidth = 3;
-            startButton.style.borderTopColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
-            startButton.style.borderBottomColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
-            startButton.style.borderLeftColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
-            startButton.style.borderRightColor = new Color(0.15f, 0.9f, 0.7f, 0.8f);
+            UIStyles.SetBorderRadius(startButton, UIStyles.RadiusPill);
+            UIStyles.SetBorderWidth(startButton, 3);
+            UIStyles.SetBorderColor(startButton, UIStyles.AccentHover);
+
+            // Update text based on language
+            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            startButton.text = lang == "fr" ? "GO" : "GO";
+
+            startButton.RegisterCallback<MouseEnterEvent>(evt =>
+            {
+                startButton.style.backgroundColor = UIStyles.AccentHover;
+                startButton.style.scale = new Scale(new Vector3(1.05f, 1.05f, 1f));
+            });
+            startButton.RegisterCallback<MouseLeaveEvent>(evt =>
+            {
+                startButton.style.backgroundColor = UIStyles.Accent;
+                startButton.style.scale = new Scale(Vector3.one);
+            });
 
             startPanel.Add(startButton);
             root.Add(startPanel);
-
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Start panel created");
         }
 
-        void OnStartButtonClicked()
-        {
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Start button clicked - starting training");
-
-            // Déclencher l'événement
-            OnTrainingStarted?.Invoke();
-
-            // Masquer les panels et désactiver l'UIDocument
-            StartCoroutine(HideAllPanelsAndStart());
-        }
-
-        IEnumerator HideAllPanelsAndStart()
-        {
-            // Fade out start panel
-            if (startPanel != null)
-            {
-                yield return FadeOut(startPanel);
-                startPanel.style.display = DisplayStyle.None;
-            }
-
-            // Désactiver complètement l'UIDocument pour ne plus intercepter aucun clic
-            if (root != null)
-            {
-                root.style.display = DisplayStyle.None;
-                root.pickingMode = PickingMode.Ignore;
-            }
-
-            if (uiDocument != null)
-            {
-                uiDocument.enabled = false;
-            }
-
-            IsDisplaying = false;
-
-            if (debugMode) Debug.Log("[LanguageSelectionUI] UIDocument disabled, applying control mode and showing HUD");
-
-            // Appliquer le mode de contrôle choisi dans le tutoriel
-            ControlModeSettings.ApplyToPlayer();
-
-            // Afficher le HUD de formation
-            ShowTrainingHUD();
-
-            // Lancer la progression des scénarios
-            if (ProgressionManager.Instance != null)
-            {
-                ProgressionManager.Instance.StartProgression();
-                if (debugMode) Debug.Log("[LanguageSelectionUI] Progression started");
-            }
-        }
+        // =====================================================================
+        // EVENT HANDLERS
+        // =====================================================================
 
         void OnLanguageButtonClicked(string langCode)
         {
@@ -645,25 +412,18 @@ namespace WiseTwin
 
             if (debugMode) Debug.Log($"[LanguageSelectionUI] Language selected: {langCode}");
 
-            // Définir la langue dans le LocalizationManager
             if (localizationManager != null)
             {
                 localizationManager.SetLanguage(langCode);
             }
 
-            // Déclencher l'événement
             OnLanguageSelected?.Invoke(langCode);
-
-            // Passer au disclaimer
             ShowDisclaimer();
         }
 
         void ShowDisclaimer()
         {
-            // Mettre à jour les textes du disclaimer selon la langue
             UpdateDisclaimerTexts();
-
-            // Transition
             StartCoroutine(TransitionToDisclaimer());
         }
 
@@ -671,81 +431,59 @@ namespace WiseTwin
         {
             string lang = selectedLanguage;
 
-            // Valeurs par défaut
             string title = lang == "fr" ? "Formation Test" : "Training Test";
             string description = lang == "fr" ? "Formation interactive de test" : "Interactive test training";
             string duration = "30 minutes";
             string difficulty = lang == "fr" ? "Débutant" : "Beginner";
 
-            // Essayer de charger depuis les métadonnées si disponibles
             if (trainingMetadata != null)
             {
-                // Extraire titre multilingue
                 title = GetLocalizedMetadataValue(trainingMetadata, "title", lang, title);
-                // Extraire description multilingue
                 description = GetLocalizedMetadataValue(trainingMetadata, "description", lang, description);
-                // Durée et difficulté ne sont pas multilingues
                 duration = GetMetadataValue<string>(trainingMetadata, "duration", duration);
                 difficulty = GetMetadataValue<string>(trainingMetadata, "difficulty", difficulty);
             }
 
-            // Titre
             var titleLabel = disclaimerPanel.Q<Label>("training-title");
-            if (titleLabel != null)
-            {
-                titleLabel.text = title;
-            }
+            if (titleLabel != null) titleLabel.text = title;
 
-            // Description
             var descLabel = disclaimerPanel.Q<Label>("training-description");
-            if (descLabel != null)
-            {
-                descLabel.text = description;
-            }
+            if (descLabel != null) descLabel.text = description;
 
-            // Durée
             var durationLabel = disclaimerPanel.Q<Label>("training-duration");
             if (durationLabel != null)
             {
-                string durationText = lang == "fr" ? $"Durée : {duration}" : $"Duration: {duration}";
-                durationLabel.text = durationText;
+                durationLabel.text = lang == "fr" ? $"Durée : {duration}" : $"Duration: {duration}";
             }
 
-            // Difficulté (traduire si nécessaire)
             var difficultyLabel = disclaimerPanel.Q<Label>("training-difficulty");
             if (difficultyLabel != null)
             {
                 string displayDifficulty = TranslateDifficulty(difficulty, lang);
-                string diffText = lang == "fr" ? $"Difficulté : {displayDifficulty}" : $"Difficulty: {displayDifficulty}";
-                difficultyLabel.text = diffText;
+                difficultyLabel.text = lang == "fr" ? $"Difficulté : {displayDifficulty}" : $"Difficulty: {displayDifficulty}";
             }
 
-            // Titre disclaimer
             var disclaimerTitle = disclaimerPanel.Q<Label>("disclaimer-title");
             if (disclaimerTitle != null)
             {
                 disclaimerTitle.text = lang == "fr" ? "Informations Importantes" : "Important Information";
             }
 
-            // Texte disclaimer
             var disclaimerText = disclaimerPanel.Q<Label>("disclaimer-text");
             if (disclaimerText != null)
             {
-                // Try to load disclaimer from metadata first
                 string customDisclaimer = null;
                 if (wiseTwinManager != null && wiseTwinManager.MetadataLoader != null)
                 {
                     customDisclaimer = wiseTwinManager.MetadataLoader.GetDisclaimer(lang);
                 }
 
-                // Use custom disclaimer if available, otherwise use default
                 if (!string.IsNullOrEmpty(customDisclaimer))
                 {
                     disclaimerText.text = customDisclaimer;
                 }
                 else
                 {
-                    // Fallback to default disclaimer text
                     if (lang == "fr")
                     {
                         disclaimerText.text =
@@ -765,109 +503,11 @@ namespace WiseTwin
                 }
             }
 
-            // Boutons
             var backButton = disclaimerPanel.Q<Button>("back-button");
-            if (backButton != null)
-            {
-                backButton.text = lang == "fr" ? "Retour" : "Back";
-            }
+            if (backButton != null) backButton.text = lang == "fr" ? "Retour" : "Back";
 
             var startButton = disclaimerPanel.Q<Button>("start-button");
-            if (startButton != null)
-            {
-                startButton.text = lang == "fr" ? "Suivant" : "Next";
-            }
-        }
-
-        T GetMetadataValue<T>(Dictionary<string, object> data, string key, T defaultValue)
-        {
-            if (data != null && data.ContainsKey(key))
-            {
-                var value = data[key];
-                if (value is T typedValue)
-                {
-                    return typedValue;
-                }
-                else if (value != null)
-                {
-                    // Essayer de convertir
-                    try
-                    {
-                        return (T)System.Convert.ChangeType(value, typeof(T));
-                    }
-                    catch
-                    {
-                        return defaultValue;
-                    }
-                }
-            }
-            return defaultValue;
-        }
-
-        string GetLocalizedMetadataValue(Dictionary<string, object> data, string key, string language, string defaultValue)
-        {
-            if (data == null || !data.ContainsKey(key))
-                return defaultValue;
-
-            var value = data[key];
-
-            // Si c'est déjà une string simple (ancien format), la retourner
-            if (value is string simpleString)
-                return simpleString;
-
-            // Si c'est un objet avec des langues {en: "...", fr: "..."}
-            if (value is Dictionary<string, object> localizedDict)
-            {
-                // Essayer de récupérer la langue demandée
-                if (localizedDict.ContainsKey(language) && localizedDict[language] != null)
-                    return localizedDict[language].ToString();
-
-                // Fallback sur l'anglais
-                if (localizedDict.ContainsKey("en") && localizedDict["en"] != null)
-                    return localizedDict["en"].ToString();
-            }
-            // Newtonsoft peut retourner un JObject
-            else if (value != null && value.GetType().FullName.Contains("JObject"))
-            {
-                try
-                {
-                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(value);
-                    var localizedObj = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-                    if (localizedObj != null)
-                    {
-                        if (localizedObj.ContainsKey(language))
-                            return localizedObj[language];
-                        if (localizedObj.ContainsKey("en"))
-                            return localizedObj["en"];
-                    }
-                }
-                catch { }
-            }
-
-            return defaultValue;
-        }
-
-        string TranslateDifficulty(string difficulty, string language)
-        {
-            // Si la langue est le français, retourner tel quel
-            if (language == "fr")
-                return difficulty;
-
-            // Traduire du français vers l'anglais
-            switch (difficulty.ToLower())
-            {
-                case "facile":
-                    return "Easy";
-                case "intermédiaire":
-                    return "Intermediate";
-                case "avancé":
-                    return "Advanced";
-                case "expert":
-                    return "Expert";
-                default:
-                    // Si c'est déjà en anglais ou inconnu, retourner tel quel
-                    return difficulty;
-            }
+            if (startButton != null) startButton.text = lang == "fr" ? "Suivant" : "Next";
         }
 
         void OnBackToLanguageSelection()
@@ -878,8 +518,6 @@ namespace WiseTwin
         void OnStartTraining()
         {
             if (debugMode) Debug.Log("[LanguageSelectionUI] Showing tutorial");
-
-            // Hide disclaimer and show tutorial
             StartCoroutine(TransitionToTutorial());
         }
 
@@ -887,7 +525,6 @@ namespace WiseTwin
         {
             if (debugMode) Debug.Log("[LanguageSelectionUI] Tutorial completed, showing start button");
 
-            // Afficher le panneau Start (gros bouton rond)
             if (startPanel != null)
             {
                 startPanel.style.display = DisplayStyle.Flex;
@@ -895,62 +532,26 @@ namespace WiseTwin
             }
         }
 
-        void ShowTrainingHUD()
+        void OnStartButtonClicked()
         {
-            // Chercher ou créer le TrainingHUD
-            var trainingHUD = TrainingHUD.Instance;
-            if (trainingHUD == null)
-            {
-                // Créer le HUD s'il n'existe pas
-                var hudGO = new GameObject("TrainingHUD");
-                trainingHUD = hudGO.AddComponent<TrainingHUD>();
-            }
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Start button clicked - starting training");
 
-            // NOTE: Auto-detection is no longer needed
-            // ProgressionManager automatically initializes the total from metadata scenarios
-
-            // Afficher le HUD
-            trainingHUD.Show();
-
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Training HUD shown");
+            OnTrainingStarted?.Invoke();
+            StartCoroutine(HideAllPanelsAndStart());
         }
 
-        public void ShowLanguageSelection()
-        {
-            if (!isInitialized)
-            {
-                Debug.LogWarning("[LanguageSelectionUI] Not initialized yet! Initializing now...");
-                Initialize();
-            }
-
-            // Block all player controls during language selection
-            PlayerControls.SetEnabled(false);
-
-            if (languageSelectionPanel != null)
-            {
-                if (debugMode) Debug.Log("[LanguageSelectionUI] Showing language selection panel");
-                languageSelectionPanel.style.display = DisplayStyle.Flex;
-                IsDisplaying = true;
-                // Désactiver temporairement le fade pour tester
-                languageSelectionPanel.style.opacity = 1;
-                //StartCoroutine(FadeIn(languageSelectionPanel));
-            }
-            else
-            {
-                Debug.LogError("[LanguageSelectionUI] Language selection panel is null!");
-            }
-        }
+        // =====================================================================
+        // TRANSITIONS
+        // =====================================================================
 
         IEnumerator TransitionToDisclaimer()
         {
-            // Fade out language panel
             if (languageSelectionPanel != null)
             {
                 yield return FadeOut(languageSelectionPanel);
                 languageSelectionPanel.style.display = DisplayStyle.None;
             }
 
-            // Fade in disclaimer panel
             if (disclaimerPanel != null)
             {
                 disclaimerPanel.style.display = DisplayStyle.Flex;
@@ -960,14 +561,12 @@ namespace WiseTwin
 
         IEnumerator TransitionToTutorial()
         {
-            // Fade out disclaimer panel
             if (disclaimerPanel != null)
             {
                 yield return FadeOut(disclaimerPanel);
                 disclaimerPanel.style.display = DisplayStyle.None;
             }
 
-            // Show tutorial
             if (tutorialUI != null)
             {
                 tutorialUI.Show(selectedLanguage);
@@ -981,14 +580,12 @@ namespace WiseTwin
 
         IEnumerator TransitionToLanguageSelection()
         {
-            // Fade out disclaimer panel
             if (disclaimerPanel != null)
             {
                 yield return FadeOut(disclaimerPanel);
                 disclaimerPanel.style.display = DisplayStyle.None;
             }
 
-            // Fade in language panel
             if (languageSelectionPanel != null)
             {
                 languageSelectionPanel.style.display = DisplayStyle.Flex;
@@ -996,47 +593,74 @@ namespace WiseTwin
             }
         }
 
-        IEnumerator HideAllPanels()
+        IEnumerator HideAllPanelsAndStart()
         {
-            if (debugMode) Debug.Log("[LanguageSelectionUI] Hiding all panels...");
-
-            if (disclaimerPanel != null && disclaimerPanel.style.display == DisplayStyle.Flex)
-            {
-                yield return FadeOut(disclaimerPanel);
-                disclaimerPanel.style.display = DisplayStyle.None;
-            }
-
-            if (languageSelectionPanel != null && languageSelectionPanel.style.display == DisplayStyle.Flex)
-            {
-                yield return FadeOut(languageSelectionPanel);
-                languageSelectionPanel.style.display = DisplayStyle.None;
-            }
-
-            // Hide start panel if visible
-            if (startPanel != null && startPanel.style.display == DisplayStyle.Flex)
+            if (startPanel != null)
             {
                 yield return FadeOut(startPanel);
                 startPanel.style.display = DisplayStyle.None;
             }
 
-            // IMPORTANT: Hide the root element and disable picking
             if (root != null)
             {
                 root.style.display = DisplayStyle.None;
                 root.pickingMode = PickingMode.Ignore;
-                if (debugMode) Debug.Log("[LanguageSelectionUI] Root element hidden + picking disabled");
             }
 
-            // Disable UIDocument entirely to prevent any event interception
             if (uiDocument != null)
             {
                 uiDocument.enabled = false;
-                if (debugMode) Debug.Log("[LanguageSelectionUI] UIDocument disabled");
             }
 
-            // IMPORTANT : Marquer comme non affiché pour permettre les clics 3D
             IsDisplaying = false;
+
+            ControlModeSettings.ApplyToPlayer();
+            ShowTrainingHUD();
+
+            if (ProgressionManager.Instance != null)
+            {
+                ProgressionManager.Instance.StartProgression();
+            }
         }
+
+        // =====================================================================
+        // HUD & DISPLAY
+        // =====================================================================
+
+        void ShowTrainingHUD()
+        {
+            var trainingHUD = TrainingHUD.Instance;
+            if (trainingHUD == null)
+            {
+                var hudGO = new GameObject("TrainingHUD");
+                trainingHUD = hudGO.AddComponent<TrainingHUD>();
+            }
+
+            trainingHUD.Show();
+
+            if (debugMode) Debug.Log("[LanguageSelectionUI] Training HUD shown");
+        }
+
+        public void ShowLanguageSelection()
+        {
+            if (!isInitialized)
+            {
+                Initialize();
+            }
+
+            PlayerControls.SetEnabled(false);
+
+            if (languageSelectionPanel != null)
+            {
+                languageSelectionPanel.style.display = DisplayStyle.Flex;
+                languageSelectionPanel.style.opacity = 1;
+                IsDisplaying = true;
+            }
+        }
+
+        // =====================================================================
+        // ANIMATIONS
+        // =====================================================================
 
         IEnumerator FadeIn(VisualElement element)
         {
@@ -1063,9 +687,74 @@ namespace WiseTwin
             element.style.opacity = 0;
         }
 
-        /// <summary>
-        /// Pour les tests dans l'éditeur
-        /// </summary>
+        // =====================================================================
+        // UTILITY
+        // =====================================================================
+
+        T GetMetadataValue<T>(Dictionary<string, object> data, string key, T defaultValue)
+        {
+            if (data != null && data.ContainsKey(key))
+            {
+                var value = data[key];
+                if (value is T typedValue) return typedValue;
+                if (value != null)
+                {
+                    try { return (T)System.Convert.ChangeType(value, typeof(T)); }
+                    catch { return defaultValue; }
+                }
+            }
+            return defaultValue;
+        }
+
+        string GetLocalizedMetadataValue(Dictionary<string, object> data, string key, string language, string defaultValue)
+        {
+            if (data == null || !data.ContainsKey(key))
+                return defaultValue;
+
+            var value = data[key];
+
+            if (value is string simpleString)
+                return simpleString;
+
+            if (value is Dictionary<string, object> localizedDict)
+            {
+                if (localizedDict.ContainsKey(language) && localizedDict[language] != null)
+                    return localizedDict[language].ToString();
+                if (localizedDict.ContainsKey("en") && localizedDict["en"] != null)
+                    return localizedDict["en"].ToString();
+            }
+            else if (value != null && value.GetType().FullName.Contains("JObject"))
+            {
+                try
+                {
+                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(value);
+                    var localizedObj = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+                    if (localizedObj != null)
+                    {
+                        if (localizedObj.ContainsKey(language)) return localizedObj[language];
+                        if (localizedObj.ContainsKey("en")) return localizedObj["en"];
+                    }
+                }
+                catch { }
+            }
+
+            return defaultValue;
+        }
+
+        string TranslateDifficulty(string difficulty, string language)
+        {
+            if (language == "fr") return difficulty;
+
+            switch (difficulty.ToLower())
+            {
+                case "facile": return "Easy";
+                case "intermédiaire": return "Intermediate";
+                case "avancé": return "Advanced";
+                case "expert": return "Expert";
+                default: return difficulty;
+            }
+        }
+
         [ContextMenu("Test Show Language Selection")]
         public void TestShowLanguageSelection()
         {

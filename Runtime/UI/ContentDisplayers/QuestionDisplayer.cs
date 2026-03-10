@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using WiseTwin.Analytics;
 using Newtonsoft.Json.Linq;
+using WiseTwin.UI;
 
 namespace WiseTwin.UI
 {
@@ -283,119 +284,89 @@ namespace WiseTwin.UI
 
         private void CreateQuestionUI()
         {
-            // Clear root
             rootElement.Clear();
 
-            // Container modal
+            // Modal backdrop
             modalContainer = new VisualElement();
-            modalContainer.style.position = Position.Absolute;
-            modalContainer.style.width = Length.Percent(100);
-            modalContainer.style.height = Length.Percent(100);
-            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.85f);
-            modalContainer.style.alignItems = Align.Center;
-            modalContainer.style.justifyContent = Justify.Center;
-            modalContainer.pickingMode = PickingMode.Position;
+            UIStyles.ApplyBackdropHeavyStyle(modalContainer);
 
-            // Boîte de question
+            // Question card
             var questionBox = new VisualElement();
-            questionBox.style.width = 700;
+            questionBox.style.width = 680;
             questionBox.style.maxWidth = Length.Percent(90);
             questionBox.style.maxHeight = Length.Percent(80);
-            questionBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
-            questionBox.style.overflow = Overflow.Hidden; // Cacher le dépassement
-            questionBox.style.borderTopLeftRadius = 25;
-            questionBox.style.borderTopRightRadius = 25;
-            questionBox.style.borderBottomLeftRadius = 25;
-            questionBox.style.borderBottomRightRadius = 25;
-            questionBox.style.paddingTop = 40;
-            questionBox.style.paddingBottom = 40;
-            questionBox.style.paddingLeft = 40;
-            questionBox.style.paddingRight = 40;
+            UIStyles.ApplyCardStyle(questionBox, UIStyles.RadiusXL);
+            questionBox.style.overflow = Overflow.Hidden;
+            UIStyles.SetPadding(questionBox, UIStyles.Space3XL);
 
-            // Indicateur de progression si plusieurs questions
+            // Progress indicator
             progressLabel = new Label();
-            progressLabel.style.fontSize = 16;
-            progressLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
-            progressLabel.style.marginBottom = 10;
+            progressLabel.style.fontSize = UIStyles.FontBase;
+            progressLabel.style.color = UIStyles.TextMuted;
+            progressLabel.style.marginBottom = UIStyles.SpaceSM;
             progressLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             questionBox.Add(progressLabel);
 
-            // Texte de la question
+            // Question text
             questionLabel = new Label();
-            questionLabel.style.fontSize = 24;
-            questionLabel.style.color = Color.white;
-            questionLabel.style.marginBottom = 35;
+            questionLabel.style.fontSize = UIStyles.FontXL;
+            questionLabel.style.color = UIStyles.TextPrimary;
+            questionLabel.style.marginBottom = UIStyles.Space2XL;
             questionLabel.style.whiteSpace = WhiteSpace.Normal;
             questionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             questionBox.Add(questionLabel);
 
-            // Container des options avec scroll
+            // Options container with scroll
             optionsContainer = new ScrollView();
-            optionsContainer.style.marginBottom = 10;
-            optionsContainer.style.maxHeight = 400; // Hauteur max avant scroll
+            optionsContainer.style.marginBottom = UIStyles.SpaceSM;
+            optionsContainer.style.maxHeight = 400;
             optionsContainer.style.flexGrow = 1;
             questionBox.Add(optionsContainer);
 
-            // Label d'instruction (choix unique/multiple) - APRÈS les options
+            // Instruction label (single/multiple choice)
             var instructionLabel = new Label();
             instructionLabel.name = "instruction-label";
-            instructionLabel.style.fontSize = 14;
-            instructionLabel.style.color = new Color(0.7f, 0.7f, 0.8f, 1f);
-            instructionLabel.style.marginTop = 5;
-            instructionLabel.style.marginBottom = 15;
-            instructionLabel.style.paddingTop = 8;
-            instructionLabel.style.paddingBottom = 8;
-            instructionLabel.style.paddingLeft = 12;
-            instructionLabel.style.paddingRight = 12;
-            instructionLabel.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.4f);
-            instructionLabel.style.borderTopLeftRadius = 6;
-            instructionLabel.style.borderTopRightRadius = 6;
-            instructionLabel.style.borderBottomLeftRadius = 6;
-            instructionLabel.style.borderBottomRightRadius = 6;
+            instructionLabel.style.fontSize = UIStyles.FontSM;
+            instructionLabel.style.color = UIStyles.TextMuted;
+            instructionLabel.style.marginTop = UIStyles.SpaceXS;
+            instructionLabel.style.marginBottom = UIStyles.SpaceLG;
+            instructionLabel.style.paddingTop = UIStyles.SpaceSM;
+            instructionLabel.style.paddingBottom = UIStyles.SpaceSM;
+            instructionLabel.style.paddingLeft = UIStyles.SpaceMD;
+            instructionLabel.style.paddingRight = UIStyles.SpaceMD;
+            instructionLabel.style.backgroundColor = UIStyles.BgElevated;
+            UIStyles.SetBorderRadius(instructionLabel, UIStyles.RadiusSM);
             instructionLabel.style.whiteSpace = WhiteSpace.Normal;
             instructionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             instructionLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
             questionBox.Add(instructionLabel);
 
-            // Zone de feedback (cachée au début)
+            // Feedback zone (hidden initially)
             feedbackContainer = new VisualElement();
             feedbackContainer.name = "feedback-container";
             feedbackContainer.style.display = DisplayStyle.None;
-            feedbackContainer.style.marginTop = 20;
-            feedbackContainer.style.paddingTop = 20;
-            feedbackContainer.style.paddingBottom = 20;
-            feedbackContainer.style.paddingLeft = 20;
-            feedbackContainer.style.paddingRight = 20;
-            feedbackContainer.style.borderTopLeftRadius = 10;
-            feedbackContainer.style.borderTopRightRadius = 10;
-            feedbackContainer.style.borderBottomLeftRadius = 10;
-            feedbackContainer.style.borderBottomRightRadius = 10;
+            feedbackContainer.style.marginTop = UIStyles.SpaceLG;
+            UIStyles.SetPadding(feedbackContainer, UIStyles.SpaceLG);
+            UIStyles.SetBorderRadius(feedbackContainer, UIStyles.RadiusMD);
 
             feedbackLabel = new Label();
             feedbackLabel.name = "feedback-text";
-            feedbackLabel.style.fontSize = 18;
-            feedbackLabel.style.color = Color.white;
+            feedbackLabel.style.fontSize = UIStyles.FontMD;
+            feedbackLabel.style.color = UIStyles.TextPrimary;
             feedbackLabel.style.whiteSpace = WhiteSpace.Normal;
             feedbackLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             feedbackContainer.Add(feedbackLabel);
             questionBox.Add(feedbackContainer);
 
-            // Bouton Valider (désactivé par défaut jusqu'à sélection)
-            validateButton = new Button(ValidateAnswer);
+            // Validate button
+            validateButton = UIStyles.CreatePrimaryButton(
+                LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate",
+                ValidateAnswer
+            );
             validateButton.name = "validate-button";
-            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
-
-            validateButton.style.height = 50;
-            validateButton.style.fontSize = 18;
-            validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-            validateButton.style.color = Color.white;
-            validateButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            validateButton.style.borderTopLeftRadius = 10;
-            validateButton.style.borderTopRightRadius = 10;
-            validateButton.style.borderBottomLeftRadius = 10;
-            validateButton.style.borderBottomRightRadius = 10;
-            validateButton.style.marginTop = 20;
-            validateButton.SetEnabled(false); // Désactivé par défaut
+            validateButton.style.marginTop = UIStyles.SpaceLG;
+            validateButton.style.alignSelf = Align.Stretch;
+            validateButton.SetEnabled(false);
             validateButton.style.opacity = 0.5f;
             questionBox.Add(validateButton);
 
@@ -617,7 +588,7 @@ namespace WiseTwin.UI
 
                     // Réinitialiser le bouton valider
                     validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
-                    validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
+                    validateButton.style.backgroundColor = UIStyles.Accent;
                     validateButton.clicked -= NextQuestion;
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += ValidateAnswer;
@@ -636,48 +607,35 @@ namespace WiseTwin.UI
             // Clear root
             rootElement.Clear();
 
-            // Container modal
+            // Modal backdrop
             modalContainer = new VisualElement();
-            modalContainer.style.position = Position.Absolute;
-            modalContainer.style.width = Length.Percent(100);
-            modalContainer.style.height = Length.Percent(100);
-            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.85f);
-            modalContainer.style.alignItems = Align.Center;
-            modalContainer.style.justifyContent = Justify.Center;
-            modalContainer.pickingMode = PickingMode.Position;
+            UIStyles.ApplyBackdropHeavyStyle(modalContainer);
 
-            // Boîte de question
+            // Question card
             var questionBox = new VisualElement();
             questionBox.style.width = 700;
             questionBox.style.maxWidth = Length.Percent(90);
             questionBox.style.maxHeight = Length.Percent(80);
-            questionBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
-            questionBox.style.overflow = Overflow.Hidden; // Cacher le dépassement
-            questionBox.style.borderTopLeftRadius = 25;
-            questionBox.style.borderTopRightRadius = 25;
-            questionBox.style.borderBottomLeftRadius = 25;
-            questionBox.style.borderBottomRightRadius = 25;
-            questionBox.style.paddingTop = 40;
-            questionBox.style.paddingBottom = 40;
-            questionBox.style.paddingLeft = 40;
-            questionBox.style.paddingRight = 40;
+            UIStyles.ApplyCardStyle(questionBox, UIStyles.RadiusXL);
+            questionBox.style.overflow = Overflow.Hidden;
+            UIStyles.SetPadding(questionBox, UIStyles.Space3XL);
 
-            // Texte de la question
+            // Question text
             questionLabel = new Label(questionText);
-            questionLabel.style.fontSize = 24;
-            questionLabel.style.color = Color.white;
-            questionLabel.style.marginBottom = 35;
+            questionLabel.style.fontSize = UIStyles.FontXL;
+            questionLabel.style.color = UIStyles.TextPrimary;
+            questionLabel.style.marginBottom = UIStyles.Space2XL;
             questionLabel.style.whiteSpace = WhiteSpace.Normal;
             questionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             questionBox.Add(questionLabel);
 
-            // Container des options avec scroll
+            // Options container with scroll
             optionsContainer = new ScrollView();
-            optionsContainer.style.marginBottom = 30;
-            optionsContainer.style.maxHeight = 400; // Hauteur max avant scroll
+            optionsContainer.style.marginBottom = UIStyles.SpaceSM;
+            optionsContainer.style.maxHeight = 400;
             optionsContainer.style.flexGrow = 1;
 
-            // Créer les boutons d'options
+            // Create option buttons
             for (int i = 0; i < options.Count; i++)
             {
                 int index = i;
@@ -687,27 +645,23 @@ namespace WiseTwin.UI
 
             questionBox.Add(optionsContainer);
 
-            // Label d'instruction (choix unique/multiple) - APRÈS les options
+            // Instruction label (single/multiple choice)
             var instructionLabel = new Label();
             instructionLabel.name = "instruction-label";
-            instructionLabel.style.fontSize = 14;
-            instructionLabel.style.color = new Color(0.7f, 0.7f, 0.8f, 1f);
-            instructionLabel.style.marginTop = 5;
-            instructionLabel.style.marginBottom = 15;
-            instructionLabel.style.paddingTop = 8;
-            instructionLabel.style.paddingBottom = 8;
-            instructionLabel.style.paddingLeft = 12;
-            instructionLabel.style.paddingRight = 12;
-            instructionLabel.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.4f);
-            instructionLabel.style.borderTopLeftRadius = 6;
-            instructionLabel.style.borderTopRightRadius = 6;
-            instructionLabel.style.borderBottomLeftRadius = 6;
-            instructionLabel.style.borderBottomRightRadius = 6;
+            instructionLabel.style.fontSize = UIStyles.FontSM;
+            instructionLabel.style.color = UIStyles.TextMuted;
+            instructionLabel.style.marginTop = UIStyles.SpaceXS;
+            instructionLabel.style.marginBottom = UIStyles.SpaceLG;
+            instructionLabel.style.paddingTop = UIStyles.SpaceSM;
+            instructionLabel.style.paddingBottom = UIStyles.SpaceSM;
+            instructionLabel.style.paddingLeft = UIStyles.SpaceMD;
+            instructionLabel.style.paddingRight = UIStyles.SpaceMD;
+            instructionLabel.style.backgroundColor = UIStyles.BgElevated;
+            UIStyles.SetBorderRadius(instructionLabel, UIStyles.RadiusSM);
             instructionLabel.style.whiteSpace = WhiteSpace.Normal;
             instructionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             instructionLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
 
-            // Mettre à jour le texte selon le mode (sans icônes)
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
             if (isMultipleChoice)
             {
@@ -723,46 +677,33 @@ namespace WiseTwin.UI
             }
             questionBox.Add(instructionLabel);
 
-            // Zone de feedback (cachée au début)
+            // Feedback zone (hidden initially)
             feedbackContainer = new VisualElement();
             feedbackContainer.name = "feedback-container";
             feedbackContainer.style.display = DisplayStyle.None;
-            feedbackContainer.style.marginTop = 20;
-            feedbackContainer.style.paddingTop = 20;
-            feedbackContainer.style.paddingBottom = 20;
-            feedbackContainer.style.paddingLeft = 20;
-            feedbackContainer.style.paddingRight = 20;
-            feedbackContainer.style.borderTopLeftRadius = 10;
-            feedbackContainer.style.borderTopRightRadius = 10;
-            feedbackContainer.style.borderBottomLeftRadius = 10;
-            feedbackContainer.style.borderBottomRightRadius = 10;
+            feedbackContainer.style.marginTop = UIStyles.SpaceLG;
+            UIStyles.SetPadding(feedbackContainer, UIStyles.SpaceLG);
+            UIStyles.SetBorderRadius(feedbackContainer, UIStyles.RadiusMD);
 
             feedbackLabel = new Label();
             feedbackLabel.name = "feedback-text";
-            feedbackLabel.style.fontSize = 18;
-            feedbackLabel.style.color = Color.white;
+            feedbackLabel.style.fontSize = UIStyles.FontMD;
+            feedbackLabel.style.color = UIStyles.TextPrimary;
             feedbackLabel.style.whiteSpace = WhiteSpace.Normal;
             feedbackLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             feedbackContainer.Add(feedbackLabel);
 
             questionBox.Add(feedbackContainer);
 
-            // Bouton Valider (désactivé par défaut jusqu'à sélection)
-            validateButton = new Button(ValidateAnswer);
+            // Validate button
+            validateButton = UIStyles.CreatePrimaryButton(
+                LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate",
+                ValidateAnswer
+            );
             validateButton.name = "validate-button";
-            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
-
-            validateButton.style.height = 50;
-            validateButton.style.fontSize = 18;
-            validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-            validateButton.style.color = Color.white;
-            validateButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            validateButton.style.borderTopLeftRadius = 10;
-            validateButton.style.borderTopRightRadius = 10;
-            validateButton.style.borderBottomLeftRadius = 10;
-            validateButton.style.borderBottomRightRadius = 10;
-            validateButton.style.marginTop = 20;
-            validateButton.SetEnabled(false); // Désactivé par défaut
+            validateButton.style.marginTop = UIStyles.SpaceLG;
+            validateButton.style.alignSelf = Align.Stretch;
+            validateButton.SetEnabled(false);
             validateButton.style.opacity = 0.5f;
 
             questionBox.Add(validateButton);
@@ -773,80 +714,46 @@ namespace WiseTwin.UI
 
         VisualElement CreateOptionButton(string text, int index)
         {
-            // Container pour l'option (contiendra le checkbox/radio + texte)
-            var optionContainer = new VisualElement();
-            optionContainer.style.flexDirection = FlexDirection.Row;
-            optionContainer.style.alignItems = Align.Center;
-            optionContainer.style.marginBottom = 12;
-            optionContainer.style.paddingTop = 12;
-            optionContainer.style.paddingBottom = 12;
-            optionContainer.style.paddingLeft = 15;
-            optionContainer.style.paddingRight = 15;
-            optionContainer.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
-            optionContainer.style.minHeight = 50; // Hauteur minimum pour éviter l'écrasement
-            optionContainer.style.borderTopLeftRadius = 10;
-            optionContainer.style.borderTopRightRadius = 10;
-            optionContainer.style.borderBottomLeftRadius = 10;
-            optionContainer.style.borderBottomRightRadius = 10;
-            optionContainer.style.borderTopWidth = 2;
-            optionContainer.style.borderBottomWidth = 2;
-            optionContainer.style.borderLeftWidth = 2;
-            optionContainer.style.borderRightWidth = 2;
-            optionContainer.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            optionContainer.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            optionContainer.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            optionContainer.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            optionContainer.style.cursor = StyleKeyword.Auto;
+            var optionContainer = UIStyles.CreateSelectableOption(UIStyles.RadiusMD);
+            optionContainer.style.minHeight = 50;
             optionContainer.pickingMode = PickingMode.Position;
             optionContainer.name = $"option-{index}";
 
-            // Indicateur visuel (cercle pour radio, carré pour checkbox)
+            // Indicator (circle for radio, square for checkbox)
             var indicator = new VisualElement();
             indicator.name = "indicator";
-            indicator.style.width = 24;
-            indicator.style.height = 24;
-            indicator.style.marginRight = 12;
-            indicator.style.borderTopWidth = 2;
-            indicator.style.borderBottomWidth = 2;
-            indicator.style.borderLeftWidth = 2;
-            indicator.style.borderRightWidth = 2;
-            indicator.style.borderTopColor = Color.white;
-            indicator.style.borderBottomColor = Color.white;
-            indicator.style.borderLeftColor = Color.white;
-            indicator.style.borderRightColor = Color.white;
+            indicator.style.width = 22;
+            indicator.style.height = 22;
+            indicator.style.marginRight = UIStyles.SpaceMD;
+            indicator.style.flexShrink = 0;
+            UIStyles.SetBorderWidth(indicator, 2);
+            UIStyles.SetBorderColor(indicator, UIStyles.TextSecondary);
             indicator.style.backgroundColor = Color.clear;
 
             if (isMultipleChoice)
             {
-                // Checkbox (carré)
-                indicator.style.borderTopLeftRadius = 4;
-                indicator.style.borderTopRightRadius = 4;
-                indicator.style.borderBottomLeftRadius = 4;
-                indicator.style.borderBottomRightRadius = 4;
+                UIStyles.SetBorderRadius(indicator, UIStyles.SpaceXS);
             }
             else
             {
-                // Radio button (cercle)
-                indicator.style.borderTopLeftRadius = 12;
-                indicator.style.borderTopRightRadius = 12;
-                indicator.style.borderBottomLeftRadius = 12;
-                indicator.style.borderBottomRightRadius = 12;
+                UIStyles.SetBorderRadius(indicator, UIStyles.RadiusPill);
             }
 
-            // Texte de l'option
+            // Option text
             var label = new Label(text);
-            label.style.fontSize = 18;
-            label.style.color = Color.white;
+            label.style.fontSize = UIStyles.FontMD;
+            label.style.color = UIStyles.TextPrimary;
             label.style.flexGrow = 1;
             label.style.flexShrink = 1;
             label.style.whiteSpace = WhiteSpace.Normal;
             label.style.overflow = Overflow.Hidden;
             label.style.textOverflow = TextOverflow.Clip;
+            label.pickingMode = PickingMode.Ignore;
 
             optionContainer.Add(indicator);
             optionContainer.Add(label);
 
-            // Event click
+            // Click
             optionContainer.RegisterCallback<ClickEvent>((evt) => {
                 if (!hasAnswered)
                 {
@@ -854,19 +761,18 @@ namespace WiseTwin.UI
                 }
             });
 
-            // Hover effect
+            // Hover
             optionContainer.RegisterCallback<MouseEnterEvent>((evt) => {
                 if (!hasAnswered)
                 {
-                    optionContainer.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
-                    optionContainer.style.cursor = StyleKeyword.Auto;
+                    optionContainer.style.backgroundColor = UIStyles.BgInputHover;
                 }
             });
 
             optionContainer.RegisterCallback<MouseLeaveEvent>((evt) => {
                 if (!hasAnswered && !optionContainer.ClassListContains("selected"))
                 {
-                    optionContainer.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
+                    optionContainer.style.backgroundColor = UIStyles.BgInput;
                 }
             });
 
@@ -932,25 +838,15 @@ namespace WiseTwin.UI
                     if (isSelected)
                     {
                         option.AddToClassList("selected");
-                        option.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
-                        option.style.borderTopColor = new Color(0.2f, 0.6f, 1f, 1f);
-                        option.style.borderBottomColor = new Color(0.2f, 0.6f, 1f, 1f);
-                        option.style.borderLeftColor = new Color(0.2f, 0.6f, 1f, 1f);
-                        option.style.borderRightColor = new Color(0.2f, 0.6f, 1f, 1f);
+                        UIStyles.ApplySelectedStyle(option);
 
-                        // Remplir l'indicateur
-                        indicator.style.backgroundColor = new Color(0.2f, 0.6f, 1f, 1f);
+                        indicator.style.backgroundColor = UIStyles.Info;
                     }
                     else
                     {
                         option.RemoveFromClassList("selected");
-                        option.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
-                        option.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                        option.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                        option.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                        option.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+                        UIStyles.ResetOptionStyle(option);
 
-                        // Vider l'indicateur
                         indicator.style.backgroundColor = Color.clear;
                     }
                 }
@@ -1021,66 +917,44 @@ namespace WiseTwin.UI
                 // Appliquer le style en fonction du statut
                 if (isCorrectOption)
                 {
-                    // Option correcte - toujours afficher en vert
-                    option.style.backgroundColor = new Color(0.1f, 0.5f, 0.3f, 0.4f);
-                    option.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    option.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    option.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    option.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    indicator.style.backgroundColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    indicator.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    indicator.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    indicator.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                    indicator.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                    UIStyles.ApplyCorrectStyle(option);
+                    indicator.style.backgroundColor = UIStyles.Success;
+                    UIStyles.SetBorderColor(indicator, UIStyles.Success);
 
-                    // Ajouter un label "✓" pour indiquer que c'est correct
                     var checkmark = option.Q<Label>("checkmark");
                     if (checkmark == null)
                     {
-                        checkmark = new Label("✓");
+                        checkmark = new Label("\u2713");
                         checkmark.name = "checkmark";
-                        checkmark.style.fontSize = 20;
-                        checkmark.style.color = new Color(0.1f, 0.8f, 0.4f, 1f);
+                        checkmark.style.fontSize = UIStyles.FontLG;
+                        checkmark.style.color = UIStyles.Success;
                         checkmark.style.unityFontStyleAndWeight = FontStyle.Bold;
-                        checkmark.style.marginLeft = 10;
+                        checkmark.style.marginLeft = UIStyles.SpaceSM;
                         option.Add(checkmark);
                     }
                 }
                 else if (isUserSelected)
                 {
-                    // Option incorrecte sélectionnée par l'utilisateur - afficher en rouge
-                    option.style.backgroundColor = new Color(0.5f, 0.1f, 0.1f, 0.4f);
-                    option.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    option.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    option.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    option.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    indicator.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    indicator.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    indicator.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    indicator.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                    indicator.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                    UIStyles.ApplyIncorrectStyle(option);
+                    indicator.style.backgroundColor = UIStyles.Danger;
+                    UIStyles.SetBorderColor(indicator, UIStyles.Danger);
 
-                    // Ajouter un label "✗" pour indiquer que c'est incorrect
                     var crossmark = option.Q<Label>("crossmark");
                     if (crossmark == null)
                     {
-                        crossmark = new Label("✗");
+                        crossmark = new Label("\u2717");
                         crossmark.name = "crossmark";
-                        crossmark.style.fontSize = 20;
-                        crossmark.style.color = new Color(0.8f, 0.2f, 0.2f, 1f);
+                        crossmark.style.fontSize = UIStyles.FontLG;
+                        crossmark.style.color = UIStyles.Danger;
                         crossmark.style.unityFontStyleAndWeight = FontStyle.Bold;
-                        crossmark.style.marginLeft = 10;
+                        crossmark.style.marginLeft = UIStyles.SpaceSM;
                         option.Add(crossmark);
                     }
                 }
                 else
                 {
-                    // Option non sélectionnée et incorrecte - griser légèrement
-                    option.style.backgroundColor = new Color(0.15f, 0.15f, 0.18f, 0.6f);
-                    option.style.borderTopColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
-                    option.style.borderBottomColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
-                    option.style.borderLeftColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
-                    option.style.borderRightColor = new Color(0.25f, 0.25f, 0.28f, 0.8f);
+                    option.style.backgroundColor = UIStyles.BgInput;
+                    UIStyles.SetBorderColor(option, UIStyles.BorderSubtle);
                     indicator.style.backgroundColor = Color.clear;
                 }
             }
@@ -1167,15 +1041,9 @@ namespace WiseTwin.UI
                         TrainingAnalytics.Instance.EndCurrentInteraction(true);
                     }
                 }
-                feedbackContainer.style.backgroundColor = new Color(0.1f, 0.6f, 0.3f, 0.3f);
-                feedbackContainer.style.borderTopWidth = 2;
-                feedbackContainer.style.borderBottomWidth = 2;
-                feedbackContainer.style.borderLeftWidth = 2;
-                feedbackContainer.style.borderRightWidth = 2;
-                feedbackContainer.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                feedbackContainer.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                feedbackContainer.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                feedbackContainer.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                feedbackContainer.style.backgroundColor = UIStyles.SuccessBg;
+                UIStyles.SetBorderWidth(feedbackContainer, 2);
+                UIStyles.SetBorderColor(feedbackContainer, UIStyles.Success);
 
                 // Si on a plusieurs questions, passer à la suivante
                 if (questionKeys != null && questionKeys.Count > 1)
@@ -1219,15 +1087,9 @@ namespace WiseTwin.UI
                     }
                 }
 
-                feedbackContainer.style.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.3f);
-                feedbackContainer.style.borderTopWidth = 2;
-                feedbackContainer.style.borderBottomWidth = 2;
-                feedbackContainer.style.borderLeftWidth = 2;
-                feedbackContainer.style.borderRightWidth = 2;
-                feedbackContainer.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                feedbackContainer.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                feedbackContainer.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                feedbackContainer.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                feedbackContainer.style.backgroundColor = UIStyles.DangerBg;
+                UIStyles.SetBorderWidth(feedbackContainer, 2);
+                UIStyles.SetBorderColor(feedbackContainer, UIStyles.Danger);
 
                 // Changer le bouton en "Suivant" - pas de retry
                 if (questionKeys != null && questionKeys.Count > 1)

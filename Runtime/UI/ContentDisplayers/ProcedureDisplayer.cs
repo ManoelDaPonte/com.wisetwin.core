@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System;
 using System.Linq;
 using WiseTwin.Analytics;
+using WiseTwin.UI;
 
 namespace WiseTwin.UI
 {
@@ -264,217 +265,170 @@ namespace WiseTwin.UI
 
         void CreateProcedureUI()
         {
-            // Clear root
             rootElement.Clear();
 
-            // Container modal semi-transparent
+            // Semi-transparent modal (more transparent to see the scene)
             modalContainer = new VisualElement();
             modalContainer.style.position = Position.Absolute;
             modalContainer.style.width = Length.Percent(100);
             modalContainer.style.height = Length.Percent(100);
-            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.3f); // Plus transparent pour mieux voir la scène
-            modalContainer.style.alignItems = Align.FlexEnd; // Aligner à droite
+            modalContainer.style.backgroundColor = UIStyles.BackdropLight;
+            modalContainer.style.alignItems = Align.FlexEnd;
             modalContainer.style.justifyContent = Justify.Center;
             modalContainer.pickingMode = PickingMode.Position;
 
-            // Panneau d'instructions vertical à droite
+            // Instruction panel (docked right), responsive width
             var instructionPanel = new VisualElement();
-            instructionPanel.style.width = 400;
+            instructionPanel.style.width = Length.Percent(28);
+            instructionPanel.style.minWidth = 340;
+            instructionPanel.style.maxWidth = 440;
             instructionPanel.style.height = Length.Percent(90);
             instructionPanel.style.maxHeight = 800;
-            instructionPanel.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
-            instructionPanel.style.marginRight = 20;
-            instructionPanel.style.borderTopLeftRadius = 20;
-            instructionPanel.style.borderTopRightRadius = 20;
-            instructionPanel.style.borderBottomLeftRadius = 20;
-            instructionPanel.style.borderBottomRightRadius = 20;
+            UIStyles.ApplyCardStyle(instructionPanel, UIStyles.RadiusXL);
+            instructionPanel.style.marginRight = UIStyles.SpaceLG;
             instructionPanel.style.borderLeftWidth = 3;
-            instructionPanel.style.borderLeftColor = new Color(0.1f, 0.8f, 0.6f, 1f);
+            instructionPanel.style.borderLeftColor = UIStyles.Accent;
             instructionPanel.style.flexDirection = FlexDirection.Column;
 
-            // Header avec titre et bouton fermer
+            // Header
             var headerSection = new VisualElement();
-            headerSection.style.paddingTop = 20;
-            headerSection.style.paddingBottom = 15;
-            headerSection.style.paddingLeft = 25;
-            headerSection.style.paddingRight = 25;
+            headerSection.style.paddingTop = UIStyles.SpaceLG;
+            headerSection.style.paddingBottom = UIStyles.SpaceMD;
+            headerSection.style.paddingLeft = UIStyles.SpaceXL;
+            headerSection.style.paddingRight = UIStyles.SpaceXL;
             headerSection.style.borderBottomWidth = 1;
-            headerSection.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            headerSection.style.borderBottomColor = UIStyles.BorderSubtle;
 
-            // Titre de la procédure
             titleLabel = new Label(procedureTitle);
-            titleLabel.style.fontSize = 24;
-            titleLabel.style.color = new Color(0.1f, 0.8f, 0.6f, 1f);
+            titleLabel.style.fontSize = UIStyles.FontXL;
+            titleLabel.style.color = UIStyles.Accent;
             titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.marginBottom = 5;
+            titleLabel.style.marginBottom = UIStyles.SpaceXS;
             titleLabel.style.whiteSpace = WhiteSpace.Normal;
             headerSection.Add(titleLabel);
 
-            // Description
             if (!string.IsNullOrEmpty(procedureDescription))
             {
                 descriptionLabel = new Label(procedureDescription);
-                descriptionLabel.style.fontSize = 14;
-                descriptionLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
+                descriptionLabel.style.fontSize = UIStyles.FontSM;
+                descriptionLabel.style.color = UIStyles.TextMuted;
                 descriptionLabel.style.whiteSpace = WhiteSpace.Normal;
                 headerSection.Add(descriptionLabel);
             }
 
             instructionPanel.Add(headerSection);
 
-            // Section de progression
+            // Progress section
             var progressSection = new VisualElement();
-            progressSection.style.paddingTop = 15;
-            progressSection.style.paddingBottom = 15;
-            progressSection.style.paddingLeft = 25;
-            progressSection.style.paddingRight = 25;
+            progressSection.style.paddingTop = UIStyles.SpaceMD;
+            progressSection.style.paddingBottom = UIStyles.SpaceMD;
+            progressSection.style.paddingLeft = UIStyles.SpaceXL;
+            progressSection.style.paddingRight = UIStyles.SpaceXL;
             progressSection.style.borderBottomWidth = 1;
-            progressSection.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            progressSection.style.borderBottomColor = UIStyles.BorderSubtle;
 
-            progressLabel = new Label($"Étape 1 / {steps.Count}");
-            progressLabel.style.fontSize = 16;
-            progressLabel.style.color = Color.white;
-            progressLabel.style.marginBottom = 10;
+            progressLabel = new Label($"\u00c9tape 1 / {steps.Count}");
+            progressLabel.style.fontSize = UIStyles.FontBase;
+            progressLabel.style.color = UIStyles.TextPrimary;
+            progressLabel.style.marginBottom = UIStyles.SpaceSM;
             progressLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             progressSection.Add(progressLabel);
 
-            progressBar = new VisualElement();
-            progressBar.style.height = 8;
-            progressBar.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f);
-            progressBar.style.borderTopLeftRadius = 4;
-            progressBar.style.borderTopRightRadius = 4;
-            progressBar.style.borderBottomLeftRadius = 4;
-            progressBar.style.borderBottomRightRadius = 4;
-
-            progressFill = new VisualElement();
+            var (bar, fill) = UIStyles.CreateProgressBar(8, UIStyles.SpaceXS);
+            progressBar = bar;
+            progressFill = fill;
             progressFill.style.position = Position.Absolute;
-            progressFill.style.width = Length.Percent(0);
             progressFill.style.height = 8;
-            progressFill.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-            progressFill.style.borderTopLeftRadius = 4;
-            progressFill.style.borderTopRightRadius = 4;
-            progressFill.style.borderBottomLeftRadius = 4;
-            progressFill.style.borderBottomRightRadius = 4;
-            progressBar.Add(progressFill);
-
             progressSection.Add(progressBar);
+
             instructionPanel.Add(progressSection);
 
-            // Section principale avec ScrollView pour l'instruction
+            // Main scrollable section
             var mainSection = new ScrollView();
             mainSection.style.flexGrow = 1;
-            mainSection.style.paddingTop = 20;
-            mainSection.style.paddingBottom = 20;
-            mainSection.style.paddingLeft = 25;
-            mainSection.style.paddingRight = 25;
+            mainSection.style.paddingTop = UIStyles.SpaceLG;
+            mainSection.style.paddingBottom = UIStyles.SpaceLG;
+            mainSection.style.paddingLeft = UIStyles.SpaceXL;
+            mainSection.style.paddingRight = UIStyles.SpaceXL;
 
-            // Instruction de l'étape actuelle
             stepLabel = new Label();
-            stepLabel.style.fontSize = 18;
-            stepLabel.style.color = Color.white;
+            stepLabel.style.fontSize = UIStyles.FontMD;
+            stepLabel.style.color = UIStyles.TextPrimary;
             stepLabel.style.whiteSpace = WhiteSpace.Normal;
             mainSection.Add(stepLabel);
 
-            // NEW: Image container for step images
+            // Image container for step images
             imageContainer = new VisualElement();
-            imageContainer.style.marginTop = 15;
-            imageContainer.style.marginBottom = 15;
-            imageContainer.style.display = DisplayStyle.None; // Hidden by default
+            imageContainer.style.marginTop = UIStyles.SpaceLG;
+            imageContainer.style.marginBottom = UIStyles.SpaceLG;
+            imageContainer.style.display = DisplayStyle.None;
             imageContainer.style.alignItems = Align.Center;
             imageContainer.style.flexDirection = FlexDirection.Column;
 
             imageElement = new VisualElement();
             imageElement.style.width = Length.Percent(100);
-            imageElement.style.height = 200; // Default height
+            imageElement.style.height = 200;
             imageElement.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
-            // Note: backgroundPosition not available in older Unity versions, using backgroundPositionX/Y
             imageElement.style.backgroundPositionX = new BackgroundPosition(BackgroundPositionKeyword.Center);
             imageElement.style.backgroundPositionY = new BackgroundPosition(BackgroundPositionKeyword.Center);
-            imageElement.style.borderTopLeftRadius = 8;
-            imageElement.style.borderTopRightRadius = 8;
-            imageElement.style.borderBottomLeftRadius = 8;
-            imageElement.style.borderBottomRightRadius = 8;
-            // Make the image clickable
+            UIStyles.SetBorderRadius(imageElement, UIStyles.RadiusSM);
             imageElement.pickingMode = PickingMode.Position;
             imageElement.RegisterCallback<ClickEvent>(OnImageClicked);
-
             imageContainer.Add(imageElement);
 
-            // Add hint text for clickable image
-            var imageHintLabel = new Label();
+            var imageHintLabel = UIStyles.CreateMutedText(
+                LocalizationManager.Instance?.CurrentLanguage == "fr"
+                    ? "Cliquez sur l'image pour agrandir"
+                    : "Click on image to zoom",
+                UIStyles.FontXS
+            );
             imageHintLabel.name = "image-hint";
-            imageHintLabel.style.fontSize = 12;
-            imageHintLabel.style.color = new Color(0.7f, 0.7f, 0.7f, 0.8f);
-            imageHintLabel.style.marginTop = 5;
-            imageHintLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "🔍 Cliquez sur l'image pour agrandir"
-                : "🔍 Click on image to zoom";
+            imageHintLabel.style.marginTop = UIStyles.SpaceXS;
             imageContainer.Add(imageHintLabel);
 
             mainSection.Add(imageContainer);
 
-            // Label de feedback d'erreur (caché par défaut)
+            // Error feedback label
             errorFeedbackLabel = new Label();
-            errorFeedbackLabel.style.fontSize = 16;
-            errorFeedbackLabel.style.color = new Color(1f, 0.3f, 0.3f, 1f);
-            errorFeedbackLabel.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.2f);
-            errorFeedbackLabel.style.paddingTop = 10;
-            errorFeedbackLabel.style.paddingBottom = 10;
-            errorFeedbackLabel.style.paddingLeft = 15;
-            errorFeedbackLabel.style.paddingRight = 15;
-            errorFeedbackLabel.style.marginTop = 15;
-            errorFeedbackLabel.style.borderTopLeftRadius = 8;
-            errorFeedbackLabel.style.borderTopRightRadius = 8;
-            errorFeedbackLabel.style.borderBottomLeftRadius = 8;
-            errorFeedbackLabel.style.borderBottomRightRadius = 8;
+            errorFeedbackLabel.style.fontSize = UIStyles.FontBase;
+            errorFeedbackLabel.style.color = UIStyles.Danger;
+            errorFeedbackLabel.style.backgroundColor = UIStyles.DangerBg;
+            UIStyles.SetPadding(errorFeedbackLabel, UIStyles.SpaceMD);
+            errorFeedbackLabel.style.marginTop = UIStyles.SpaceLG;
+            UIStyles.SetBorderRadius(errorFeedbackLabel, UIStyles.RadiusSM);
             errorFeedbackLabel.style.whiteSpace = WhiteSpace.Normal;
-            errorFeedbackLabel.style.display = DisplayStyle.None; // Caché par défaut
+            errorFeedbackLabel.style.display = DisplayStyle.None;
             mainSection.Add(errorFeedbackLabel);
 
             instructionPanel.Add(mainSection);
 
-            // Section des boutons en bas
+            // Bottom buttons section
             var buttonSection = new VisualElement();
-            buttonSection.style.paddingTop = 20;
-            buttonSection.style.paddingBottom = 20;
-            buttonSection.style.paddingLeft = 25;
-            buttonSection.style.paddingRight = 25;
+            buttonSection.style.paddingTop = UIStyles.SpaceLG;
+            buttonSection.style.paddingBottom = UIStyles.SpaceLG;
+            buttonSection.style.paddingLeft = UIStyles.SpaceXL;
+            buttonSection.style.paddingRight = UIStyles.SpaceXL;
             buttonSection.style.borderTopWidth = 1;
-            buttonSection.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            buttonSection.style.borderTopColor = UIStyles.BorderSubtle;
 
-            // Info text adapté selon le contexte (avec/sans fakes, avec/sans highlight)
-            // On vérifiera dynamiquement pour chaque étape s'il y a des fakes
             var infoLabel = new Label();
             infoLabel.name = "instruction-label";
-            infoLabel.style.fontSize = 14;
-            infoLabel.style.color = new Color(0.7f, 0.7f, 0.7f);
+            infoLabel.style.fontSize = UIStyles.FontSM;
+            infoLabel.style.color = UIStyles.TextMuted;
             infoLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             infoLabel.style.whiteSpace = WhiteSpace.Normal;
-            infoLabel.style.paddingTop = 10;
-            infoLabel.style.paddingBottom = 10;
-            infoLabel.style.paddingLeft = 15;
-            infoLabel.style.paddingRight = 15;
-            infoLabel.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.5f);
-            infoLabel.style.borderTopLeftRadius = 8;
-            infoLabel.style.borderTopRightRadius = 8;
-            infoLabel.style.borderBottomLeftRadius = 8;
-            infoLabel.style.borderBottomRightRadius = 8;
+            UIStyles.SetPadding(infoLabel, UIStyles.SpaceSM);
+            infoLabel.style.backgroundColor = UIStyles.BgElevated;
+            UIStyles.SetBorderRadius(infoLabel, UIStyles.RadiusSM);
             buttonSection.Add(infoLabel);
 
-            // NEW: Manual validation button (hidden by default, shown when step requires it)
-            validateButton = new Button();
-            validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "✓ Valider l'étape" : "✓ Validate Step";
-            validateButton.style.marginTop = 15;
-            validateButton.style.height = 45;
-            validateButton.style.fontSize = 16;
-            validateButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-            validateButton.style.color = Color.white;
-            validateButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            validateButton.style.borderTopLeftRadius = 10;
-            validateButton.style.borderTopRightRadius = 10;
-            validateButton.style.borderBottomLeftRadius = 10;
-            validateButton.style.borderBottomRightRadius = 10;
-            validateButton.style.display = DisplayStyle.None; // Hidden by default
+            // Manual validation button
+            validateButton = UIStyles.CreatePrimaryButton(
+                LocalizationManager.Instance?.CurrentLanguage == "fr" ? "\u2713 Valider l'\u00e9tape" : "\u2713 Validate Step"
+            );
+            validateButton.style.marginTop = UIStyles.SpaceLG;
+            validateButton.style.alignSelf = Align.Stretch;
+            validateButton.style.display = DisplayStyle.None;
             validateButton.clicked += OnValidateButtonClicked;
             buttonSection.Add(validateButton);
 
@@ -1123,14 +1077,9 @@ namespace WiseTwin.UI
                     if (!imageZoomed)
                     {
                         imageElement.style.opacity = 0.85f;
-                        imageElement.style.borderLeftWidth = 2;
-                        imageElement.style.borderRightWidth = 2;
-                        imageElement.style.borderTopWidth = 2;
-                        imageElement.style.borderBottomWidth = 2;
-                        imageElement.style.borderLeftColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
-                        imageElement.style.borderRightColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
-                        imageElement.style.borderTopColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
-                        imageElement.style.borderBottomColor = new Color(0.1f, 0.8f, 0.6f, 0.5f);
+                        UIStyles.SetBorderWidth(imageElement, 2);
+                        var accentHalf = new Color(UIStyles.Accent.r, UIStyles.Accent.g, UIStyles.Accent.b, 0.5f);
+                        UIStyles.SetBorderColor(imageElement, accentHalf);
                     }
                 });
 
@@ -1139,10 +1088,7 @@ namespace WiseTwin.UI
                     if (!imageZoomed)
                     {
                         imageElement.style.opacity = 1f;
-                        imageElement.style.borderLeftWidth = 0;
-                        imageElement.style.borderRightWidth = 0;
-                        imageElement.style.borderTopWidth = 0;
-                        imageElement.style.borderBottomWidth = 0;
+                        UIStyles.SetBorderWidth(imageElement, 0);
                     }
                 });
 
@@ -1188,7 +1134,7 @@ namespace WiseTwin.UI
                 overlay.style.top = 0;
                 overlay.style.width = Length.Percent(100);
                 overlay.style.height = Length.Percent(100);
-                overlay.style.backgroundColor = new Color(0, 0, 0, 0.95f);
+                overlay.style.backgroundColor = UIStyles.BackdropHeavy;
                 overlay.style.justifyContent = Justify.Center;
                 overlay.style.alignItems = Align.Center;
                 overlay.pickingMode = PickingMode.Position;
@@ -1210,8 +1156,8 @@ namespace WiseTwin.UI
                 closeLabel.style.position = Position.Absolute;
                 closeLabel.style.top = 20;
                 closeLabel.style.right = 20;
-                closeLabel.style.color = Color.white;
-                closeLabel.style.fontSize = 18;
+                closeLabel.style.color = UIStyles.TextPrimary;
+                closeLabel.style.fontSize = UIStyles.FontMD;
                 closeLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
 
                 overlay.Add(zoomedImage);

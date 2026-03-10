@@ -222,10 +222,11 @@ namespace WiseTwin
 
             if (debugMode) Debug.Log($"[ProgressionManager] Starting scenario {currentScenarioIndex + 1}/{scenarios.Count}: {scenario.id} ({scenario.type})");
 
-            // Disable next button while scenario is in progress
+            // Update HUD
             if (TrainingHUD.Instance != null)
             {
                 TrainingHUD.Instance.OnScenarioStarted();
+                TrainingHUD.Instance.SetScenarioTitle(GetScenarioDisplayTitle(scenario));
             }
 
             // Display the scenario
@@ -390,6 +391,51 @@ namespace WiseTwin
         {
             if (debugMode) Debug.Log("[ProgressionManager] Resetting progression");
             StartProgression();
+        }
+
+        /// <summary>
+        /// Extract a display title from a scenario's content data
+        /// </summary>
+        string GetScenarioDisplayTitle(ScenarioData scenario)
+        {
+            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            var content = scenario.GetContentData();
+            if (content == null) return scenario.id;
+
+            // Try "title" field (procedure, text, dialogue)
+            var titleToken = content["title"];
+            if (titleToken != null)
+            {
+                if (titleToken.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                {
+                    var localized = titleToken[lang]?.ToString() ?? titleToken["en"]?.ToString();
+                    if (!string.IsNullOrEmpty(localized)) return localized;
+                }
+                else if (titleToken.Type == Newtonsoft.Json.Linq.JTokenType.String)
+                {
+                    return titleToken.ToString();
+                }
+            }
+
+            // Try "questionText" for single questions
+            var questionText = content["questionText"];
+            if (questionText != null)
+            {
+                if (questionText.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                {
+                    var localized = questionText[lang]?.ToString() ?? questionText["en"]?.ToString();
+                    if (!string.IsNullOrEmpty(localized))
+                        return localized.Length > 60 ? localized.Substring(0, 57) + "..." : localized;
+                }
+                else if (questionText.Type == Newtonsoft.Json.Linq.JTokenType.String)
+                {
+                    var text = questionText.ToString();
+                    return text.Length > 60 ? text.Substring(0, 57) + "..." : text;
+                }
+            }
+
+            // Fallback: capitalize type
+            return scenario.type?.Substring(0, 1).ToUpper() + scenario.type?.Substring(1) ?? scenario.id;
         }
 
         #region Transition Panel

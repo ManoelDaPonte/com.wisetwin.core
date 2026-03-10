@@ -8,7 +8,7 @@ namespace WiseTwin.UI
 {
     /// <summary>
     /// Afficheur spécialisé pour les dialogues interactifs (arbre de conversation avec PNJ).
-    /// Style chat-bubble avec choix, feedback visuel, et tracking analytics.
+    /// Style conversation avec avatar, bulles de dialogue, et choix de réponse.
     /// </summary>
     public class DialogueDisplayer : MonoBehaviour, IContentDisplayer
     {
@@ -19,19 +19,19 @@ namespace WiseTwin.UI
         private VisualElement rootElement;
         private VisualElement modalContainer;
         private VisualElement dialogueBox;
-        private VisualElement contextContainer; // Previous dialogue context shown above choices
-        private Label contextSpeakerLabel;
-        private Label contextTextLabel;
-        private Label speakerLabel;
-        private Label textLabel;
+        private ScrollView conversationScroll;
+        private VisualElement conversationContainer;
+        private VisualElement choicesSection;
         private VisualElement choicesContainer;
         private Button continueButton;
+        private Label headerTitleLabel;
 
         // Dialogue state
         private DialogueTreeData dialogueTree;
         private DialogueNodeRuntime currentNode;
-        private DialogueNodeRuntime lastDialogueNode; // Remember last dialogue for context
+        private DialogueNodeRuntime lastDialogueNode;
         private bool isProcessing = false;
+        private string currentSpeakerName = "";
 
         // Analytics
         private DialogueInteractionData dialogueInteractionData;
@@ -42,17 +42,14 @@ namespace WiseTwin.UI
             currentObjectId = objectId;
             rootElement = root;
 
-            // Block player controls
             PlayerControls.SetEnabled(false);
 
-            // Subscribe to language changes
             if (LocalizationManager.Instance != null)
             {
                 LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
                 LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
             }
 
-            // Parse dialogue tree
             dialogueTree = DialogueTreeData.FromDictionary(contentData);
             if (dialogueTree == null || string.IsNullOrEmpty(dialogueTree.startNodeId))
             {
@@ -61,13 +58,9 @@ namespace WiseTwin.UI
                 return;
             }
 
-            // Initialize analytics
             InitializeAnalytics();
-
-            // Build UI
             CreateDialogueUI();
 
-            // Start from the first node
             var startNode = dialogueTree.GetStartNode();
             if (startNode != null && startNode.type == "start" && !string.IsNullOrEmpty(startNode.nextNodeId))
             {
@@ -91,7 +84,6 @@ namespace WiseTwin.UI
                 totalChoiceNodes = dialogueTree.CountChoiceNodes()
             };
 
-            // Start analytics interaction
             if (TrainingAnalytics.Instance != null)
             {
                 TrainingAnalytics.Instance.StartInteraction(currentObjectId, "dialogue", "branching");
@@ -104,110 +96,108 @@ namespace WiseTwin.UI
 
             // Modal overlay
             modalContainer = new VisualElement();
-            modalContainer.style.position = Position.Absolute;
-            modalContainer.style.width = Length.Percent(100);
-            modalContainer.style.height = Length.Percent(100);
-            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.85f);
-            modalContainer.style.alignItems = Align.Center;
-            modalContainer.style.justifyContent = Justify.Center;
+            UIStyles.ApplyBackdropHeavyStyle(modalContainer);
 
             // Dialogue box
             dialogueBox = new VisualElement();
             dialogueBox.style.width = 700;
             dialogueBox.style.maxWidth = Length.Percent(90);
-            dialogueBox.style.maxHeight = Length.Percent(80);
-            dialogueBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
-            dialogueBox.style.borderTopLeftRadius = 20;
-            dialogueBox.style.borderTopRightRadius = 20;
-            dialogueBox.style.borderBottomLeftRadius = 20;
-            dialogueBox.style.borderBottomRightRadius = 20;
-            dialogueBox.style.paddingTop = 30;
-            dialogueBox.style.paddingBottom = 30;
-            dialogueBox.style.paddingLeft = 35;
-            dialogueBox.style.paddingRight = 35;
-            dialogueBox.style.borderTopWidth = 2;
-            dialogueBox.style.borderBottomWidth = 2;
-            dialogueBox.style.borderLeftWidth = 2;
-            dialogueBox.style.borderRightWidth = 2;
-            dialogueBox.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            dialogueBox.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            dialogueBox.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            dialogueBox.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+            dialogueBox.style.maxHeight = Length.Percent(85);
+            UIStyles.ApplyCardStyle(dialogueBox, UIStyles.RadiusXL);
+            dialogueBox.style.overflow = Overflow.Hidden;
+            dialogueBox.style.flexDirection = FlexDirection.Column;
 
-            // Context container (shows previous dialogue text above choices)
-            contextContainer = new VisualElement();
-            contextContainer.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.8f);
-            contextContainer.style.borderTopLeftRadius = 10;
-            contextContainer.style.borderTopRightRadius = 10;
-            contextContainer.style.borderBottomLeftRadius = 10;
-            contextContainer.style.borderBottomRightRadius = 10;
-            contextContainer.style.paddingTop = 12;
-            contextContainer.style.paddingBottom = 12;
-            contextContainer.style.paddingLeft = 15;
-            contextContainer.style.paddingRight = 15;
-            contextContainer.style.marginBottom = 18;
-            contextContainer.style.borderLeftWidth = 3;
-            contextContainer.style.borderLeftColor = new Color(0.1f, 0.8f, 0.6f, 0.6f);
-            contextContainer.style.display = DisplayStyle.None;
+            // ========== HEADER ==========
+            var header = new VisualElement();
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
+            header.style.paddingTop = UIStyles.SpaceLG;
+            header.style.paddingBottom = UIStyles.SpaceLG;
+            header.style.paddingLeft = UIStyles.Space2XL;
+            header.style.paddingRight = UIStyles.Space2XL;
+            header.style.backgroundColor = UIStyles.BgElevated;
+            header.style.borderBottomWidth = 1;
+            header.style.borderBottomColor = UIStyles.BorderSubtle;
+            header.style.flexShrink = 0;
 
-            contextSpeakerLabel = new Label();
-            contextSpeakerLabel.style.fontSize = 16;
-            contextSpeakerLabel.style.color = new Color(0.1f, 0.8f, 0.6f, 0.7f);
-            contextSpeakerLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            contextSpeakerLabel.style.marginBottom = 5;
-            contextContainer.Add(contextSpeakerLabel);
+            string lang = GetCurrentLanguage();
+            string dialogueTitle = lang == "fr" ? dialogueTree.title_fr : dialogueTree.title_en;
+            if (string.IsNullOrEmpty(dialogueTitle))
+                dialogueTitle = lang == "fr" ? dialogueTree.title_en : dialogueTree.title_fr;
 
-            contextTextLabel = new Label();
-            contextTextLabel.style.fontSize = 16;
-            contextTextLabel.style.color = new Color(0.7f, 0.7f, 0.7f, 1f);
-            contextTextLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
-            contextTextLabel.style.whiteSpace = WhiteSpace.Normal;
-            contextContainer.Add(contextTextLabel);
+            headerTitleLabel = new Label(dialogueTitle ?? (lang == "fr" ? "Conversation" : "Conversation"));
+            headerTitleLabel.style.fontSize = UIStyles.FontLG;
+            headerTitleLabel.style.color = UIStyles.TextPrimary;
+            headerTitleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            headerTitleLabel.style.flexGrow = 1;
+            header.Add(headerTitleLabel);
 
-            dialogueBox.Add(contextContainer);
+            dialogueBox.Add(header);
 
-            // Speaker name
-            speakerLabel = new Label();
-            speakerLabel.style.fontSize = 22;
-            speakerLabel.style.color = new Color(0.1f, 0.8f, 0.6f, 1f); // Accent green
-            speakerLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            speakerLabel.style.marginBottom = 15;
-            dialogueBox.Add(speakerLabel);
+            // ========== CONVERSATION AREA (scrollable) ==========
+            conversationScroll = new ScrollView(ScrollViewMode.Vertical);
+            conversationScroll.style.flexGrow = 1;
+            conversationScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+            conversationScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
 
-            // Text content
-            textLabel = new Label();
-            textLabel.style.fontSize = 20;
-            textLabel.style.color = Color.white;
-            textLabel.style.whiteSpace = WhiteSpace.Normal;
-            textLabel.style.marginBottom = 25;
-            dialogueBox.Add(textLabel);
+            conversationScroll.RegisterCallback<AttachToPanelEvent>(evt => UIStyles.ApplyMinimalScrollbar(conversationScroll));
+            conversationScroll.RegisterCallback<GeometryChangedEvent>(evt => UIStyles.ApplyMinimalScrollbar(conversationScroll));
 
-            // Choices container (for choice nodes)
+            conversationContainer = new VisualElement();
+            conversationContainer.style.paddingTop = UIStyles.SpaceXL;
+            conversationContainer.style.paddingBottom = UIStyles.SpaceLG;
+            conversationContainer.style.paddingLeft = UIStyles.Space2XL;
+            conversationContainer.style.paddingRight = UIStyles.Space2XL;
+
+            conversationScroll.Add(conversationContainer);
+            dialogueBox.Add(conversationScroll);
+
+            // ========== CHOICES SECTION (fixed at bottom) ==========
+            choicesSection = new VisualElement();
+            choicesSection.style.flexShrink = 0;
+            choicesSection.style.borderTopWidth = 1;
+            choicesSection.style.borderTopColor = UIStyles.BorderSubtle;
+            choicesSection.style.paddingTop = UIStyles.SpaceLG;
+            choicesSection.style.paddingBottom = UIStyles.SpaceLG;
+            choicesSection.style.paddingLeft = UIStyles.Space2XL;
+            choicesSection.style.paddingRight = UIStyles.Space2XL;
+            choicesSection.style.display = DisplayStyle.None;
+
+            // "Your response" label
+            var responseLabel = new Label();
+            responseLabel.name = "response-label";
+            responseLabel.style.fontSize = UIStyles.FontSM;
+            responseLabel.style.color = UIStyles.TextMuted;
+            responseLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            responseLabel.style.letterSpacing = 1;
+            responseLabel.style.marginBottom = UIStyles.SpaceMD;
+            choicesSection.Add(responseLabel);
+
             choicesContainer = new VisualElement();
-            choicesContainer.style.marginBottom = 15;
-            dialogueBox.Add(choicesContainer);
+            choicesSection.Add(choicesContainer);
 
-            // Continue button (for dialogue nodes)
-            continueButton = new Button();
-            continueButton.style.height = 50;
-            continueButton.style.backgroundColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-            continueButton.style.color = Color.white;
-            continueButton.style.fontSize = 18;
-            continueButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            continueButton.style.borderTopLeftRadius = 10;
-            continueButton.style.borderTopRightRadius = 10;
-            continueButton.style.borderBottomLeftRadius = 10;
-            continueButton.style.borderBottomRightRadius = 10;
-            continueButton.style.borderTopWidth = 0;
-            continueButton.style.borderBottomWidth = 0;
-            continueButton.style.borderLeftWidth = 0;
-            continueButton.style.borderRightWidth = 0;
+            dialogueBox.Add(choicesSection);
+
+            // ========== CONTINUE BUTTON (fixed at bottom) ==========
+            var buttonSection = new VisualElement();
+            buttonSection.style.flexShrink = 0;
+            buttonSection.style.paddingTop = UIStyles.SpaceMD;
+            buttonSection.style.paddingBottom = UIStyles.SpaceLG;
+            buttonSection.style.paddingLeft = UIStyles.Space2XL;
+            buttonSection.style.paddingRight = UIStyles.Space2XL;
+
+            continueButton = UIStyles.CreatePrimaryButton("");
+            continueButton.style.alignSelf = Align.Stretch;
             continueButton.style.display = DisplayStyle.None;
-            dialogueBox.Add(continueButton);
+            buttonSection.Add(continueButton);
+
+            dialogueBox.Add(buttonSection);
 
             modalContainer.Add(dialogueBox);
             rootElement.Add(modalContainer);
         }
+
+        // ========== NAVIGATION ==========
 
         private void NavigateToNode(string nodeId)
         {
@@ -237,7 +227,6 @@ namespace WiseTwin.UI
                     EndDialogue(true);
                     break;
                 case "start":
-                    // Start nodes just redirect
                     NavigateToNode(currentNode.nextNodeId);
                     break;
                 default:
@@ -247,32 +236,26 @@ namespace WiseTwin.UI
             }
         }
 
+        // ========== DIALOGUE NODE (NPC speaking) ==========
+
         private void DisplayDialogueNode(DialogueNodeRuntime node)
         {
             string lang = GetCurrentLanguage();
-
-            // Remember this dialogue node for context when showing choices
             lastDialogueNode = node;
 
-            // Hide context (not needed for dialogue nodes)
-            contextContainer.style.display = DisplayStyle.None;
+            string speaker = GetLocalized(node.speaker_en, node.speaker_fr, lang);
+            string text = GetLocalized(node.text_en, node.text_fr, lang);
+            currentSpeakerName = speaker;
 
-            // Show speaker
-            string speaker = lang == "fr" ? node.speaker_fr : node.speaker_en;
-            if (string.IsNullOrEmpty(speaker))
-                speaker = lang == "fr" ? node.speaker_en : node.speaker_fr; // fallback
-            speakerLabel.text = speaker;
-            speakerLabel.style.display = string.IsNullOrEmpty(speaker) ? DisplayStyle.None : DisplayStyle.Flex;
+            // Clear previous content
+            conversationContainer.Clear();
 
-            // Show text
-            string text = lang == "fr" ? node.text_fr : node.text_en;
-            if (string.IsNullOrEmpty(text))
-                text = lang == "fr" ? node.text_en : node.text_fr; // fallback
-            textLabel.text = text;
+            // Add NPC bubble
+            AddNpcBubble(speaker, text);
 
-            // Hide choices, show continue button
+            // Hide choices, show continue
+            choicesSection.style.display = DisplayStyle.None;
             choicesContainer.Clear();
-            choicesContainer.style.display = DisplayStyle.None;
 
             string continueText = lang == "fr" ? "Continuer" : "Continue";
             continueButton.text = continueText;
@@ -282,71 +265,171 @@ namespace WiseTwin.UI
                 if (isProcessing) return;
                 NavigateToNode(node.nextNodeId);
             });
+
+            ScrollToBottom();
         }
+
+        // ========== CHOICE NODE (Player choosing) ==========
 
         private void DisplayChoiceNode(DialogueNodeRuntime node)
         {
             string lang = GetCurrentLanguage();
 
-            // Show previous dialogue context if available
+            // Clear conversation area
+            conversationContainer.Clear();
+
+            // Show the NPC's previous dialogue as context
             if (lastDialogueNode != null)
             {
-                string ctxSpeaker = lang == "fr" ? lastDialogueNode.speaker_fr : lastDialogueNode.speaker_en;
-                if (string.IsNullOrEmpty(ctxSpeaker))
-                    ctxSpeaker = lang == "fr" ? lastDialogueNode.speaker_en : lastDialogueNode.speaker_fr;
-
-                string ctxText = lang == "fr" ? lastDialogueNode.text_fr : lastDialogueNode.text_en;
-                if (string.IsNullOrEmpty(ctxText))
-                    ctxText = lang == "fr" ? lastDialogueNode.text_en : lastDialogueNode.text_fr;
+                string ctxSpeaker = GetLocalized(lastDialogueNode.speaker_en, lastDialogueNode.speaker_fr, lang);
+                string ctxText = GetLocalized(lastDialogueNode.text_en, lastDialogueNode.text_fr, lang);
 
                 if (!string.IsNullOrEmpty(ctxText))
                 {
-                    contextSpeakerLabel.text = ctxSpeaker ?? "";
-                    contextSpeakerLabel.style.display = string.IsNullOrEmpty(ctxSpeaker) ? DisplayStyle.None : DisplayStyle.Flex;
-                    contextTextLabel.text = $"\"{ctxText}\"";
-                    contextContainer.style.display = DisplayStyle.Flex;
+                    AddNpcBubble(ctxSpeaker, ctxText);
                 }
-                else
-                {
-                    contextContainer.style.display = DisplayStyle.None;
-                }
-            }
-            else
-            {
-                contextContainer.style.display = DisplayStyle.None;
             }
 
-            // Show prompt text
-            string prompt = lang == "fr" ? node.choiceText_fr : node.choiceText_en;
-            if (string.IsNullOrEmpty(prompt))
-                prompt = lang == "fr" ? node.choiceText_en : node.choiceText_fr;
-            speakerLabel.text = "";
-            speakerLabel.style.display = DisplayStyle.None;
-            textLabel.text = prompt;
+            // Show prompt text if present
+            string prompt = GetLocalized(node.choiceText_en, node.choiceText_fr, lang);
+            if (!string.IsNullOrEmpty(prompt))
+            {
+                var promptLabel = new Label(prompt);
+                promptLabel.style.fontSize = UIStyles.FontBase;
+                promptLabel.style.color = UIStyles.TextSecondary;
+                promptLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
+                promptLabel.style.whiteSpace = WhiteSpace.Normal;
+                promptLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                promptLabel.style.marginTop = UIStyles.SpaceLG;
+                conversationContainer.Add(promptLabel);
+            }
 
             // Hide continue button
             continueButton.style.display = DisplayStyle.None;
 
-            // Show choices
+            // Show choices section
+            var responseLabel = choicesSection.Q<Label>("response-label");
+            if (responseLabel != null)
+            {
+                responseLabel.text = lang == "fr" ? "VOTRE REPONSE" : "YOUR RESPONSE";
+            }
+
             choicesContainer.Clear();
-            choicesContainer.style.display = DisplayStyle.Flex;
+            choicesSection.style.display = DisplayStyle.Flex;
 
             if (node.choices == null) return;
 
-            // Determine if this is an evaluated choice node (at least one choice marked correct)
             bool isEvaluated = IsEvaluatedChoiceNode(node);
 
             foreach (var choice in node.choices)
             {
-                var choiceButton = CreateChoiceButton(choice, node, isEvaluated);
-                choicesContainer.Add(choiceButton);
+                var choiceOption = CreateChoiceOption(choice, node, isEvaluated);
+                choicesContainer.Add(choiceOption);
             }
+
+            ScrollToBottom();
+        }
+
+        // ========== UI BUILDERS ==========
+
+        /// <summary>
+        /// Creates a chat bubble for the NPC with avatar and speech bubble
+        /// </summary>
+        private void AddNpcBubble(string speaker, string text)
+        {
+            var bubbleRow = new VisualElement();
+            bubbleRow.style.flexDirection = FlexDirection.Row;
+            bubbleRow.style.alignItems = Align.FlexStart;
+            bubbleRow.style.marginBottom = UIStyles.SpaceMD;
+
+            // Avatar circle
+            var avatar = CreateAvatar(speaker);
+            bubbleRow.Add(avatar);
+
+            // Speech bubble
+            var bubble = new VisualElement();
+            bubble.style.flexGrow = 1;
+            bubble.style.flexShrink = 1;
+            bubble.style.backgroundColor = UIStyles.BgElevated;
+            UIStyles.SetBorderRadius(bubble, UIStyles.RadiusMD);
+            bubble.style.paddingTop = UIStyles.SpaceLG;
+            bubble.style.paddingBottom = UIStyles.SpaceLG;
+            bubble.style.paddingLeft = UIStyles.SpaceLG;
+            bubble.style.paddingRight = UIStyles.SpaceLG;
+            bubble.style.borderLeftWidth = 3;
+            bubble.style.borderLeftColor = UIStyles.Accent;
+
+            // Speaker name inside bubble
+            if (!string.IsNullOrEmpty(speaker))
+            {
+                var nameLabel = new Label(speaker);
+                nameLabel.style.fontSize = UIStyles.FontBase;
+                nameLabel.style.color = UIStyles.Accent;
+                nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+                nameLabel.style.marginBottom = UIStyles.SpaceSM;
+                bubble.Add(nameLabel);
+            }
+
+            // Message text
+            var textLabel = new Label(text);
+            textLabel.style.fontSize = UIStyles.FontMD;
+            textLabel.style.color = UIStyles.TextPrimary;
+            textLabel.style.whiteSpace = WhiteSpace.Normal;
+            bubble.Add(textLabel);
+
+            bubbleRow.Add(bubble);
+            conversationContainer.Add(bubbleRow);
         }
 
         /// <summary>
-        /// A choice node is "evaluated" if at least one choice has isCorrect = true.
-        /// If no choice is marked correct, the node is "neutral" (no feedback).
+        /// Creates a circular avatar with the speaker's initials
         /// </summary>
+        private VisualElement CreateAvatar(string speaker)
+        {
+            var avatar = new VisualElement();
+            avatar.style.width = 48;
+            avatar.style.height = 48;
+            avatar.style.minWidth = 48;
+            avatar.style.minHeight = 48;
+            UIStyles.SetBorderRadius(avatar, UIStyles.RadiusPill);
+            avatar.style.backgroundColor = UIStyles.Accent;
+            avatar.style.alignItems = Align.Center;
+            avatar.style.justifyContent = Justify.Center;
+            avatar.style.marginRight = UIStyles.SpaceMD;
+            avatar.style.flexShrink = 0;
+
+            // Initials
+            string initials = GetInitials(speaker);
+            var initialsLabel = new Label(initials);
+            initialsLabel.style.fontSize = UIStyles.FontMD;
+            initialsLabel.style.color = UIStyles.BgDeep;
+            initialsLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            initialsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            initialsLabel.pickingMode = PickingMode.Ignore;
+            avatar.Add(initialsLabel);
+
+            return avatar;
+        }
+
+        /// <summary>
+        /// Extracts up to 2 initials from a speaker name
+        /// </summary>
+        private string GetInitials(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "?";
+
+            var parts = name.Trim().Split(' ');
+            if (parts.Length >= 2)
+            {
+                return $"{char.ToUpper(parts[0][0])}{char.ToUpper(parts[1][0])}";
+            }
+            else if (parts.Length == 1 && parts[0].Length >= 2)
+            {
+                return $"{char.ToUpper(parts[0][0])}{char.ToUpper(parts[0][1])}";
+            }
+            return $"{char.ToUpper(parts[0][0])}";
+        }
+
         private bool IsEvaluatedChoiceNode(DialogueNodeRuntime node)
         {
             if (node.choices == null) return false;
@@ -357,70 +440,35 @@ namespace WiseTwin.UI
             return false;
         }
 
-        private VisualElement CreateChoiceButton(DialogueChoiceRuntime choice, DialogueNodeRuntime parentNode, bool isEvaluated)
+        private VisualElement CreateChoiceOption(DialogueChoiceRuntime choice, DialogueNodeRuntime parentNode, bool isEvaluated)
         {
             string lang = GetCurrentLanguage();
 
-            string choiceText = lang == "fr" ? choice.text_fr : choice.text_en;
-            if (string.IsNullOrEmpty(choiceText))
-                choiceText = lang == "fr" ? choice.text_en : choice.text_fr;
+            string choiceText = GetLocalized(choice.text_en, choice.text_fr, lang);
 
-            var container = new VisualElement();
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
-            container.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
-            container.style.borderTopLeftRadius = 10;
-            container.style.borderTopRightRadius = 10;
-            container.style.borderBottomLeftRadius = 10;
-            container.style.borderBottomRightRadius = 10;
-            container.style.paddingTop = 15;
-            container.style.paddingBottom = 15;
-            container.style.paddingLeft = 20;
-            container.style.paddingRight = 20;
-            container.style.marginBottom = 8;
-            container.style.borderTopWidth = 2;
-            container.style.borderBottomWidth = 2;
-            container.style.borderLeftWidth = 2;
-            container.style.borderRightWidth = 2;
-            container.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            container.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            container.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-            container.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
+            var container = UIStyles.CreateSelectableOption(UIStyles.RadiusMD);
+
+            // Arrow indicator
+            var arrow = new Label("\u203A");
+            arrow.style.fontSize = UIStyles.FontLG;
+            arrow.style.color = UIStyles.TextMuted;
+            arrow.style.marginRight = UIStyles.SpaceSM;
+            arrow.style.flexShrink = 0;
+            arrow.pickingMode = PickingMode.Ignore;
+            container.Add(arrow);
 
             var label = new Label(choiceText);
-            label.style.fontSize = 18;
-            label.style.color = Color.white;
+            label.style.fontSize = UIStyles.FontMD;
+            label.style.color = UIStyles.TextPrimary;
             label.style.whiteSpace = WhiteSpace.Normal;
             label.style.flexGrow = 1;
-
+            label.pickingMode = PickingMode.Ignore;
             container.Add(label);
 
-            // Hover effects
-            container.RegisterCallback<MouseEnterEvent>(evt =>
-            {
-                if (!isProcessing)
-                {
-                    container.style.backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
-                    container.style.borderTopColor = new Color(0.2f, 0.6f, 1f, 0.5f);
-                    container.style.borderBottomColor = new Color(0.2f, 0.6f, 1f, 0.5f);
-                    container.style.borderLeftColor = new Color(0.2f, 0.6f, 1f, 0.5f);
-                    container.style.borderRightColor = new Color(0.2f, 0.6f, 1f, 0.5f);
-                }
-            });
+            // Hover
+            UIStyles.ApplyOptionHover(container, () => !isProcessing);
 
-            container.RegisterCallback<MouseLeaveEvent>(evt =>
-            {
-                if (!isProcessing)
-                {
-                    container.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 1f);
-                    container.style.borderTopColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                    container.style.borderBottomColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                    container.style.borderLeftColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                    container.style.borderRightColor = new Color(0.3f, 0.3f, 0.35f, 1f);
-                }
-            });
-
-            // Click handler
+            // Click
             container.RegisterCallback<MouseDownEvent>(evt =>
             {
                 if (isProcessing) return;
@@ -437,22 +485,15 @@ namespace WiseTwin.UI
 
                 if (isEvaluated)
                 {
-                    // Evaluated choice: show green/red feedback, then navigate after delay
                     if (choice.isCorrect)
                     {
-                        container.style.backgroundColor = new Color(0.1f, 0.5f, 0.3f, 0.4f);
-                        container.style.borderTopColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                        container.style.borderBottomColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                        container.style.borderLeftColor = new Color(0.1f, 0.8f, 0.4f, 1f);
-                        container.style.borderRightColor = new Color(0.1f, 0.8f, 0.4f, 1f);
+                        UIStyles.ApplyCorrectStyle(container);
+                        arrow.style.color = UIStyles.Success;
                     }
                     else
                     {
-                        container.style.backgroundColor = new Color(0.5f, 0.1f, 0.1f, 0.4f);
-                        container.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                        container.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                        container.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-                        container.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+                        UIStyles.ApplyIncorrectStyle(container);
+                        arrow.style.color = UIStyles.Danger;
                     }
 
                     rootElement.schedule.Execute(() =>
@@ -463,12 +504,8 @@ namespace WiseTwin.UI
                 }
                 else
                 {
-                    // Neutral choice: brief highlight, navigate quickly
-                    container.style.backgroundColor = new Color(0.2f, 0.4f, 0.6f, 0.4f);
-                    container.style.borderTopColor = new Color(0.3f, 0.6f, 0.9f, 1f);
-                    container.style.borderBottomColor = new Color(0.3f, 0.6f, 0.9f, 1f);
-                    container.style.borderLeftColor = new Color(0.3f, 0.6f, 0.9f, 1f);
-                    container.style.borderRightColor = new Color(0.3f, 0.6f, 0.9f, 1f);
+                    UIStyles.ApplySelectedStyle(container);
+                    arrow.style.color = UIStyles.Info;
 
                     rootElement.schedule.Execute(() =>
                     {
@@ -481,9 +518,10 @@ namespace WiseTwin.UI
             return container;
         }
 
+        // ========== END / CLOSE ==========
+
         private void EndDialogue(bool success)
         {
-            // Complete analytics
             dialogueInteractionData.Complete();
 
             if (TrainingAnalytics.Instance != null)
@@ -499,12 +537,45 @@ namespace WiseTwin.UI
 
             OnCompleted?.Invoke(currentObjectId, success);
 
-            // Show brief completion then close
+            // Show completion state
             string lang = GetCurrentLanguage();
-            string completeText = lang == "fr" ? "Dialogue terminé" : "Dialogue complete";
-            textLabel.text = completeText;
-            speakerLabel.style.display = DisplayStyle.None;
-            choicesContainer.style.display = DisplayStyle.None;
+            conversationContainer.Clear();
+            choicesSection.style.display = DisplayStyle.None;
+
+            // Completion message with checkmark
+            var completionRow = new VisualElement();
+            completionRow.style.alignItems = Align.Center;
+            completionRow.style.justifyContent = Justify.Center;
+            completionRow.style.marginTop = UIStyles.Space3XL;
+            completionRow.style.marginBottom = UIStyles.SpaceXL;
+
+            var checkCircle = new VisualElement();
+            checkCircle.style.width = 56;
+            checkCircle.style.height = 56;
+            UIStyles.SetBorderRadius(checkCircle, UIStyles.RadiusPill);
+            checkCircle.style.backgroundColor = UIStyles.SuccessBg;
+            UIStyles.SetBorderWidth(checkCircle, 2);
+            UIStyles.SetBorderColor(checkCircle, UIStyles.Success);
+            checkCircle.style.alignItems = Align.Center;
+            checkCircle.style.justifyContent = Justify.Center;
+            checkCircle.style.marginBottom = UIStyles.SpaceLG;
+
+            var checkLabel = new Label("\u2713");
+            checkLabel.style.fontSize = UIStyles.Font2XL;
+            checkLabel.style.color = UIStyles.Success;
+            checkLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            checkLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            checkCircle.Add(checkLabel);
+            completionRow.Add(checkCircle);
+
+            var completeText = new Label(lang == "fr" ? "Dialogue termine" : "Dialogue complete");
+            completeText.style.fontSize = UIStyles.FontLG;
+            completeText.style.color = UIStyles.TextPrimary;
+            completeText.style.unityFontStyleAndWeight = FontStyle.Bold;
+            completeText.style.unityTextAlign = TextAnchor.MiddleCenter;
+            completionRow.Add(completeText);
+
+            conversationContainer.Add(completionRow);
 
             string closeText = lang == "fr" ? "Fermer" : "Close";
             continueButton.text = closeText;
@@ -516,10 +587,8 @@ namespace WiseTwin.UI
         {
             isProcessing = false;
 
-            // Unblock player controls
             PlayerControls.SetEnabled(true);
 
-            // Unsubscribe from language changes
             if (LocalizationManager.Instance != null)
                 LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
 
@@ -527,9 +596,29 @@ namespace WiseTwin.UI
             OnClosed?.Invoke(currentObjectId);
         }
 
+        // ========== HELPERS ==========
+
+        private void ScrollToBottom()
+        {
+            if (conversationScroll != null)
+            {
+                conversationScroll.schedule.Execute(() =>
+                {
+                    conversationScroll.scrollOffset = new Vector2(0, conversationScroll.contentContainer.layout.height);
+                }).ExecuteLater(50);
+            }
+        }
+
+        private string GetLocalized(string en, string fr, string lang)
+        {
+            string primary = lang == "fr" ? fr : en;
+            if (!string.IsNullOrEmpty(primary)) return primary;
+            string fallback = lang == "fr" ? en : fr;
+            return fallback ?? "";
+        }
+
         private void OnLanguageChanged(string newLanguage)
         {
-            // Refresh current node display
             if (currentNode == null) return;
 
             switch (currentNode.type)
@@ -540,6 +629,14 @@ namespace WiseTwin.UI
                 case "choice":
                     DisplayChoiceNode(currentNode);
                     break;
+            }
+
+            // Update header
+            string lang = newLanguage;
+            string dialogueTitle = GetLocalized(dialogueTree.title_en, dialogueTree.title_fr, lang);
+            if (headerTitleLabel != null && !string.IsNullOrEmpty(dialogueTitle))
+            {
+                headerTitleLabel.text = dialogueTitle;
             }
         }
 

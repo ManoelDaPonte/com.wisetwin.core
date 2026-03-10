@@ -3,6 +3,7 @@ using UnityEngine.UIElements;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using WiseTwin.UI;
 
 namespace WiseTwin
 {
@@ -34,9 +35,6 @@ namespace WiseTwin
         private const float FadeDuration = 0.3f;
         private Coroutine fadeCoroutine;
 
-        // Accent color matching the rest of the UI
-        private static readonly Color AccentColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-
         void Awake()
         {
             if (Instance != null)
@@ -54,9 +52,6 @@ namespace WiseTwin
             if (Instance == this) Instance = null;
         }
 
-        /// <summary>
-        /// Assigne le PanelSettings (appelé par le créateur du GO)
-        /// </summary>
         public void SetPanelSettings(PanelSettings settings)
         {
             if (uiDocument != null)
@@ -72,7 +67,7 @@ namespace WiseTwin
             {
                 uiDocument = gameObject.AddComponent<UIDocument>();
             }
-            uiDocument.visualTreeAsset = null; // UI construite en code
+            uiDocument.visualTreeAsset = null;
 
             root = uiDocument.rootVisualElement;
             if (root == null) return;
@@ -88,94 +83,52 @@ namespace WiseTwin
             // Backdrop plein écran
             backdrop = new VisualElement();
             backdrop.name = "transition-backdrop";
-            backdrop.style.position = Position.Absolute;
-            backdrop.style.left = 0;
-            backdrop.style.top = 0;
-            backdrop.style.width = Length.Percent(100);
-            backdrop.style.height = Length.Percent(100);
-            backdrop.style.backgroundColor = new Color(0, 0, 0, 0.6f);
-            backdrop.style.justifyContent = Justify.Center;
-            backdrop.style.alignItems = Align.Center;
-            backdrop.pickingMode = PickingMode.Position;
+            UIStyles.ApplyBackdropStyle(backdrop);
             backdrop.style.display = DisplayStyle.None;
 
             // Panneau central
             panel = new VisualElement();
             panel.name = "transition-panel";
             panel.style.width = 500;
-            panel.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
-            panel.style.borderTopLeftRadius = 20;
-            panel.style.borderTopRightRadius = 20;
-            panel.style.borderBottomLeftRadius = 20;
-            panel.style.borderBottomRightRadius = 20;
-            panel.style.borderLeftWidth = 2;
-            panel.style.borderRightWidth = 2;
-            panel.style.borderTopWidth = 2;
-            panel.style.borderBottomWidth = 2;
-            panel.style.borderLeftColor = AccentColor;
-            panel.style.borderRightColor = AccentColor;
-            panel.style.borderTopColor = AccentColor;
-            panel.style.borderBottomColor = AccentColor;
-            panel.style.paddingTop = 40;
-            panel.style.paddingBottom = 40;
-            panel.style.paddingLeft = 40;
-            panel.style.paddingRight = 40;
+            panel.style.maxWidth = Length.Percent(90);
+            UIStyles.ApplyCardStyle(panel, UIStyles.RadiusXL);
+            UIStyles.SetBorderWidth(panel, 2);
+            UIStyles.SetBorderColor(panel, UIStyles.Accent);
+            UIStyles.SetPadding(panel, UIStyles.Space3XL);
             panel.style.alignItems = Align.Center;
 
             // Titre
-            titleLabel = new Label();
+            titleLabel = UIStyles.CreateTitle("", UIStyles.Font2XL);
             titleLabel.name = "transition-title";
-            titleLabel.style.fontSize = 28;
-            titleLabel.style.color = AccentColor;
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            titleLabel.style.marginBottom = 15;
-            titleLabel.style.whiteSpace = WhiteSpace.Normal;
+            titleLabel.style.marginBottom = UIStyles.SpaceLG;
             panel.Add(titleLabel);
 
             // Sous-titre
-            subtitleLabel = new Label();
+            subtitleLabel = UIStyles.CreateSubtitle("", UIStyles.FontBase);
             subtitleLabel.name = "transition-subtitle";
-            subtitleLabel.style.fontSize = 16;
-            subtitleLabel.style.color = new Color(0.75f, 0.75f, 0.75f, 1f);
-            subtitleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            subtitleLabel.style.marginBottom = 30;
-            subtitleLabel.style.whiteSpace = WhiteSpace.Normal;
+            subtitleLabel.style.color = UIStyles.TextMuted;
+            subtitleLabel.style.marginBottom = UIStyles.Space2XL;
             panel.Add(subtitleLabel);
 
             // Bouton d'action
-            actionButton = new Button();
+            actionButton = UIStyles.CreatePrimaryButton("");
             actionButton.name = "transition-action-button";
-            actionButton.style.width = 350;
-            actionButton.style.height = 60;
-            actionButton.style.fontSize = 20;
-            actionButton.style.backgroundColor = AccentColor;
-            actionButton.style.color = Color.white;
-            actionButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            actionButton.style.borderTopLeftRadius = 12;
-            actionButton.style.borderTopRightRadius = 12;
-            actionButton.style.borderBottomLeftRadius = 12;
-            actionButton.style.borderBottomRightRadius = 12;
-            actionButton.style.borderLeftWidth = 0;
-            actionButton.style.borderRightWidth = 0;
-            actionButton.style.borderTopWidth = 0;
-            actionButton.style.borderBottomWidth = 0;
+            actionButton.style.width = 320;
+            actionButton.style.maxWidth = Length.Percent(100);
+            actionButton.style.height = 56;
+            actionButton.style.fontSize = UIStyles.FontLG;
             actionButton.clicked += OnButtonClicked;
             panel.Add(actionButton);
 
             backdrop.Add(panel);
             root.Add(backdrop);
 
-            // S'abonner aux changements de langue
             if (LocalizationManager.Instance != null)
             {
                 LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
             }
         }
 
-        /// <summary>
-        /// Affiche le panneau de démarrage de la formation
-        /// </summary>
         public void ShowStartPanel(int totalScenarios)
         {
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
@@ -187,9 +140,6 @@ namespace WiseTwin
             ShowInternal();
         }
 
-        /// <summary>
-        /// Affiche le panneau de transition entre scénarios
-        /// </summary>
         public void ShowTransitionPanel(int completedIndex, int totalScenarios)
         {
             string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
@@ -203,15 +153,11 @@ namespace WiseTwin
             ShowInternal();
         }
 
-        /// <summary>
-        /// Cache le panneau
-        /// </summary>
         public void Hide()
         {
             if (!isVisible) return;
             isVisible = false;
 
-            // Réactiver les contrôles du joueur
             SetPlayerControlsEnabled(true);
 
             if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
@@ -222,7 +168,6 @@ namespace WiseTwin
         {
             isVisible = true;
 
-            // Bloquer les contrôles du joueur
             SetPlayerControlsEnabled(false);
 
             if (backdrop != null)
@@ -247,8 +192,6 @@ namespace WiseTwin
 
         void OnLanguageChanged(string newLanguage)
         {
-            // Si le panneau est visible, rafraîchir les textes
-            // On ne peut pas savoir quel mode était affiché, donc on ne rafraîchit pas automatiquement
             // Les textes seront corrects au prochain Show
         }
 

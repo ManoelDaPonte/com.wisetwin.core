@@ -252,49 +252,31 @@ namespace WiseTwin.UI
 
             // Container principal
             var container = new VisualElement();
-            container.style.position = Position.Absolute;
-            container.style.width = Length.Percent(100);
-            container.style.height = Length.Percent(100);
-            container.style.backgroundColor = new Color(0, 0, 0, 0.8f);
-            container.style.alignItems = Align.Center;
-            container.style.justifyContent = Justify.Center;
+            UIStyles.ApplyBackdropHeavyStyle(container);
 
             // Boîte de contenu
             var contentBox = new VisualElement();
             contentBox.style.width = 600;
-            contentBox.style.paddingTop = 40;
-            contentBox.style.paddingBottom = 40;
-            contentBox.style.paddingLeft = 40;
-            contentBox.style.paddingRight = 40;
-            contentBox.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f);
-            contentBox.style.borderTopLeftRadius = 20;
-            contentBox.style.borderTopRightRadius = 20;
-            contentBox.style.borderBottomLeftRadius = 20;
-            contentBox.style.borderBottomRightRadius = 20;
+            contentBox.style.maxWidth = Length.Percent(90);
+            UIStyles.ApplyCardStyle(contentBox, UIStyles.RadiusXL);
+            UIStyles.SetPadding(contentBox, UIStyles.Space3XL);
 
             // Titre
-            var title = new Label($"Content Type: {contentType}");
-            title.style.fontSize = 28;
-            title.style.color = Color.white;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            title.style.marginBottom = 20;
-            title.style.unityTextAlign = TextAnchor.MiddleCenter;
+            var title = UIStyles.CreateTitle($"Content Type: {contentType}", UIStyles.Font2XL);
+            title.style.marginBottom = UIStyles.SpaceLG;
             contentBox.Add(title);
 
             // Message
-            var message = new Label("This content type is not yet implemented.\nClick anywhere to close.");
-            message.style.fontSize = 18;
-            message.style.color = new Color(0.8f, 0.8f, 0.8f);
+            var message = UIStyles.CreateBodyText("This content type is not yet implemented.\nClick anywhere to close.", UIStyles.FontMD);
+            message.style.color = UIStyles.TextSecondary;
             message.style.unityTextAlign = TextAnchor.MiddleCenter;
-            message.style.marginBottom = 30;
+            message.style.marginBottom = UIStyles.SpaceXL;
             contentBox.Add(message);
 
             // Afficher les données de debug si activé
             if (debugMode && contentData != null)
             {
-                var debugText = new Label($"Data keys: {string.Join(", ", contentData.Keys)}");
-                debugText.style.fontSize = 14;
-                debugText.style.color = new Color(0.6f, 0.6f, 0.6f);
+                var debugText = UIStyles.CreateMutedText($"Data keys: {string.Join(", ", contentData.Keys)}", UIStyles.FontSM);
                 debugText.style.unityTextAlign = TextAnchor.MiddleCenter;
                 contentBox.Add(debugText);
             }

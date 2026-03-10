@@ -3,23 +3,19 @@ using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
+using WiseTwin.UI;
 
 namespace WiseTwin
 {
     /// <summary>
-    /// HUD minimaliste pour afficher le timer et la progression pendant la formation
-    /// Layout: [restart (rouge)] [barre de progression] [help (?)]
+    /// HUD minimaliste pour afficher le timer, la progression et le titre du scénario.
+    /// Layout: [restart] [scenario title] [progress bar + timer] [help (?)]
     /// </summary>
     public class TrainingHUD : MonoBehaviour
     {
         [Header("Configuration")]
         [SerializeField] private bool showOnStart = false;
         [SerializeField] private float fadeInDuration = 0.5f;
-
-        [Header("Style")]
-        [SerializeField] private Color backgroundColor = new Color(0.05f, 0.05f, 0.08f, 0.85f);
-        [SerializeField] private Color progressColor = new Color(0.1f, 0.8f, 0.6f, 1f);
-        [SerializeField] private Color textColor = new Color(0.9f, 0.9f, 0.9f, 1f);
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
@@ -30,6 +26,7 @@ namespace WiseTwin
         private VisualElement hudContainer;
         private Label timerLabel;
         private Label progressLabel;
+        private Label scenarioTitleLabel;
         private VisualElement progressBar;
         private VisualElement progressFill;
         private Button resetButton;
@@ -40,7 +37,7 @@ namespace WiseTwin
         private int currentProgress = 0;
         private int totalObjects = 0;
         private bool isVisible = false;
-        private HashSet<string> completedObjects = new HashSet<string>(); // Pour éviter la triche
+        private HashSet<string> completedObjects = new HashSet<string>();
 
         // Singleton
         public static TrainingHUD Instance { get; private set; }
@@ -50,13 +47,10 @@ namespace WiseTwin
             if (Instance == null)
             {
                 Instance = this;
-                // Ne pas appliquer DontDestroyOnLoad si on est dans WiseTwinSystem
-                // C'est le parent WiseTwinSystem qui gère la persistance
                 if (transform.parent == null)
                 {
                     DontDestroyOnLoad(gameObject);
                 }
-                // Pas de warning si on est enfant de WiseTwinSystem
             }
             else
             {
@@ -64,10 +58,8 @@ namespace WiseTwin
                 return;
             }
 
-            // Setup UIDocument
             SetupUIDocument();
 
-            // S'abonner aux changements de langue
             if (LocalizationManager.Instance != null)
             {
                 LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
@@ -76,7 +68,6 @@ namespace WiseTwin
 
         void OnDestroy()
         {
-            // Se désabonner des événements
             if (LocalizationManager.Instance != null)
             {
                 LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
@@ -121,92 +112,92 @@ namespace WiseTwin
 
         void CreateHUD()
         {
-            // Clear root
             root.Clear();
-            root.pickingMode = PickingMode.Ignore; // Ne pas bloquer les clics
+            root.pickingMode = PickingMode.Ignore;
 
-            // Container principal - barre horizontale en haut
+            // Container principal - barre horizontale en haut, responsive
             hudContainer = new VisualElement();
             hudContainer.name = "training-hud";
             hudContainer.style.position = Position.Absolute;
-            hudContainer.style.top = 10;
+            hudContainer.style.top = UIStyles.SpaceSM;
             hudContainer.style.left = Length.Percent(50);
-            hudContainer.style.translate = new Translate(-325, 0); // 650/2
-            hudContainer.style.width = 650;
+            hudContainer.style.width = Length.Percent(50);
+            hudContainer.style.maxWidth = 720;
+            hudContainer.style.minWidth = 380;
+            hudContainer.style.translate = new Translate(Length.Percent(-50), 0);
             hudContainer.style.height = 52;
-            hudContainer.style.backgroundColor = backgroundColor;
-            hudContainer.style.borderTopLeftRadius = 26;
-            hudContainer.style.borderTopRightRadius = 26;
-            hudContainer.style.borderBottomLeftRadius = 26;
-            hudContainer.style.borderBottomRightRadius = 26;
+            hudContainer.style.backgroundColor = UIStyles.BgBase;
+            UIStyles.SetBorderRadius(hudContainer, UIStyles.Radius2XL);
+            UIStyles.SetBorderWidth(hudContainer, 1);
+            UIStyles.SetBorderColor(hudContainer, UIStyles.BorderSubtle);
             hudContainer.style.flexDirection = FlexDirection.Row;
             hudContainer.style.alignItems = Align.Center;
-            hudContainer.style.paddingLeft = 12;
-            hudContainer.style.paddingRight = 12;
+            hudContainer.style.paddingLeft = UIStyles.SpaceMD;
+            hudContainer.style.paddingRight = UIStyles.SpaceMD;
             hudContainer.style.display = DisplayStyle.None;
-            hudContainer.pickingMode = PickingMode.Position; // Allow picking buttons inside
+            hudContainer.pickingMode = PickingMode.Position;
 
-            // ===== Section 1: Bouton Restart (gauche, rouge) =====
-            resetButton = new Button(() => OnResetButtonClicked());
-            resetButton.text = "\u21BB";
+            // ===== Bouton Restart (gauche) =====
+            resetButton = UIStyles.CreateIconButton("\u21BB", 36, UIStyles.Danger, () => OnResetButtonClicked());
             resetButton.name = "reset-button";
-            resetButton.style.width = 38;
-            resetButton.style.height = 38;
-            resetButton.style.fontSize = 22;
-            resetButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.9f);
-            resetButton.style.color = Color.white;
-            resetButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            resetButton.style.borderTopLeftRadius = 19;
-            resetButton.style.borderTopRightRadius = 19;
-            resetButton.style.borderBottomLeftRadius = 19;
-            resetButton.style.borderBottomRightRadius = 19;
-            resetButton.style.paddingTop = 0;
-            resetButton.style.paddingBottom = 0;
-            resetButton.style.paddingLeft = 0;
-            resetButton.style.paddingRight = 0;
-            resetButton.style.marginRight = 12;
+            resetButton.style.marginRight = UIStyles.SpaceMD;
+            resetButton.style.flexShrink = 0;
             hudContainer.Add(resetButton);
 
-            // ===== Section 2: Barre de progression (centre, flex grow) =====
-            var progressSection = new VisualElement();
-            progressSection.style.flexGrow = 1;
-            progressSection.style.flexDirection = FlexDirection.Column;
-            progressSection.style.justifyContent = Justify.Center;
+            // ===== Section centrale (titre + progress) =====
+            var centerSection = new VisualElement();
+            centerSection.style.flexGrow = 1;
+            centerSection.style.flexDirection = FlexDirection.Column;
+            centerSection.style.justifyContent = Justify.Center;
+            centerSection.style.overflow = Overflow.Hidden;
+
+            // Titre du scénario
+            scenarioTitleLabel = new Label();
+            scenarioTitleLabel.name = "scenario-title";
+            scenarioTitleLabel.style.fontSize = UIStyles.FontXS;
+            scenarioTitleLabel.style.color = UIStyles.TextMuted;
+            scenarioTitleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            scenarioTitleLabel.style.overflow = Overflow.Hidden;
+            scenarioTitleLabel.style.textOverflow = TextOverflow.Ellipsis;
+            scenarioTitleLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            scenarioTitleLabel.style.display = DisplayStyle.None;
+            centerSection.Add(scenarioTitleLabel);
+
+            // Row: progress label + bar
+            var progressRow = new VisualElement();
+            progressRow.style.flexDirection = FlexDirection.Row;
+            progressRow.style.alignItems = Align.Center;
 
             // Label de progression
             progressLabel = new Label("0 / 0");
-            progressLabel.style.fontSize = 12;
-            progressLabel.style.color = new Color(textColor.r, textColor.g, textColor.b, 0.8f);
-            progressLabel.style.marginBottom = 4;
-            progressLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            progressSection.Add(progressLabel);
+            progressLabel.style.fontSize = UIStyles.FontXS;
+            progressLabel.style.color = UIStyles.TextSecondary;
+            progressLabel.style.marginRight = UIStyles.SpaceSM;
+            progressLabel.style.flexShrink = 0;
+            progressRow.Add(progressLabel);
 
             // Barre de progression
-            progressBar = new VisualElement();
-            progressBar.style.height = 7;
-            progressBar.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f, 0.5f);
-            progressBar.style.borderTopLeftRadius = 3;
-            progressBar.style.borderTopRightRadius = 3;
-            progressBar.style.borderBottomLeftRadius = 3;
-            progressBar.style.borderBottomRightRadius = 3;
+            var (bar, fill) = UIStyles.CreateProgressBar(6, UIStyles.SpaceXS);
+            progressBar = bar;
+            progressFill = fill;
+            bar.style.flexGrow = 1;
+            progressRow.Add(bar);
 
-            // Remplissage de la barre
-            progressFill = new VisualElement();
-            progressFill.style.height = Length.Percent(100);
-            progressFill.style.width = Length.Percent(0);
-            progressFill.style.backgroundColor = progressColor;
-            progressFill.style.borderTopLeftRadius = 3;
-            progressFill.style.borderTopRightRadius = 3;
-            progressFill.style.borderBottomLeftRadius = 3;
-            progressFill.style.borderBottomRightRadius = 3;
-            progressBar.Add(progressFill);
+            centerSection.Add(progressRow);
+            hudContainer.Add(centerSection);
 
-            progressSection.Add(progressBar);
-            hudContainer.Add(progressSection);
+            // ===== Timer (droite) =====
+            timerLabel = new Label("00:00");
+            timerLabel.name = "timer-label";
+            timerLabel.style.fontSize = UIStyles.FontSM;
+            timerLabel.style.color = UIStyles.TextMuted;
+            timerLabel.style.marginLeft = UIStyles.SpaceMD;
+            timerLabel.style.flexShrink = 0;
+            hudContainer.Add(timerLabel);
 
             root.Add(hudContainer);
 
-            // Confirmation dialog (hidden by default)
+            // Confirmation dialog
             CreateRestartConfirmationDialog();
 
             if (debugMode) Debug.Log("[TrainingHUD] HUD created");
@@ -216,81 +207,46 @@ namespace WiseTwin
         {
             confirmationOverlay = new VisualElement();
             confirmationOverlay.name = "restart-confirmation";
-            confirmationOverlay.style.position = Position.Absolute;
-            confirmationOverlay.style.width = Length.Percent(100);
-            confirmationOverlay.style.height = Length.Percent(100);
-            confirmationOverlay.style.backgroundColor = new Color(0, 0, 0, 0.7f);
-            confirmationOverlay.style.alignItems = Align.Center;
-            confirmationOverlay.style.justifyContent = Justify.Center;
+            UIStyles.ApplyBackdropStyle(confirmationOverlay);
             confirmationOverlay.style.display = DisplayStyle.None;
-            confirmationOverlay.pickingMode = PickingMode.Position;
 
             var dialog = new VisualElement();
             dialog.style.width = 420;
-            dialog.style.paddingTop = 30;
-            dialog.style.paddingBottom = 30;
-            dialog.style.paddingLeft = 40;
-            dialog.style.paddingRight = 40;
-            dialog.style.backgroundColor = new Color(0.15f, 0.15f, 0.18f, 0.98f);
-            dialog.style.borderTopLeftRadius = 15;
-            dialog.style.borderTopRightRadius = 15;
-            dialog.style.borderBottomLeftRadius = 15;
-            dialog.style.borderBottomRightRadius = 15;
-            dialog.style.borderTopWidth = 2;
-            dialog.style.borderBottomWidth = 2;
-            dialog.style.borderLeftWidth = 2;
-            dialog.style.borderRightWidth = 2;
-            dialog.style.borderTopColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
-            dialog.style.borderBottomColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
-            dialog.style.borderLeftColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
-            dialog.style.borderRightColor = new Color(0.8f, 0.2f, 0.2f, 0.6f);
+            dialog.style.maxWidth = Length.Percent(90);
+            UIStyles.ApplyElevatedCardStyle(dialog, UIStyles.RadiusXL);
+            UIStyles.SetBorderWidth(dialog, 2);
+            UIStyles.SetBorderColor(dialog, new Color(UIStyles.Danger.r, UIStyles.Danger.g, UIStyles.Danger.b, 0.5f));
+            UIStyles.SetPadding(dialog, UIStyles.Space3XL);
             dialog.style.alignItems = Align.Center;
 
             var warningIcon = new Label("\u26A0");
-            warningIcon.style.fontSize = 40;
+            warningIcon.style.fontSize = UIStyles.Font3XL;
             warningIcon.style.unityTextAlign = TextAnchor.MiddleCenter;
-            warningIcon.style.marginBottom = 15;
+            warningIcon.style.marginBottom = UIStyles.SpaceLG;
             dialog.Add(warningIcon);
 
             var messageLabel = new Label();
             messageLabel.name = "restart-message";
-            messageLabel.style.fontSize = 18;
-            messageLabel.style.color = Color.white;
+            messageLabel.style.fontSize = UIStyles.FontMD;
+            messageLabel.style.color = UIStyles.TextPrimary;
             messageLabel.style.whiteSpace = WhiteSpace.Normal;
             messageLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            messageLabel.style.marginBottom = 25;
+            messageLabel.style.marginBottom = UIStyles.SpaceXL;
             dialog.Add(messageLabel);
 
             var buttonRow = new VisualElement();
             buttonRow.style.flexDirection = FlexDirection.Row;
             buttonRow.style.justifyContent = Justify.Center;
 
-            var cancelButton = new Button(() => HideRestartConfirmation());
+            var cancelButton = UIStyles.CreateSecondaryButton("", () => HideRestartConfirmation());
             cancelButton.name = "cancel-restart-button";
             cancelButton.style.width = 140;
-            cancelButton.style.height = 45;
-            cancelButton.style.fontSize = 16;
-            cancelButton.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f, 0.9f);
-            cancelButton.style.color = Color.white;
-            cancelButton.style.borderTopLeftRadius = 8;
-            cancelButton.style.borderTopRightRadius = 8;
-            cancelButton.style.borderBottomLeftRadius = 8;
-            cancelButton.style.borderBottomRightRadius = 8;
-            cancelButton.style.marginRight = 15;
+            cancelButton.style.marginRight = UIStyles.SpaceLG;
             buttonRow.Add(cancelButton);
 
-            var restartButton = new Button(() => ConfirmRestart());
+            var restartButton = UIStyles.CreateDangerButton("", () => ConfirmRestart());
             restartButton.name = "confirm-restart-button";
             restartButton.style.width = 140;
-            restartButton.style.height = 45;
-            restartButton.style.fontSize = 16;
-            restartButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.9f);
-            restartButton.style.color = Color.white;
-            restartButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            restartButton.style.borderTopLeftRadius = 8;
-            restartButton.style.borderTopRightRadius = 8;
-            restartButton.style.borderBottomLeftRadius = 8;
-            restartButton.style.borderBottomRightRadius = 8;
             buttonRow.Add(restartButton);
 
             dialog.Add(buttonRow);
@@ -349,6 +305,24 @@ namespace WiseTwin
             if (debugMode) Debug.Log("[TrainingHUD] HUD hidden");
         }
 
+        /// <summary>
+        /// Met à jour le titre du scénario affiché dans le HUD.
+        /// </summary>
+        public void SetScenarioTitle(string title)
+        {
+            if (scenarioTitleLabel == null) return;
+
+            if (string.IsNullOrEmpty(title))
+            {
+                scenarioTitleLabel.style.display = DisplayStyle.None;
+            }
+            else
+            {
+                scenarioTitleLabel.text = title;
+                scenarioTitleLabel.style.display = DisplayStyle.Flex;
+            }
+        }
+
         public void SetTotalObjects(int total)
         {
             totalObjects = total;
@@ -365,13 +339,11 @@ namespace WiseTwin
 
         public void IncrementProgress()
         {
-            // Méthode legacy sans ID d'objet (pour compatibilité)
             IncrementProgressForObject(null);
         }
 
         public void IncrementProgressForObject(string objectId)
         {
-            // Si on a un ID d'objet, vérifier qu'il n'a pas déjà été complété
             if (!string.IsNullOrEmpty(objectId))
             {
                 if (completedObjects.Contains(objectId))
@@ -382,7 +354,6 @@ namespace WiseTwin
                 completedObjects.Add(objectId);
             }
 
-            // Ne pas incrémenter si on a déjà atteint le maximum
             if (currentProgress >= totalObjects)
             {
                 Debug.LogWarning($"[TrainingHUD] Progress already at maximum ({currentProgress}/{totalObjects})");
@@ -397,7 +368,6 @@ namespace WiseTwin
                 Debug.Log($"[TrainingHUD] Progress: {currentProgress}/{totalObjects} (Object: {objectId ?? "unknown"})");
             }
 
-            // Vérifier si on a terminé tous les modules
             if (currentProgress >= totalObjects && totalObjects > 0)
             {
                 OnTrainingCompleted();
@@ -413,15 +383,16 @@ namespace WiseTwin
 
             if (progressFill != null && totalObjects > 0)
             {
-                float percentage = (float)currentProgress / totalObjects * 100f;
-                // S'assurer que le pourcentage ne dépasse pas 100%
-                percentage = Mathf.Clamp(percentage, 0f, 100f);
+                float percentage = Mathf.Clamp((float)currentProgress / totalObjects * 100f, 0f, 100f);
                 progressFill.style.width = Length.Percent(percentage);
 
-                // Changer la couleur quand c'est terminé
                 if (currentProgress >= totalObjects)
                 {
-                    progressFill.style.backgroundColor = new Color(0.2f, 0.9f, 0.4f, 1f);
+                    progressFill.style.backgroundColor = UIStyles.Success;
+                }
+                else
+                {
+                    progressFill.style.backgroundColor = UIStyles.Accent;
                 }
             }
         }
@@ -430,7 +401,6 @@ namespace WiseTwin
         {
             if (!isVisible || timerLabel == null) return;
 
-            // Mettre à jour le timer
             float elapsed = Time.time - startTime;
             int minutes = Mathf.FloorToInt(elapsed / 60);
             int seconds = Mathf.FloorToInt(elapsed % 60);
@@ -445,8 +415,7 @@ namespace WiseTwin
             while (elapsed < fadeInDuration)
             {
                 elapsed += Time.deltaTime;
-                float opacity = Mathf.Lerp(0, 1, elapsed / fadeInDuration);
-                hudContainer.style.opacity = opacity;
+                hudContainer.style.opacity = Mathf.Lerp(0, 1, elapsed / fadeInDuration);
                 yield return null;
             }
 
@@ -460,8 +429,7 @@ namespace WiseTwin
             while (elapsed < fadeInDuration)
             {
                 elapsed += Time.deltaTime;
-                float opacity = Mathf.Lerp(1, 0, elapsed / fadeInDuration);
-                hudContainer.style.opacity = opacity;
+                hudContainer.style.opacity = Mathf.Lerp(1, 0, elapsed / fadeInDuration);
                 yield return null;
             }
 
@@ -478,7 +446,6 @@ namespace WiseTwin
             Debug.LogWarning("[TrainingHUD] AutoDetectInteractables is deprecated. The total is automatically set by ProgressionManager from metadata.");
         }
 
-        // Pour les tests
         [ContextMenu("Test Show HUD")]
         public void TestShow()
         {
@@ -496,40 +463,31 @@ namespace WiseTwin
         {
             if (debugMode) Debug.Log($"[TrainingHUD] Training completed! {currentProgress}/{totalObjects} modules done");
 
-            // Calculer le temps total
             float totalTime = Time.time - startTime;
 
-            // S'assurer que TrainingAnalytics existe avant de créer l'UI de complétion
             if (Analytics.TrainingAnalytics.Instance == null)
             {
                 var analyticsGO = new GameObject("TrainingAnalytics");
                 analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
             }
 
-            // Chercher ou créer l'UI de complétion
             var completionUI = FindFirstObjectByType<UI.TrainingCompletionUI>();
             if (completionUI == null)
             {
-                // Créer l'UI de complétion s'il n'existe pas
                 GameObject completionGO = new GameObject("TrainingCompletionUI");
                 completionUI = completionGO.AddComponent<UI.TrainingCompletionUI>();
 
-                // Ajouter UIDocument
                 var uiDoc = completionGO.AddComponent<UIDocument>();
 
-                // Essayer de trouver et assigner le PanelSettings du HUD actuel
                 if (uiDocument != null && uiDocument.panelSettings != null)
                 {
                     uiDoc.panelSettings = uiDocument.panelSettings;
-                    if (debugMode) Debug.Log("[TrainingHUD] PanelSettings assigned to TrainingCompletionUI from TrainingHUD");
                 }
             }
 
-            // IMPORTANT: Afficher l'écran de complétion avec les statistiques
             if (completionUI != null)
             {
                 completionUI.ShowCompletionScreen(totalTime, totalObjects);
-                if (debugMode) Debug.Log("[TrainingHUD] Completion screen displayed successfully");
             }
             else
             {
@@ -539,20 +497,13 @@ namespace WiseTwin
 
         #region Scenario Methods
 
-        /// <summary>
-        /// Called when a scenario starts
-        /// </summary>
         public void OnScenarioStarted()
         {
             if (debugMode) Debug.Log("[TrainingHUD] Scenario started");
         }
 
-        /// <summary>
-        /// Called when a scenario is completed - increments progress
-        /// </summary>
         public void OnScenarioCompleted()
         {
-            // Incrémenter le compteur de progression
             if (currentProgress < totalObjects)
             {
                 currentProgress++;
@@ -564,27 +515,18 @@ namespace WiseTwin
 
         /// <summary>
         /// Legacy method - no-op since next button was removed.
-        /// Transitions between scenarios are handled by ScenarioTransitionPanel.
         /// </summary>
         public void SetNextButtonVisible(bool visible)
         {
             // No-op
         }
 
-        /// <summary>
-        /// Called when all scenarios are completed
-        /// </summary>
         public void OnAllScenariosCompleted()
         {
             if (debugMode) Debug.Log("[TrainingHUD] All scenarios completed");
-
-            // Show completion UI
             OnTrainingCompleted();
         }
 
-        /// <summary>
-        /// Initialize for scenario-based progression
-        /// </summary>
         public void InitializeForScenarios()
         {
             if (ProgressionManager.Instance != null)
@@ -600,9 +542,6 @@ namespace WiseTwin
 
         #region Button Handlers
 
-        /// <summary>
-        /// Called when restart button is clicked - shows confirmation dialog
-        /// </summary>
         void OnResetButtonClicked()
         {
             if (debugMode) Debug.Log("[TrainingHUD] Restart button clicked - showing confirmation");
@@ -635,29 +574,22 @@ namespace WiseTwin
         {
             if (debugMode) Debug.Log("[TrainingHUD] Restart confirmed - reloading scene");
 
-            // Reset static state that persists across scene loads
             ControlModeSettings.Reset();
 
-            // Destroy the entire WiseTwinSystem hierarchy (includes this TrainingHUD and all singletons)
             var rootGO = transform.root.gameObject;
             Destroy(rootGO);
 
-            // Destroy all standalone DontDestroyOnLoad objects not under WiseTwinSystem
             var transitionPanel = FindFirstObjectByType<ScenarioTransitionPanel>();
             if (transitionPanel != null) Destroy(transitionPanel.gameObject);
 
             var tutorialUI = FindFirstObjectByType<TutorialUI>();
             if (tutorialUI != null) Destroy(tutorialUI.gameObject);
 
-            // Reload the current scene for a clean restart
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
         #endregion
 
-        /// <summary>
-        /// Called when language changes - updates confirmation dialog texts
-        /// </summary>
         void OnLanguageChanged(string newLanguage)
         {
             UpdateConfirmationTexts();

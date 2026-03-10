@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections;
+using WiseTwin.UI;
 
 namespace WiseTwin
 {
@@ -13,11 +14,6 @@ namespace WiseTwin
     {
         [Header("Configuration")]
         [SerializeField] private float animationDuration = 0.3f;
-
-        [Header("Colors")]
-        [SerializeField] private Color primaryColor = new Color(0.2f, 0.4f, 0.8f);
-        [SerializeField] private Color accentColor = new Color(0.1f, 0.8f, 0.6f);
-        [SerializeField] private Color backgroundColor = new Color(0.05f, 0.05f, 0.05f, 0.95f);
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
@@ -108,7 +104,6 @@ namespace WiseTwin
                 currentLanguage = languageCode;
             }
 
-            // Reset control mode to default on each show (fresh start)
             selectedMode = ControlMode.KeyboardMouse;
             ControlModeSettings.SetMode(ControlMode.KeyboardMouse);
 
@@ -127,7 +122,6 @@ namespace WiseTwin
                 root.Remove(tutorialPanel);
             }
 
-            // Block all player controls
             PlayerControls.SetEnabled(false);
 
             CreateTutorialPanel();
@@ -150,81 +144,63 @@ namespace WiseTwin
             tutorialPanel.style.position = Position.Absolute;
             tutorialPanel.style.width = Length.Percent(100);
             tutorialPanel.style.height = Length.Percent(100);
-            tutorialPanel.style.backgroundColor = backgroundColor;
+            tutorialPanel.style.backgroundColor = UIStyles.BgDeep;
             tutorialPanel.style.alignItems = Align.Center;
             tutorialPanel.style.justifyContent = Justify.Center;
             tutorialPanel.pickingMode = PickingMode.Position;
 
             var contentContainer = new VisualElement();
-            contentContainer.style.width = 750;
+            contentContainer.style.width = 720;
             contentContainer.style.maxWidth = Length.Percent(90);
             contentContainer.style.maxHeight = Length.Percent(90);
-            contentContainer.style.backgroundColor = new Color(0.12f, 0.12f, 0.15f, 0.98f);
-            contentContainer.style.borderTopLeftRadius = 15;
-            contentContainer.style.borderTopRightRadius = 15;
-            contentContainer.style.borderBottomLeftRadius = 15;
-            contentContainer.style.borderBottomRightRadius = 15;
-            contentContainer.style.borderTopWidth = 1;
-            contentContainer.style.borderBottomWidth = 1;
-            contentContainer.style.borderLeftWidth = 1;
-            contentContainer.style.borderRightWidth = 1;
-            contentContainer.style.borderTopColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
-            contentContainer.style.borderBottomColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
-            contentContainer.style.borderLeftColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
-            contentContainer.style.borderRightColor = new Color(0.2f, 0.2f, 0.25f, 0.3f);
+            UIStyles.ApplyCardStyle(contentContainer, UIStyles.RadiusXL);
 
             var scrollView = new ScrollView(ScrollViewMode.Vertical);
             scrollView.style.flexGrow = 1;
             scrollView.verticalScrollerVisibility = ScrollerVisibility.Auto;
             scrollView.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
 
+            // Setup minimal scrollbar
+            scrollView.RegisterCallback<AttachToPanelEvent>(evt => UIStyles.ApplyMinimalScrollbar(scrollView));
+            scrollView.RegisterCallback<GeometryChangedEvent>(evt => UIStyles.ApplyMinimalScrollbar(scrollView));
+
             var scrollContent = new VisualElement();
-            scrollContent.style.paddingTop = 40;
-            scrollContent.style.paddingBottom = 40;
-            scrollContent.style.paddingLeft = 45;
-            scrollContent.style.paddingRight = 45;
+            scrollContent.style.paddingTop = UIStyles.Space3XL;
+            scrollContent.style.paddingBottom = UIStyles.Space3XL;
+            scrollContent.style.paddingLeft = UIStyles.Space3XL;
+            scrollContent.style.paddingRight = UIStyles.Space3XL;
 
             // Title
-            var titleLabel = new Label(GetText("title"));
-            titleLabel.style.fontSize = 28;
-            titleLabel.style.color = accentColor;
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.marginBottom = 25;
-            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            var titleLabel = UIStyles.CreateTitle(GetText("title"), UIStyles.Font2XL);
+            titleLabel.style.marginBottom = UIStyles.SpaceXL;
             scrollContent.Add(titleLabel);
 
             // Control mode selection
             CreateControlModeSelection(scrollContent);
 
-            CreateSeparator(scrollContent);
+            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
 
-            // Movement section (adapts to selected mode)
+            // Movement section
             var movementSection = new VisualElement();
-            movementSection.style.marginBottom = 20;
+            movementSection.style.marginBottom = UIStyles.SpaceLG;
 
-            var moveTitleLabel = new Label(GetText("movement_title"));
-            moveTitleLabel.style.fontSize = 20;
-            moveTitleLabel.style.color = primaryColor;
-            moveTitleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            moveTitleLabel.style.marginBottom = 8;
+            var moveTitleLabel = CreateSectionTitle(GetText("movement_title"));
             movementSection.Add(moveTitleLabel);
 
-            movementDescLabel = new Label(GetMovementDesc());
-            movementDescLabel.style.fontSize = 15;
-            movementDescLabel.style.color = new Color(0.85f, 0.85f, 0.85f);
-            movementDescLabel.style.whiteSpace = WhiteSpace.Normal;
+            movementDescLabel = UIStyles.CreateBodyText(GetMovementDesc(), UIStyles.FontBase);
+            movementDescLabel.style.color = UIStyles.TextSecondary;
             movementSection.Add(movementDescLabel);
             scrollContent.Add(movementSection);
 
-            CreateSeparator(scrollContent);
+            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
 
             // Procedures
             CreateSection(scrollContent, GetText("procedures_title"), GetText("procedures_desc"));
-            CreateSeparator(scrollContent);
+            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
 
             // Questions
             CreateSection(scrollContent, GetText("questions_title"), GetText("questions_desc"));
-            CreateSeparator(scrollContent);
+            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
 
             // Interface
             CreateSection(scrollContent, GetText("interface_title"), GetText("interface_desc"));
@@ -232,20 +208,11 @@ namespace WiseTwin
             // Next button
             var buttonContainer = new VisualElement();
             buttonContainer.style.alignItems = Align.Center;
-            buttonContainer.style.marginTop = 30;
+            buttonContainer.style.marginTop = UIStyles.Space2XL;
 
-            var startButton = new Button(() => OnStartButtonClicked());
-            startButton.text = GetText("start_button");
-            startButton.style.width = 300;
-            startButton.style.height = 55;
-            startButton.style.fontSize = 19;
-            startButton.style.backgroundColor = accentColor;
-            startButton.style.color = Color.white;
-            startButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-            startButton.style.borderTopLeftRadius = 10;
-            startButton.style.borderTopRightRadius = 10;
-            startButton.style.borderBottomLeftRadius = 10;
-            startButton.style.borderBottomRightRadius = 10;
+            var startButton = UIStyles.CreatePrimaryButton(GetText("start_button"), () => OnStartButtonClicked());
+            startButton.style.width = 280;
+            startButton.style.height = 52;
             buttonContainer.Add(startButton);
 
             scrollContent.Add(buttonContainer);
@@ -257,18 +224,14 @@ namespace WiseTwin
 
         void CreateControlModeSelection(VisualElement parent)
         {
-            var modeLabel = new Label(GetText("control_mode_title"));
-            modeLabel.style.fontSize = 18;
-            modeLabel.style.color = primaryColor;
-            modeLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            modeLabel.style.marginBottom = 12;
+            var modeLabel = CreateSectionTitle(GetText("control_mode_title"));
             modeLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             parent.Add(modeLabel);
 
             var cardsRow = new VisualElement();
             cardsRow.style.flexDirection = FlexDirection.Row;
             cardsRow.style.justifyContent = Justify.Center;
-            cardsRow.style.marginBottom = 10;
+            cardsRow.style.marginBottom = UIStyles.SpaceMD;
 
             keyboardCard = CreateControlModeCard(
                 GetText("mode_keyboard_title"),
@@ -283,7 +246,7 @@ namespace WiseTwin
             cardsRow.Add(keyboardCard);
 
             var spacer = new VisualElement();
-            spacer.style.width = 20;
+            spacer.style.width = UIStyles.SpaceLG;
             cardsRow.Add(spacer);
 
             mouseCard = CreateControlModeCard(
@@ -304,35 +267,26 @@ namespace WiseTwin
         VisualElement CreateControlModeCard(string title, string icon, bool isSelected)
         {
             var card = new VisualElement();
-            card.style.width = 280;
-            card.style.paddingTop = 18;
-            card.style.paddingBottom = 18;
-            card.style.paddingLeft = 15;
-            card.style.paddingRight = 15;
-            card.style.borderTopLeftRadius = 12;
-            card.style.borderTopRightRadius = 12;
-            card.style.borderBottomLeftRadius = 12;
-            card.style.borderBottomRightRadius = 12;
-            card.style.borderTopWidth = 2;
-            card.style.borderBottomWidth = 2;
-            card.style.borderLeftWidth = 2;
-            card.style.borderRightWidth = 2;
+            card.style.width = 260;
+            UIStyles.SetPadding(card, UIStyles.SpaceLG);
+            UIStyles.SetBorderRadius(card, UIStyles.RadiusMD);
+            UIStyles.SetBorderWidth(card, 2);
             card.style.alignItems = Align.Center;
             card.pickingMode = PickingMode.Position;
 
-            ApplyCardStyle(card, isSelected);
+            ApplyControlCardStyle(card, isSelected);
 
             var iconLabel = new Label(icon);
-            iconLabel.style.fontSize = 26;
-            iconLabel.style.color = Color.white;
+            iconLabel.style.fontSize = UIStyles.FontXL;
+            iconLabel.style.color = UIStyles.TextPrimary;
             iconLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            iconLabel.style.marginBottom = 8;
+            iconLabel.style.marginBottom = UIStyles.SpaceSM;
             iconLabel.pickingMode = PickingMode.Ignore;
             card.Add(iconLabel);
 
             var titleLabel = new Label(title);
-            titleLabel.style.fontSize = 16;
-            titleLabel.style.color = Color.white;
+            titleLabel.style.fontSize = UIStyles.FontBase;
+            titleLabel.style.color = UIStyles.TextPrimary;
             titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             titleLabel.pickingMode = PickingMode.Ignore;
@@ -341,16 +295,13 @@ namespace WiseTwin
             return card;
         }
 
-        void ApplyCardStyle(VisualElement card, bool isSelected)
+        void ApplyControlCardStyle(VisualElement card, bool isSelected)
         {
-            Color borderColor = isSelected ? accentColor : new Color(0.3f, 0.3f, 0.35f, 0.5f);
-            card.style.borderTopColor = borderColor;
-            card.style.borderBottomColor = borderColor;
-            card.style.borderLeftColor = borderColor;
-            card.style.borderRightColor = borderColor;
+            Color borderColor = isSelected ? UIStyles.Accent : UIStyles.BorderSubtle;
+            UIStyles.SetBorderColor(card, borderColor);
             card.style.backgroundColor = isSelected
-                ? new Color(0.1f, 0.25f, 0.2f, 1f)
-                : new Color(0.18f, 0.18f, 0.22f, 1f);
+                ? new Color(UIStyles.Accent.r, UIStyles.Accent.g, UIStyles.Accent.b, 0.12f)
+                : UIStyles.BgInput;
         }
 
         void SelectControlMode(ControlMode mode)
@@ -359,9 +310,9 @@ namespace WiseTwin
             ControlModeSettings.SetMode(mode);
 
             if (keyboardCard != null)
-                ApplyCardStyle(keyboardCard, mode == ControlMode.KeyboardMouse);
+                ApplyControlCardStyle(keyboardCard, mode == ControlMode.KeyboardMouse);
             if (mouseCard != null)
-                ApplyCardStyle(mouseCard, mode == ControlMode.MouseOnly);
+                ApplyControlCardStyle(mouseCard, mode == ControlMode.MouseOnly);
 
             if (movementDescLabel != null)
                 movementDescLabel.text = GetMovementDesc();
@@ -380,35 +331,28 @@ namespace WiseTwin
             return GetText("movement_desc");
         }
 
+        Label CreateSectionTitle(string text)
+        {
+            var label = new Label(text);
+            label.style.fontSize = UIStyles.FontMD;
+            label.style.color = UIStyles.Info;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.marginBottom = UIStyles.SpaceSM;
+            return label;
+        }
+
         void CreateSection(VisualElement parent, string title, string description)
         {
             var section = new VisualElement();
-            section.style.marginBottom = 20;
+            section.style.marginBottom = UIStyles.SpaceLG;
 
-            var titleLabel = new Label(title);
-            titleLabel.style.fontSize = 20;
-            titleLabel.style.color = primaryColor;
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.marginBottom = 8;
-            section.Add(titleLabel);
+            section.Add(CreateSectionTitle(title));
 
-            var descLabel = new Label(description);
-            descLabel.style.fontSize = 15;
-            descLabel.style.color = new Color(0.85f, 0.85f, 0.85f);
-            descLabel.style.whiteSpace = WhiteSpace.Normal;
+            var descLabel = UIStyles.CreateBodyText(description, UIStyles.FontBase);
+            descLabel.style.color = UIStyles.TextSecondary;
             section.Add(descLabel);
 
             parent.Add(section);
-        }
-
-        void CreateSeparator(VisualElement parent)
-        {
-            var separator = new VisualElement();
-            separator.style.height = 1;
-            separator.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f, 0.4f);
-            separator.style.marginTop = 12;
-            separator.style.marginBottom = 12;
-            parent.Add(separator);
         }
 
         string GetText(string key)
@@ -497,7 +441,6 @@ namespace WiseTwin
             tutorialPanel.style.display = DisplayStyle.None;
             IsDisplaying = false;
 
-            // Re-enable controls
             PlayerControls.SetEnabled(true);
 
             if (debugMode) Debug.Log("[TutorialUI] Tutorial hidden");

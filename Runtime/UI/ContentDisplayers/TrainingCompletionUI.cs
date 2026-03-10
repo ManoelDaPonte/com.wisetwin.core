@@ -17,11 +17,9 @@ namespace WiseTwin.UI
         private VisualElement rootElement;
         private VisualElement modalContainer;
 
-        // Stats pour afficher
         private float totalTime = 0f;
         private int totalInteractions = 0;
 
-        // Singleton
         public static TrainingCompletionUI Instance { get; private set; }
 
         void Awake()
@@ -47,7 +45,6 @@ namespace WiseTwin.UI
                 uiDocument = gameObject.AddComponent<UIDocument>();
             }
 
-            // Assigner le PanelSettings depuis l'inspector
             if (uiDocument.panelSettings == null)
             {
                 if (panelSettings != null)
@@ -69,16 +66,12 @@ namespace WiseTwin.UI
 
             rootElement = uiDocument.rootVisualElement;
 
-            // Configuration de base
             rootElement.style.position = Position.Absolute;
             rootElement.style.width = Length.Percent(100);
             rootElement.style.height = Length.Percent(100);
             rootElement.pickingMode = PickingMode.Ignore;
         }
 
-        /// <summary>
-        /// Affiche l'écran de complétion de formation
-        /// </summary>
         public void ShowCompletionScreen(float trainingTime, int modulesCompleted)
         {
             Debug.Log($"[TrainingCompletionUI] Showing completion screen - Time: {trainingTime}s, Modules: {modulesCompleted}");
@@ -86,137 +79,96 @@ namespace WiseTwin.UI
             totalTime = trainingTime;
             totalInteractions = modulesCompleted;
 
-            // IMPORTANT : Forcer le HUD à 100% avant d'afficher l'UI de completion
             if (TrainingHUD.Instance != null)
             {
                 TrainingHUD.Instance.UpdateProgress(modulesCompleted);
-                Debug.Log($"[TrainingCompletionUI] Forced HUD to 100%: {modulesCompleted}/{modulesCompleted}");
             }
 
-            // Block player controls during completion screen
             PlayerControls.SetEnabled(false);
-            Debug.Log("[TrainingCompletionUI] Player controls disabled");
 
             CreateCompletionUI();
-
-            // Notifier que la formation est terminée
             NotifyTrainingCompletion();
-
-            Debug.Log("[TrainingCompletionUI] Completion screen displayed - User must quit manually");
         }
 
         void CreateCompletionUI()
         {
-            // Clear root
             rootElement.Clear();
             rootElement.pickingMode = PickingMode.Position;
 
-            // Container modal avec animation d'entrée
+            // Modal backdrop
             modalContainer = new VisualElement();
-            modalContainer.style.position = Position.Absolute;
-            modalContainer.style.width = Length.Percent(100);
-            modalContainer.style.height = Length.Percent(100);
-            modalContainer.style.backgroundColor = new Color(0, 0, 0, 0.9f);
-            modalContainer.style.alignItems = Align.Center;
-            modalContainer.style.justifyContent = Justify.Center;
-            modalContainer.pickingMode = PickingMode.Position;
+            UIStyles.ApplyBackdropHeavyStyle(modalContainer);
 
-            // Boîte de succès principale
-            var successBox = new VisualElement();
-            successBox.style.width = 600;
-            successBox.style.maxWidth = Length.Percent(90);
-            successBox.style.backgroundColor = new Color(0.08f, 0.08f, 0.12f, 0.98f);
-            successBox.style.borderTopLeftRadius = 30;
-            successBox.style.borderTopRightRadius = 30;
-            successBox.style.borderBottomLeftRadius = 30;
-            successBox.style.borderBottomRightRadius = 30;
-            successBox.style.paddingTop = 50;
-            successBox.style.paddingBottom = 50;
-            successBox.style.paddingLeft = 50;
-            successBox.style.paddingRight = 50;
+            // Success card
+            var card = new VisualElement();
+            card.style.width = 580;
+            card.style.maxWidth = Length.Percent(90);
+            UIStyles.ApplyCardStyle(card, UIStyles.Radius2XL);
+            UIStyles.SetBorderWidth(card, 2);
+            UIStyles.SetBorderColor(card, new Color(UIStyles.Success.r, UIStyles.Success.g, UIStyles.Success.b, 0.6f));
+            card.style.paddingTop = UIStyles.Space4XL;
+            card.style.paddingBottom = UIStyles.Space4XL;
+            card.style.paddingLeft = UIStyles.Space4XL;
+            card.style.paddingRight = UIStyles.Space4XL;
 
-            // Bordure lumineuse de succès
-            successBox.style.borderTopWidth = 3;
-            successBox.style.borderBottomWidth = 3;
-            successBox.style.borderLeftWidth = 3;
-            successBox.style.borderRightWidth = 3;
-            successBox.style.borderTopColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
-            successBox.style.borderBottomColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
-            successBox.style.borderLeftColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
-            successBox.style.borderRightColor = new Color(0.1f, 0.9f, 0.5f, 0.8f);
+            // Close button
+            var closeBtn = UIStyles.CreateIconButton("X", 34, UIStyles.Danger, () => CloseCompletionUI());
+            closeBtn.style.position = Position.Absolute;
+            closeBtn.style.top = UIStyles.SpaceLG;
+            closeBtn.style.right = UIStyles.SpaceLG;
+            card.Add(closeBtn);
 
-            // Bouton fermer (X) en haut à droite
-            var closeButton = new Button(() => CloseCompletionUI());
-            closeButton.text = "X";
-            closeButton.style.position = Position.Absolute;
-            closeButton.style.top = 15;
-            closeButton.style.right = 15;
-            closeButton.style.width = 35;
-            closeButton.style.height = 35;
-            closeButton.style.fontSize = 24;
-            closeButton.style.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
-            closeButton.style.color = Color.white;
-            closeButton.style.borderTopLeftRadius = 17;
-            closeButton.style.borderTopRightRadius = 17;
-            closeButton.style.borderBottomLeftRadius = 17;
-            closeButton.style.borderBottomRightRadius = 17;
-            successBox.Add(closeButton);
+            // Congrats title
+            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
 
-            // Message de félicitations
-            var congratsTitle = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "Félicitations !"
-                : "Congratulations!");
-            congratsTitle.style.fontSize = 42;
-            congratsTitle.style.color = new Color(0.1f, 0.9f, 0.5f, 1f);
-            congratsTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-            congratsTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
-            congratsTitle.style.marginBottom = 15;
-            successBox.Add(congratsTitle);
+            var congratsTitle = UIStyles.CreateTitle(
+                lang == "fr" ? "Félicitations !" : "Congratulations!",
+                UIStyles.Font4XL
+            );
+            congratsTitle.style.color = UIStyles.Success;
+            congratsTitle.style.marginBottom = UIStyles.SpaceLG;
+            card.Add(congratsTitle);
 
-            // Message de succès
-            var successMessage = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "Formation terminée avec succès !"
-                : "Training completed successfully!");
-            successMessage.style.fontSize = 24;
-            successMessage.style.color = new Color(0.9f, 0.9f, 0.95f, 1f);
-            successMessage.style.unityTextAlign = TextAnchor.MiddleCenter;
-            successMessage.style.marginBottom = 30;
-            successBox.Add(successMessage);
+            // Success message
+            var successMsg = UIStyles.CreateSubtitle(
+                lang == "fr" ? "Formation terminée avec succès !" : "Training completed successfully!",
+                UIStyles.FontXL
+            );
+            successMsg.style.color = UIStyles.TextPrimary;
+            successMsg.style.marginBottom = UIStyles.Space2XL;
+            card.Add(successMsg);
 
-            // Ligne de séparation
-            var separator = new VisualElement();
-            separator.style.height = 1;
-            separator.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f, 0.5f);
-            separator.style.marginTop = 20;
-            separator.style.marginBottom = 20;
-            successBox.Add(separator);
+            // Separator
+            card.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
 
-            // Statistiques de la session
+            // Stats
             var statsContainer = new VisualElement();
-            statsContainer.style.marginBottom = 30;
+            statsContainer.style.marginBottom = UIStyles.SpaceXL;
 
-            // Temps total
-            var timeLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? $"⏱ Temps total : {FormatTime(totalTime)}"
-                : $"⏱ Total time: {FormatTime(totalTime)}");
-            timeLabel.style.fontSize = 18;
-            timeLabel.style.color = new Color(0.7f, 0.7f, 0.75f, 1f);
+            var timeLabel = UIStyles.CreateBodyText(
+                lang == "fr"
+                    ? $"Temps total : {FormatTime(totalTime)}"
+                    : $"Total time: {FormatTime(totalTime)}",
+                UIStyles.FontMD
+            );
+            timeLabel.style.color = UIStyles.TextSecondary;
             timeLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            timeLabel.style.marginBottom = 10;
+            timeLabel.style.marginBottom = UIStyles.SpaceSM;
             statsContainer.Add(timeLabel);
 
-            // Modules complétés
-            var modulesLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? $"✅ Modules complétés : {totalInteractions}"
-                : $"✅ Modules completed: {totalInteractions}");
-            modulesLabel.style.fontSize = 18;
-            modulesLabel.style.color = new Color(0.7f, 0.7f, 0.75f, 1f);
+            var modulesLabel = UIStyles.CreateBodyText(
+                lang == "fr"
+                    ? $"Modules complétés : {totalInteractions}"
+                    : $"Modules completed: {totalInteractions}",
+                UIStyles.FontMD
+            );
+            modulesLabel.style.color = UIStyles.TextSecondary;
             modulesLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             statsContainer.Add(modulesLabel);
 
-            successBox.Add(statsContainer);
+            card.Add(statsContainer);
 
-            // Score ou performance
+            // Score & analytics
             float finalScore = 100f;
             int analyticsInteractions = 0;
             int successfulInteractionsCount = 0;
@@ -230,153 +182,119 @@ namespace WiseTwin.UI
                 failedInteractionsCount = Analytics.TrainingAnalytics.Instance.GetFailedInteractions();
             }
 
-            // Section détails des interactions (juste avant le score)
+            // Interaction details
             if (analyticsInteractions > 0)
             {
-                var interactionsDetailContainer = new VisualElement();
-                interactionsDetailContainer.style.backgroundColor = new Color(0.12f, 0.12f, 0.16f, 0.4f);
-                interactionsDetailContainer.style.borderTopLeftRadius = 10;
-                interactionsDetailContainer.style.borderTopRightRadius = 10;
-                interactionsDetailContainer.style.borderBottomLeftRadius = 10;
-                interactionsDetailContainer.style.borderBottomRightRadius = 10;
-                interactionsDetailContainer.style.paddingTop = 15;
-                interactionsDetailContainer.style.paddingBottom = 15;
-                interactionsDetailContainer.style.paddingLeft = 20;
-                interactionsDetailContainer.style.paddingRight = 20;
-                interactionsDetailContainer.style.marginBottom = 20;
+                var detailBox = new VisualElement();
+                detailBox.style.backgroundColor = UIStyles.BgElevated;
+                UIStyles.SetBorderRadius(detailBox, UIStyles.RadiusMD);
+                UIStyles.SetPadding(detailBox, UIStyles.SpaceLG);
+                detailBox.style.marginBottom = UIStyles.SpaceXL;
 
-                // Titre de la section
-                var detailTitle = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Détails des interactions"
-                    : "Interaction details");
-                detailTitle.style.fontSize = 16;
-                detailTitle.style.color = new Color(0.6f, 0.6f, 0.65f, 1f);
-                detailTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
-                detailTitle.style.marginBottom = 10;
+                var detailTitle = UIStyles.CreateMutedText(
+                    lang == "fr" ? "Détails des interactions" : "Interaction details",
+                    UIStyles.FontBase
+                );
                 detailTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-                interactionsDetailContainer.Add(detailTitle);
+                detailTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+                detailTitle.style.marginBottom = UIStyles.SpaceSM;
+                detailBox.Add(detailTitle);
 
-                // Total interactions
-                var totalInteractionsLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"Total : {analyticsInteractions}"
-                    : $"Total: {analyticsInteractions}");
-                totalInteractionsLabel.style.fontSize = 16;
-                totalInteractionsLabel.style.color = new Color(0.75f, 0.75f, 0.8f, 1f);
-                totalInteractionsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-                totalInteractionsLabel.style.marginBottom = 5;
-                interactionsDetailContainer.Add(totalInteractionsLabel);
+                var totalLabel = UIStyles.CreateBodyText(
+                    lang == "fr" ? $"Total : {analyticsInteractions}" : $"Total: {analyticsInteractions}",
+                    UIStyles.FontBase
+                );
+                totalLabel.style.color = UIStyles.TextSecondary;
+                totalLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                totalLabel.style.marginBottom = UIStyles.SpaceXS;
+                detailBox.Add(totalLabel);
 
-                // Interactions réussies (du premier coup, sans erreur)
-                var successfulLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"Réussies : {successfulInteractionsCount}"
-                    : $"Successful: {successfulInteractionsCount}");
-                successfulLabel.style.fontSize = 16;
-                successfulLabel.style.color = new Color(0.1f, 0.85f, 0.45f, 1f);
-                successfulLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-                successfulLabel.style.marginBottom = 5;
-                interactionsDetailContainer.Add(successfulLabel);
+                var successLabel = UIStyles.CreateBodyText(
+                    lang == "fr" ? $"Réussies : {successfulInteractionsCount}" : $"Successful: {successfulInteractionsCount}",
+                    UIStyles.FontBase
+                );
+                successLabel.style.color = UIStyles.Success;
+                successLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                successLabel.style.marginBottom = UIStyles.SpaceXS;
+                detailBox.Add(successLabel);
 
-                // Interactions ratées (si > 0)
                 if (failedInteractionsCount > 0)
                 {
-                    var failedLabel = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                        ? $"Ratées : {failedInteractionsCount}"
-                        : $"Failed: {failedInteractionsCount}");
-                    failedLabel.style.fontSize = 16;
-                    failedLabel.style.color = new Color(0.9f, 0.4f, 0.3f, 1f);
+                    var failedLabel = UIStyles.CreateBodyText(
+                        lang == "fr" ? $"Ratées : {failedInteractionsCount}" : $"Failed: {failedInteractionsCount}",
+                        UIStyles.FontBase
+                    );
+                    failedLabel.style.color = UIStyles.Danger;
                     failedLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-                    interactionsDetailContainer.Add(failedLabel);
+                    detailBox.Add(failedLabel);
                 }
 
-                successBox.Add(interactionsDetailContainer);
+                card.Add(detailBox);
             }
 
-            var scoreContainer = new VisualElement();
-            scoreContainer.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.5f);
-            scoreContainer.style.borderTopLeftRadius = 15;
-            scoreContainer.style.borderTopRightRadius = 15;
-            scoreContainer.style.borderBottomLeftRadius = 15;
-            scoreContainer.style.borderBottomRightRadius = 15;
-            scoreContainer.style.paddingTop = 20;
-            scoreContainer.style.paddingBottom = 20;
-            scoreContainer.style.marginBottom = 30;
+            // Score display
+            var scoreBox = new VisualElement();
+            scoreBox.style.backgroundColor = UIStyles.BgElevated;
+            UIStyles.SetBorderRadius(scoreBox, UIStyles.RadiusLG);
+            scoreBox.style.paddingTop = UIStyles.SpaceXL;
+            scoreBox.style.paddingBottom = UIStyles.SpaceXL;
+            scoreBox.style.marginBottom = UIStyles.SpaceXL;
 
             var scoreLabel = new Label($"{Mathf.RoundToInt(finalScore)}%");
-            scoreLabel.style.fontSize = 48;
-
-            // Couleur du score selon la performance
-            if (finalScore >= 90f)
-                scoreLabel.style.color = new Color(0.1f, 0.9f, 0.5f, 1f); // Vert
-            else if (finalScore >= 70f)
-                scoreLabel.style.color = new Color(0.9f, 0.7f, 0.1f, 1f); // Orange
-            else
-                scoreLabel.style.color = new Color(0.9f, 0.3f, 0.2f, 1f); // Rouge
-
+            scoreLabel.style.fontSize = UIStyles.Font4XL + 6;
             scoreLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             scoreLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            scoreContainer.Add(scoreLabel);
 
-            string scoreMessage = "";
-            if (finalScore >= 100f)
-            {
-                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Score parfait !"
-                    : "Perfect score!";
-            }
-            else if (finalScore >= 90f)
-            {
-                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Excellent travail !"
-                    : "Excellent work!";
-            }
+            if (finalScore >= 90f)
+                scoreLabel.style.color = UIStyles.Success;
             else if (finalScore >= 70f)
-            {
-                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Bon travail !"
-                    : "Good job!";
-            }
+                scoreLabel.style.color = UIStyles.Warning;
             else
-            {
-                scoreMessage = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Peut mieux faire"
-                    : "Room for improvement";
-            }
+                scoreLabel.style.color = UIStyles.Danger;
 
-            var scoreText = new Label(scoreMessage);
-            scoreText.style.fontSize = 16;
-            scoreText.style.color = new Color(0.8f, 0.8f, 0.85f, 1f);
-            scoreText.style.unityTextAlign = TextAnchor.MiddleCenter;
-            scoreContainer.Add(scoreText);
+            scoreBox.Add(scoreLabel);
 
-            successBox.Add(scoreContainer);
+            string scoreMessage;
+            if (finalScore >= 100f)
+                scoreMessage = lang == "fr" ? "Score parfait !" : "Perfect score!";
+            else if (finalScore >= 90f)
+                scoreMessage = lang == "fr" ? "Excellent travail !" : "Excellent work!";
+            else if (finalScore >= 70f)
+                scoreMessage = lang == "fr" ? "Bon travail !" : "Good job!";
+            else
+                scoreMessage = lang == "fr" ? "Peut mieux faire" : "Room for improvement";
 
-            // Message informatif pour indiquer qu'on peut quitter ou explorer
-            var infoMessage = new Label(LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? "Vous pouvez maintenant fermer cette fenêtre pour explorer l'environnement 3D ou quitter la formation."
-                : "You can now close this window to explore the 3D environment or quit the training.");
-            infoMessage.style.fontSize = 14;
-            infoMessage.style.color = new Color(0.7f, 0.7f, 0.75f, 1f);
-            infoMessage.style.unityTextAlign = TextAnchor.MiddleCenter;
-            infoMessage.style.marginTop = 20;
-            infoMessage.style.paddingTop = 15;
-            infoMessage.style.paddingBottom = 10;
-            infoMessage.style.paddingLeft = 20;
-            infoMessage.style.paddingRight = 20;
-            infoMessage.style.backgroundColor = new Color(0.12f, 0.12f, 0.16f, 0.5f);
-            infoMessage.style.borderTopLeftRadius = 10;
-            infoMessage.style.borderTopRightRadius = 10;
-            infoMessage.style.borderBottomLeftRadius = 10;
-            infoMessage.style.borderBottomRightRadius = 10;
-            infoMessage.style.whiteSpace = WhiteSpace.Normal;
-            successBox.Add(infoMessage);
+            var scoreText = UIStyles.CreateSubtitle(scoreMessage, UIStyles.FontBase);
+            scoreText.style.color = UIStyles.TextSecondary;
+            scoreBox.Add(scoreText);
 
-            modalContainer.Add(successBox);
+            card.Add(scoreBox);
+
+            // Info message
+            var infoBox = new VisualElement();
+            infoBox.style.backgroundColor = UIStyles.BgElevated;
+            UIStyles.SetBorderRadius(infoBox, UIStyles.RadiusMD);
+            UIStyles.SetPadding(infoBox, UIStyles.SpaceLG);
+
+            var infoText = UIStyles.CreateMutedText(
+                lang == "fr"
+                    ? "Vous pouvez maintenant fermer cette fenêtre pour explorer l'environnement 3D ou quitter la formation."
+                    : "You can now close this window to explore the 3D environment or quit the training.",
+                UIStyles.FontSM
+            );
+            infoText.style.unityTextAlign = TextAnchor.MiddleCenter;
+            infoBox.Add(infoText);
+
+            card.Add(infoBox);
+
+            modalContainer.Add(card);
             rootElement.Add(modalContainer);
 
-            // Animation d'entrée (scale)
-            successBox.style.scale = new Scale(new Vector3(0.8f, 0.8f, 1f));
-            successBox.RegisterCallback<GeometryChangedEvent>((evt) => {
-                successBox.style.scale = new Scale(Vector3.one);
+            // Scale-in animation
+            card.style.scale = new Scale(new Vector3(0.85f, 0.85f, 1f));
+            card.RegisterCallback<GeometryChangedEvent>((evt) =>
+            {
+                card.style.scale = new Scale(Vector3.one);
             });
         }
 
@@ -384,29 +302,17 @@ namespace WiseTwin.UI
         {
             Debug.Log("[TrainingCompletionUI] Sending training completion notification...");
 
-            // S'assurer que les analytics sont complètes avant l'envoi
             if (Analytics.TrainingAnalytics.Instance != null)
             {
-                // Marquer la formation comme complétée si ce n'est pas déjà fait
                 Analytics.TrainingAnalytics.Instance.CompleteTraining("completed");
-                Debug.Log("[TrainingCompletionUI] Training marked as completed in analytics");
             }
 
-            // Toujours essayer de notifier, peu importe le mode
-            // Le notifier décidera lui-même s'il doit envoyer ou non
             var completionNotifier = FindFirstObjectByType<TrainingCompletionNotifier>();
             if (completionNotifier != null)
             {
                 completionNotifier.FormationCompleted(SceneManager.GetActiveScene().name);
-                Debug.Log("[TrainingCompletionUI] Completion notification sent");
-            }
-            else
-            {
-                Debug.Log("[TrainingCompletionUI] TrainingCompletionNotifier not found - training completed locally only");
             }
         }
-
-
 
         string FormatTime(float seconds)
         {
@@ -415,17 +321,12 @@ namespace WiseTwin.UI
             return $"{minutes:00}:{secs:00}";
         }
 
-        /// <summary>
-        /// Ferme l'UI de completion et réactive les contrôles du personnage
-        /// </summary>
         void CloseCompletionUI()
         {
             Debug.Log("[TrainingCompletionUI] Closing completion UI - User can now explore");
 
-            // Re-enable player controls
             PlayerControls.SetEnabled(true);
 
-            // Nettoyer l'UI
             rootElement?.Clear();
             rootElement.pickingMode = PickingMode.Ignore;
         }
