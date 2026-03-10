@@ -9,128 +9,306 @@ namespace WiseTwin.Editor
 {
     /// <summary>
     /// Scenarios Configuration tab for WiseTwinEditor
+    /// Improved UX with color-coded types, collapsible sections, question reordering, and better visual hierarchy
     /// </summary>
     public static class WiseTwinEditorScenariosTab
     {
+        // Color scheme per scenario type
+        private static readonly Color QuestionColor = new Color(0.35f, 0.55f, 0.95f);    // Blue
+        private static readonly Color ProcedureColor = new Color(0.3f, 0.75f, 0.45f);     // Green
+        private static readonly Color TextColor = new Color(0.95f, 0.65f, 0.25f);         // Orange
+        private static readonly Color DialogueColor = new Color(0.7f, 0.45f, 0.9f);       // Purple
+
+        // Foldout state tracking (persists during editor session)
+        private static Dictionary<string, bool> _foldoutStates = new Dictionary<string, bool>();
+
+        // Accordion group tracking: only one section open per group
+        private static Dictionary<string, string> _accordionStates = new Dictionary<string, string>();
+
+        private static bool GetFoldout(string key, bool defaultValue = false)
+        {
+            if (!_foldoutStates.ContainsKey(key)) _foldoutStates[key] = defaultValue;
+            return _foldoutStates[key];
+        }
+        private static void SetFoldout(string key, bool value) => _foldoutStates[key] = value;
+
+        /// <summary>
+        /// Accordion: only one section open per group. Returns true if this section is the open one.
+        /// </summary>
+        private static bool IsAccordionOpen(string group, string section)
+        {
+            if (!_accordionStates.ContainsKey(group)) _accordionStates[group] = section;
+            return _accordionStates[group] == section;
+        }
+        private static void SetAccordionOpen(string group, string section)
+        {
+            _accordionStates[group] = section;
+        }
+        private static void ToggleAccordion(string group, string section)
+        {
+            if (_accordionStates.ContainsKey(group) && _accordionStates[group] == section)
+                _accordionStates[group] = ""; // close all
+            else
+                _accordionStates[group] = section;
+        }
+
+        private static Color GetTypeColor(ScenarioType type)
+        {
+            switch (type)
+            {
+                case ScenarioType.Question: return QuestionColor;
+                case ScenarioType.Procedure: return ProcedureColor;
+                case ScenarioType.Text: return TextColor;
+                case ScenarioType.Dialogue: return DialogueColor;
+                default: return Color.gray;
+            }
+        }
+
+        private static string GetTypeIcon(ScenarioType type)
+        {
+            switch (type)
+            {
+                case ScenarioType.Question: return "?";
+                case ScenarioType.Procedure: return "#";
+                case ScenarioType.Text: return "T";
+                case ScenarioType.Dialogue: return "D";
+                default: return " ";
+            }
+        }
+
+        private static string GetScenarioSummary(ScenarioConfiguration scenario)
+        {
+            switch (scenario.type)
+            {
+                case ScenarioType.Question:
+                    int qCount = scenario.questions?.Count ?? 0;
+                    return $"{qCount} question{(qCount > 1 ? "s" : "")}";
+                case ScenarioType.Procedure:
+                    int sCount = scenario.procedureData?.steps?.Count ?? 0;
+                    string title = !string.IsNullOrEmpty(scenario.procedureData?.titleFR)
+                        ? scenario.procedureData.titleFR
+                        : scenario.procedureData?.titleEN ?? "";
+                    if (title.Length > 30) title = title.Substring(0, 27) + "...";
+                    return $"{sCount} step{(sCount > 1 ? "s" : "")}" + (title != "" ? $" - {title}" : "");
+                case ScenarioType.Text:
+                    string tTitle = !string.IsNullOrEmpty(scenario.textData?.titleFR)
+                        ? scenario.textData.titleFR
+                        : scenario.textData?.titleEN ?? "";
+                    if (tTitle.Length > 40) tTitle = tTitle.Substring(0, 37) + "...";
+                    return tTitle != "" ? tTitle : "(empty)";
+                case ScenarioType.Dialogue:
+                    string dTitle = !string.IsNullOrEmpty(scenario.dialogueData?.titleFR)
+                        ? scenario.dialogueData.titleFR
+                        : scenario.dialogueData?.titleEN ?? "";
+                    if (dTitle.Length > 40) dTitle = dTitle.Substring(0, 37) + "...";
+                    return dTitle != "" ? dTitle : "(empty)";
+                default:
+                    return "";
+            }
+        }
+
         public static void Draw(WiseTwinEditorData data)
         {
-            EditorGUILayout.LabelField("🎬 Scenario Configuration", EditorStyles.largeLabel);
-            EditorGUILayout.HelpBox("Configure your training scenarios visually. Choose type (Question/Procedure/Text/Dialogue), configure parameters, and export to metadata.json.", MessageType.Info);
-            EditorGUILayout.Space();
+            // Header
+            EditorGUILayout.LabelField("Scenario Configuration", EditorStyles.largeLabel);
+            EditorGUILayout.Space(2);
 
-            // Add scenario button
-            if (GUILayout.Button("➕ Add New Scenario", GUILayout.Height(30)))
+            // Top toolbar
+            EditorGUILayout.BeginHorizontal();
+
+            // Add scenario dropdown
+            if (GUILayout.Button("+ Add Scenario", GUILayout.Height(28), GUILayout.Width(140)))
             {
-                data.scenarios.Add(new ScenarioConfiguration());
-                data.selectedScenarioIndex = data.scenarios.Count - 1;
+                GenericMenu menu = new GenericMenu();
+                menu.AddItem(new GUIContent("Question"), false, () => AddScenario(data, ScenarioType.Question));
+                menu.AddItem(new GUIContent("Procedure"), false, () => AddScenario(data, ScenarioType.Procedure));
+                menu.AddItem(new GUIContent("Text"), false, () => AddScenario(data, ScenarioType.Text));
+                menu.AddItem(new GUIContent("Dialogue"), false, () => AddScenario(data, ScenarioType.Dialogue));
+                menu.ShowAsContext();
             }
 
-            EditorGUILayout.Space();
+            GUILayout.FlexibleSpace();
+
+            // Legend
+            DrawLegend();
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(4);
 
             if (data.scenarios.Count == 0)
             {
-                EditorGUILayout.HelpBox("No scenarios yet. Click 'Add New Scenario' to get started!", MessageType.Info);
+                EditorGUILayout.HelpBox("No scenarios yet. Click '+ Add Scenario' to get started.", MessageType.Info);
                 return;
             }
 
-            // Scenario list with delete buttons and drag & drop
+            // Scenario list
             EditorGUILayout.LabelField($"Scenarios ({data.scenarios.Count})", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Drag scenarios to reorder them. The order will be used in the ProgressionManager.", MessageType.Info);
+            EditorGUILayout.Space(2);
 
             for (int i = 0; i < data.scenarios.Count; i++)
             {
-                EditorGUILayout.BeginHorizontal("box");
-
-                // Drag handle
-                GUI.backgroundColor = new Color(0.7f, 0.7f, 0.7f);
-                if (GUILayout.RepeatButton("≡", GUILayout.Width(25), GUILayout.Height(25)))
-                {
-                    // Start dragging
-                    if (Event.current.type == EventType.MouseDown)
-                    {
-                        data.draggingScenarioIndex = i;
-                    }
-                }
-                GUI.backgroundColor = Color.white;
-
-                // Move up button
-                GUI.enabled = i > 0;
-                if (GUILayout.Button("↑", GUILayout.Width(25), GUILayout.Height(25)))
-                {
-                    var temp = data.scenarios[i];
-                    data.scenarios[i] = data.scenarios[i - 1];
-                    data.scenarios[i - 1] = temp;
-                    if (data.selectedScenarioIndex == i)
-                        data.selectedScenarioIndex = i - 1;
-                    else if (data.selectedScenarioIndex == i - 1)
-                        data.selectedScenarioIndex = i;
-                }
-                GUI.enabled = true;
-
-                // Move down button
-                GUI.enabled = i < data.scenarios.Count - 1;
-                if (GUILayout.Button("↓", GUILayout.Width(25), GUILayout.Height(25)))
-                {
-                    var temp = data.scenarios[i];
-                    data.scenarios[i] = data.scenarios[i + 1];
-                    data.scenarios[i + 1] = temp;
-                    if (data.selectedScenarioIndex == i)
-                        data.selectedScenarioIndex = i + 1;
-                    else if (data.selectedScenarioIndex == i + 1)
-                        data.selectedScenarioIndex = i;
-                }
-                GUI.enabled = true;
-
-                // Select/Toggle button
-                bool isSelected = (data.selectedScenarioIndex == i);
-                GUI.backgroundColor = isSelected ? new Color(0.4f, 0.8f, 1f) : Color.white;
-                string buttonText = isSelected ? $"▼ {i + 1}. {data.scenarios[i].id} ({data.scenarios[i].type})" : $"▶ {i + 1}. {data.scenarios[i].id} ({data.scenarios[i].type})";
-                if (GUILayout.Button(buttonText, GUILayout.Height(25)))
-                {
-                    // Toggle: si déjà sélectionné, replier (-1), sinon ouvrir (i)
-                    data.selectedScenarioIndex = isSelected ? -1 : i;
-                }
-                GUI.backgroundColor = Color.white;
-
-                // Delete button
-                GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
-                if (GUILayout.Button("🗑", GUILayout.Width(30), GUILayout.Height(25)))
-                {
-                    if (EditorUtility.DisplayDialog("Delete Scenario", $"Delete scenario '{data.scenarios[i].id}'?", "Delete", "Cancel"))
-                    {
-                        data.scenarios.RemoveAt(i);
-                        if (data.selectedScenarioIndex >= data.scenarios.Count)
-                        {
-                            data.selectedScenarioIndex = data.scenarios.Count - 1;
-                        }
-                    }
-                }
-                GUI.backgroundColor = Color.white;
-
-                EditorGUILayout.EndHorizontal();
+                DrawScenarioListItem(data, i);
             }
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(8);
 
             // Edit selected scenario
             if (data.selectedScenarioIndex >= 0 && data.selectedScenarioIndex < data.scenarios.Count)
             {
+                DrawSeparator();
+                EditorGUILayout.Space(4);
                 DrawScenarioEditor(data.scenarios[data.selectedScenarioIndex], data);
             }
         }
 
+        private static void AddScenario(WiseTwinEditorData data, ScenarioType type)
+        {
+            var scenario = new ScenarioConfiguration();
+            scenario.type = type;
+            scenario.id = $"scenario_{data.scenarios.Count + 1}";
+            data.scenarios.Add(scenario);
+            data.selectedScenarioIndex = data.scenarios.Count - 1;
+        }
+
+        private static void DrawLegend()
+        {
+            var types = new[] { ScenarioType.Question, ScenarioType.Procedure, ScenarioType.Text, ScenarioType.Dialogue };
+            foreach (var type in types)
+            {
+                Color c = GetTypeColor(type);
+                var prevBg = GUI.backgroundColor;
+                GUI.backgroundColor = c;
+                GUILayout.Label($" {GetTypeIcon(type)} {type} ", EditorStyles.miniButton, GUILayout.Height(18));
+                GUI.backgroundColor = prevBg;
+                GUILayout.Space(2);
+            }
+        }
+
+        private static void DrawScenarioListItem(WiseTwinEditorData data, int index)
+        {
+            var scenario = data.scenarios[index];
+            bool isSelected = (data.selectedScenarioIndex == index);
+            Color typeColor = GetTypeColor(scenario.type);
+            string summary = GetScenarioSummary(scenario);
+
+            // Main row
+            EditorGUILayout.BeginHorizontal();
+
+            // Color bar (type indicator)
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = typeColor;
+            GUILayout.Box("", GUILayout.Width(4), GUILayout.Height(28));
+            GUI.backgroundColor = prevBg;
+
+            // Move up
+            GUI.enabled = index > 0;
+            if (GUILayout.Button("^", GUILayout.Width(22), GUILayout.Height(28)))
+            {
+                SwapScenarios(data, index, index - 1);
+            }
+            GUI.enabled = true;
+
+            // Move down
+            GUI.enabled = index < data.scenarios.Count - 1;
+            if (GUILayout.Button("v", GUILayout.Width(22), GUILayout.Height(28)))
+            {
+                SwapScenarios(data, index, index + 1);
+            }
+            GUI.enabled = true;
+
+            // Main button (select/deselect)
+            GUI.backgroundColor = isSelected ? new Color(typeColor.r, typeColor.g, typeColor.b, 0.3f) : Color.white;
+
+            // Build label
+            string typeTag = $"[{scenario.type}]";
+            string label = isSelected
+                ? $"  {index + 1}. {scenario.id}  {typeTag}  {summary}"
+                : $"  {index + 1}. {scenario.id}  {typeTag}  {summary}";
+
+            GUIStyle btnStyle = new GUIStyle(GUI.skin.button);
+            btnStyle.alignment = TextAnchor.MiddleLeft;
+            btnStyle.fontStyle = isSelected ? FontStyle.Bold : FontStyle.Normal;
+
+            if (GUILayout.Button(label, btnStyle, GUILayout.Height(28)))
+            {
+                data.selectedScenarioIndex = isSelected ? -1 : index;
+            }
+            GUI.backgroundColor = Color.white;
+
+            // Duplicate button
+            if (GUILayout.Button("C", GUILayout.Width(22), GUILayout.Height(28)))
+            {
+                DuplicateScenario(data, index);
+            }
+
+            // Delete button
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("X", GUILayout.Width(22), GUILayout.Height(28)))
+            {
+                if (EditorUtility.DisplayDialog("Delete Scenario", $"Delete scenario '{scenario.id}'?", "Delete", "Cancel"))
+                {
+                    data.scenarios.RemoveAt(index);
+                    if (data.selectedScenarioIndex >= data.scenarios.Count)
+                        data.selectedScenarioIndex = data.scenarios.Count - 1;
+                    else if (data.selectedScenarioIndex == index)
+                        data.selectedScenarioIndex = -1;
+                }
+            }
+            GUI.backgroundColor = Color.white;
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private static void SwapScenarios(WiseTwinEditorData data, int from, int to)
+        {
+            var temp = data.scenarios[from];
+            data.scenarios[from] = data.scenarios[to];
+            data.scenarios[to] = temp;
+            if (data.selectedScenarioIndex == from)
+                data.selectedScenarioIndex = to;
+            else if (data.selectedScenarioIndex == to)
+                data.selectedScenarioIndex = from;
+        }
+
+        private static void DuplicateScenario(WiseTwinEditorData data, int index)
+        {
+            var original = data.scenarios[index];
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(original);
+            var copy = Newtonsoft.Json.JsonConvert.DeserializeObject<ScenarioConfiguration>(json);
+            copy.id = original.id + "_copy";
+            data.scenarios.Insert(index + 1, copy);
+            data.selectedScenarioIndex = index + 1;
+        }
+
+        private static void DrawSeparator()
+        {
+            EditorGUILayout.Space(2);
+            EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 2), new Color(0.3f, 0.3f, 0.3f));
+            EditorGUILayout.Space(2);
+        }
+
+        // ============= SCENARIO EDITOR =============
+
         private static void DrawScenarioEditor(ScenarioConfiguration scenario, WiseTwinEditorData data)
         {
-            EditorGUILayout.LabelField("Edit Scenario", EditorStyles.boldLabel);
-            EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 1), Color.gray);
-            EditorGUILayout.Space();
+            Color typeColor = GetTypeColor(scenario.type);
+
+            // Header with colored background
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(typeColor.r, typeColor.g, typeColor.b, 0.15f);
+            EditorGUILayout.BeginVertical("box");
+            GUI.backgroundColor = prevBg;
+
+            EditorGUILayout.LabelField($"Edit: {scenario.id}", EditorStyles.boldLabel);
+            EditorGUILayout.Space(2);
 
             // Basic info
-            EditorGUILayout.LabelField("Basic Information", EditorStyles.boldLabel);
             scenario.id = EditorGUILayout.TextField("Scenario ID", scenario.id);
             scenario.type = (ScenarioType)EditorGUILayout.EnumPopup("Type", scenario.type);
 
-            EditorGUILayout.Space();
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4);
 
             // Type-specific fields
             switch (scenario.type)
@@ -150,84 +328,151 @@ namespace WiseTwin.Editor
             }
         }
 
+        // ============= QUESTIONS EDITOR =============
+
         private static void DrawQuestionsEditor(List<QuestionScenarioData> questions)
         {
-            EditorGUILayout.LabelField("Questions Configuration", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox($"{questions.Count} question(s) in this scenario. Questions will be displayed sequentially.", MessageType.Info);
-
-            EditorGUILayout.Space();
-
-            // Add/Remove buttons
+            // Questions list with accordion header + add button
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("➕ Add Question", GUILayout.Height(25)))
+            EditorGUILayout.LabelField($"Questions ({questions.Count})", EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("+ Add Question", GUILayout.Height(22), GUILayout.Width(120)))
             {
                 questions.Add(new QuestionScenarioData());
+                // Auto-open the new question
+                SetAccordionOpen("questions_accordion", $"q_{questions.Count - 1}");
             }
-            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
-            if (questions.Count > 1 && GUILayout.Button($"➖ Remove Last Question", GUILayout.Height(25)))
-            {
-                questions.RemoveAt(questions.Count - 1);
-            }
-            GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(4);
 
-            // Draw each question
             for (int i = 0; i < questions.Count; i++)
             {
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.LabelField($"━━━ Question {i + 1} / {questions.Count} ━━━", EditorStyles.boldLabel);
-                EditorGUILayout.Space();
-
-                DrawQuestionEditor(questions[i], i, questions);
-
-                EditorGUILayout.EndVertical();
-                EditorGUILayout.Space(10);
+                DrawQuestionItem(questions, i);
+                EditorGUILayout.Space(2);
             }
         }
 
-        private static void DrawQuestionEditor(QuestionScenarioData question, int index, List<QuestionScenarioData> allQuestions)
+        private static void DrawQuestionItem(List<QuestionScenarioData> questions, int index)
         {
-            EditorGUILayout.LabelField("Question Configuration", EditorStyles.boldLabel);
+            var question = questions[index];
+            string accordionGroup = "questions_accordion";
+            string sectionKey = $"q_{index}";
 
-            // Question text (larger area with word wrap)
-            EditorGUILayout.LabelField("Question Text", EditorStyles.miniBoldLabel);
-            EditorGUILayout.LabelField("  (English)", EditorStyles.miniLabel);
+            // Question box with visible colored background
+            bool isOpen = IsAccordionOpen(accordionGroup, sectionKey);
+            Rect qRect = EditorGUILayout.BeginVertical("box");
+            if (isOpen)
+                EditorGUI.DrawRect(qRect, new Color(0.2f, 0.3f, 0.55f, 0.15f));
+
+            EditorGUILayout.BeginHorizontal();
+            string arrow = isOpen ? "v" : ">";
+            string previewText = !string.IsNullOrEmpty(question.questionTextFR)
+                ? question.questionTextFR
+                : question.questionTextEN;
+            if (previewText.Length > 60) previewText = previewText.Substring(0, 57) + "...";
+            if (string.IsNullOrEmpty(previewText)) previewText = "(empty question)";
+
+            GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel);
+            headerStyle.richText = true;
+
+            if (GUILayout.Button($"{arrow}  Q{index + 1}: {previewText}", headerStyle))
+            {
+                ToggleAccordion(accordionGroup, sectionKey);
+            }
+
+            // Reorder buttons
+            GUI.enabled = index > 0;
+            if (GUILayout.Button("^", GUILayout.Width(22), GUILayout.Height(18)))
+            {
+                var temp = questions[index];
+                questions[index] = questions[index - 1];
+                questions[index - 1] = temp;
+            }
+            GUI.enabled = true;
+
+            GUI.enabled = index < questions.Count - 1;
+            if (GUILayout.Button("v", GUILayout.Width(22), GUILayout.Height(18)))
+            {
+                var temp = questions[index];
+                questions[index] = questions[index + 1];
+                questions[index + 1] = temp;
+            }
+            GUI.enabled = true;
+
+            // Delete button
+            GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+            if (GUILayout.Button("X", GUILayout.Width(22), GUILayout.Height(18)))
+            {
+                if (questions.Count > 1 || EditorUtility.DisplayDialog("Delete Question", "Remove the last question from this scenario?", "Delete", "Cancel"))
+                {
+                    questions.RemoveAt(index);
+                    GUI.backgroundColor = Color.white;
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.EndVertical();
+                    return;
+                }
+            }
+            GUI.backgroundColor = Color.white;
+
+            EditorGUILayout.EndHorizontal();
+
+            // Accordion content - only one question open at a time
+            if (IsAccordionOpen(accordionGroup, sectionKey))
+            {
+                EditorGUILayout.Space(2);
+                DrawQuestionFields(question);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawQuestionFields(QuestionScenarioData question)
+        {
             GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
-            question.questionTextEN = EditorGUILayout.TextArea(question.questionTextEN, textAreaStyle, GUILayout.Height(80));
-            EditorGUILayout.LabelField("  (Français)", EditorStyles.miniLabel);
-            question.questionTextFR = EditorGUILayout.TextArea(question.questionTextFR, textAreaStyle, GUILayout.Height(80));
 
-            EditorGUILayout.Space();
+            // Question text
+            EditorGUILayout.LabelField("Question Text", EditorStyles.miniBoldLabel);
+            EditorGUI.indentLevel++;
+            EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
+            question.questionTextEN = EditorGUILayout.TextArea(question.questionTextEN, textAreaStyle, GUILayout.Height(50));
+            EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
+            question.questionTextFR = EditorGUILayout.TextArea(question.questionTextFR, textAreaStyle, GUILayout.Height(50));
+            EditorGUI.indentLevel--;
 
-            // Question type
-            question.isMultipleChoice = EditorGUILayout.Toggle("Multiple Choice (plusieurs réponses)", question.isMultipleChoice);
+            EditorGUILayout.Space(4);
 
-            EditorGUILayout.Space();
+            // Multiple choice toggle
+            question.isMultipleChoice = EditorGUILayout.Toggle("Multiple Choice", question.isMultipleChoice);
+
+            EditorGUILayout.Space(4);
 
             // Options
-            EditorGUILayout.LabelField("Options", EditorStyles.miniBoldLabel);
-
+            EditorGUILayout.LabelField("Answer Options", EditorStyles.miniBoldLabel);
             int optionsCount = Mathf.Max(question.optionsEN.Count, question.optionsFR.Count);
 
             for (int i = 0; i < optionsCount; i++)
             {
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"Option {i + 1}", EditorStyles.boldLabel, GUILayout.Width(80));
+                while (question.optionsEN.Count <= i) question.optionsEN.Add("");
+                while (question.optionsFR.Count <= i) question.optionsFR.Add("");
 
-                // Toggle pour correct answer
                 bool isCorrect = question.correctAnswers.Contains(i);
-                bool newIsCorrect = EditorGUILayout.Toggle("Correct", isCorrect, GUILayout.Width(80));
+
+                // Option row with colored indicator
+                var prevBg = GUI.backgroundColor;
+                GUI.backgroundColor = isCorrect ? new Color(0.3f, 0.85f, 0.4f, 0.3f) : Color.white;
+                EditorGUILayout.BeginVertical("box");
+                GUI.backgroundColor = prevBg;
+
+                EditorGUILayout.BeginHorizontal();
+
+                // Correct toggle
+                bool newIsCorrect = EditorGUILayout.Toggle(isCorrect, GUILayout.Width(16));
                 if (newIsCorrect != isCorrect)
                 {
                     if (newIsCorrect)
                     {
-                        if (!question.isMultipleChoice)
-                        {
-                            question.correctAnswers.Clear();
-                        }
+                        if (!question.isMultipleChoice) question.correctAnswers.Clear();
                         question.correctAnswers.Add(i);
                     }
                     else
@@ -236,20 +481,21 @@ namespace WiseTwin.Editor
                     }
                 }
 
-                // Delete button
-                GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
-                if (GUILayout.Button("×", GUILayout.Width(25)))
+                EditorGUILayout.LabelField(isCorrect ? $"Option {i + 1} (correct)" : $"Option {i + 1}",
+                    isCorrect ? EditorStyles.boldLabel : EditorStyles.label, GUILayout.Width(130));
+
+                GUILayout.FlexibleSpace();
+
+                // Delete option
+                GUI.backgroundColor = new Color(1f, 0.5f, 0.5f);
+                if (optionsCount > 2 && GUILayout.Button("X", GUILayout.Width(20), GUILayout.Height(16)))
                 {
                     question.optionsEN.RemoveAt(i);
                     question.optionsFR.RemoveAt(i);
                     question.correctAnswers.Remove(i);
-                    // Adjust indices in correctAnswers
                     for (int j = 0; j < question.correctAnswers.Count; j++)
                     {
-                        if (question.correctAnswers[j] > i)
-                        {
-                            question.correctAnswers[j]--;
-                        }
+                        if (question.correctAnswers[j] > i) question.correctAnswers[j]--;
                     }
                     GUI.backgroundColor = Color.white;
                     EditorGUILayout.EndHorizontal();
@@ -260,116 +506,167 @@ namespace WiseTwin.Editor
 
                 EditorGUILayout.EndHorizontal();
 
-                // Ensure lists have enough elements
-                while (question.optionsEN.Count <= i) question.optionsEN.Add("");
-                while (question.optionsFR.Count <= i) question.optionsFR.Add("");
+                EditorGUI.indentLevel++;
+                question.optionsEN[i] = EditorGUILayout.TextField("EN", question.optionsEN[i]);
+                question.optionsFR[i] = EditorGUILayout.TextField("FR", question.optionsFR[i]);
+                EditorGUI.indentLevel--;
 
-                question.optionsEN[i] = EditorGUILayout.TextField("  EN", question.optionsEN[i]);
-                question.optionsFR[i] = EditorGUILayout.TextField("  FR", question.optionsFR[i]);
                 EditorGUILayout.EndVertical();
             }
 
-            if (GUILayout.Button("➕ Add Option"))
+            if (GUILayout.Button("+ Add Option", GUILayout.Height(20)))
             {
                 question.optionsEN.Add("");
                 question.optionsFR.Add("");
             }
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(4);
 
-            // Feedback (larger area with word wrap)
-            EditorGUILayout.LabelField("Feedback Messages", EditorStyles.miniBoldLabel);
-            EditorGUILayout.LabelField("Success Feedback (English):", EditorStyles.miniLabel);
-            question.feedbackEN = EditorGUILayout.TextArea(question.feedbackEN, textAreaStyle, GUILayout.Height(60));
-            EditorGUILayout.LabelField("Success Feedback (Français):", EditorStyles.miniLabel);
-            question.feedbackFR = EditorGUILayout.TextArea(question.feedbackFR, textAreaStyle, GUILayout.Height(60));
+            // Feedback - collapsible
+            string fbKey = $"fb_{question.GetHashCode()}";
+            bool fbOpen = GetFoldout(fbKey, false);
+            if (GUILayout.Button(fbOpen ? "v Feedback Messages" : "> Feedback Messages", EditorStyles.boldLabel))
+            {
+                SetFoldout(fbKey, !fbOpen);
+            }
 
-            EditorGUILayout.Space();
+            if (fbOpen)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField("Correct Feedback", EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
+                question.feedbackEN = EditorGUILayout.TextArea(question.feedbackEN, textAreaStyle, GUILayout.Height(45));
+                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
+                question.feedbackFR = EditorGUILayout.TextArea(question.feedbackFR, textAreaStyle, GUILayout.Height(45));
 
-            EditorGUILayout.LabelField("Error Feedback (English):", EditorStyles.miniLabel);
-            question.incorrectFeedbackEN = EditorGUILayout.TextArea(question.incorrectFeedbackEN, textAreaStyle, GUILayout.Height(60));
-            EditorGUILayout.LabelField("Error Feedback (Français):", EditorStyles.miniLabel);
-            question.incorrectFeedbackFR = EditorGUILayout.TextArea(question.incorrectFeedbackFR, textAreaStyle, GUILayout.Height(60));
+                EditorGUILayout.Space(2);
+
+                EditorGUILayout.LabelField("Incorrect Feedback", EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
+                question.incorrectFeedbackEN = EditorGUILayout.TextArea(question.incorrectFeedbackEN, textAreaStyle, GUILayout.Height(45));
+                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
+                question.incorrectFeedbackFR = EditorGUILayout.TextArea(question.incorrectFeedbackFR, textAreaStyle, GUILayout.Height(45));
+                EditorGUI.indentLevel--;
+            }
         }
+
+        // ============= PROCEDURE EDITOR =============
 
         private static void DrawProcedureEditor(ProcedureScenarioData procedure)
         {
-            EditorGUILayout.LabelField("Procedure Configuration", EditorStyles.boldLabel);
+            string accordionGroup = "proc_accordion";
 
-            // Title & Description
-            EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
-            procedure.titleEN = EditorGUILayout.TextField("  EN", procedure.titleEN);
-            procedure.titleFR = EditorGUILayout.TextField("  FR", procedure.titleFR);
+            // === GENERAL SECTION (accordion) ===
+            bool generalOpen = IsAccordionOpen(accordionGroup, "general");
+            DrawAccordionHeader("General (Title & Description)", generalOpen, () => ToggleAccordion(accordionGroup, "general"));
 
-            EditorGUILayout.Space();
-
-            EditorGUILayout.LabelField("Description", EditorStyles.miniBoldLabel);
-            GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
-            EditorGUILayout.LabelField("  (English)", EditorStyles.miniLabel);
-            procedure.descriptionEN = EditorGUILayout.TextArea(procedure.descriptionEN, textAreaStyle, GUILayout.Height(60));
-            EditorGUILayout.LabelField("  (Français)", EditorStyles.miniLabel);
-            procedure.descriptionFR = EditorGUILayout.TextArea(procedure.descriptionFR, textAreaStyle, GUILayout.Height(60));
-
-            EditorGUILayout.Space();
-
-            // Steps
-            EditorGUILayout.LabelField("Steps", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Use arrows to reorder steps. The order will be used in the procedure execution.", MessageType.Info);
-
-            for (int i = 0; i < procedure.steps.Count; i++)
+            if (generalOpen)
             {
-                DrawProcedureStep(procedure.steps[i], i, procedure.steps);
+                Rect genRect = EditorGUILayout.BeginVertical("box");
+                EditorGUI.DrawRect(genRect, new Color(0.2f, 0.4f, 0.25f, 0.15f));
+
+                EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
+                EditorGUI.indentLevel++;
+                procedure.titleEN = EditorGUILayout.TextField("EN", procedure.titleEN);
+                procedure.titleFR = EditorGUILayout.TextField("FR", procedure.titleFR);
+                EditorGUI.indentLevel--;
+
+                EditorGUILayout.Space(2);
+
+                GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
+                EditorGUILayout.LabelField("Description", EditorStyles.miniBoldLabel);
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
+                procedure.descriptionEN = EditorGUILayout.TextArea(procedure.descriptionEN, textAreaStyle, GUILayout.Height(45));
+                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
+                procedure.descriptionFR = EditorGUILayout.TextArea(procedure.descriptionFR, textAreaStyle, GUILayout.Height(45));
+                EditorGUI.indentLevel--;
+
+                EditorGUILayout.EndVertical();
             }
 
-            if (GUILayout.Button("➕ Add Step", GUILayout.Height(25)))
+            EditorGUILayout.Space(2);
+
+            // === STEPS SECTION (accordion) ===
+            bool stepsOpen = IsAccordionOpen(accordionGroup, "steps");
+            EditorGUILayout.BeginHorizontal();
+            DrawAccordionHeader($"Steps ({procedure.steps.Count})", stepsOpen, () => ToggleAccordion(accordionGroup, "steps"));
+            if (stepsOpen && GUILayout.Button("+ Add Step", GUILayout.Height(22), GUILayout.Width(100)))
             {
                 procedure.steps.Add(new ProcedureStep());
             }
+            EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.Space();
-
-            // Fake Objects
-            EditorGUILayout.LabelField("Fake Objects (Errors)", EditorStyles.boldLabel);
-            for (int i = 0; i < procedure.fakeObjects.Count; i++)
+            if (stepsOpen)
             {
-                DrawFakeObject(procedure.fakeObjects[i], i, procedure.fakeObjects);
+                EditorGUILayout.Space(2);
+                for (int i = 0; i < procedure.steps.Count; i++)
+                {
+                    DrawProcedureStep(procedure.steps[i], i, procedure.steps);
+                }
             }
+        }
 
-            if (GUILayout.Button("➕ Add Fake Object", GUILayout.Height(25)))
+        private static void DrawAccordionHeader(string title, bool isOpen, System.Action onClick)
+        {
+            var prevBg = GUI.backgroundColor;
+            GUI.backgroundColor = isOpen ? new Color(0.45f, 0.65f, 0.85f) : new Color(0.55f, 0.55f, 0.55f);
+            GUIStyle headerStyle = new GUIStyle(GUI.skin.button);
+            headerStyle.alignment = TextAnchor.MiddleLeft;
+            headerStyle.fontStyle = FontStyle.Bold;
+            headerStyle.fontSize = 12;
+
+            if (GUILayout.Button($"  {(isOpen ? "v" : ">")}  {title}", headerStyle, GUILayout.Height(26)))
             {
-                procedure.fakeObjects.Add(new FakeObject());
+                onClick?.Invoke();
             }
+            GUI.backgroundColor = prevBg;
         }
 
         private static void DrawProcedureStep(ProcedureStep step, int index, List<ProcedureStep> steps)
         {
-            EditorGUILayout.BeginVertical("box");
+            string accordionGroup = "steps_accordion";
+            string sectionKey = $"step_{index}";
+            bool isOpen = IsAccordionOpen(accordionGroup, sectionKey);
 
+            // Preview text
+            string preview = !string.IsNullOrEmpty(step.textFR) ? step.textFR : step.textEN;
+            if (preview.Length > 50) preview = preview.Substring(0, 47) + "...";
+            if (string.IsNullOrEmpty(preview)) preview = "(empty step)";
+
+            string valBadge = step.validationType == ValidationType.Click ? "[Click]" :
+                              step.validationType == ValidationType.Manual ? "[Manual]" : "[Zone]";
+
+            // Box with visible colored background
+            Rect stepRect = EditorGUILayout.BeginVertical("box");
+            if (isOpen)
+                EditorGUI.DrawRect(stepRect, new Color(0.2f, 0.4f, 0.25f, 0.15f));
+
+            // Header
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"Step {index + 1}", EditorStyles.boldLabel);
 
-            // Move up button
-            GUI.enabled = index > 0;
-            if (GUILayout.Button("↑", GUILayout.Width(25)))
+            if (GUILayout.Button($"{(isOpen ? "v" : ">")}  Step {index + 1} {valBadge}: {preview}", EditorStyles.boldLabel))
             {
-                var temp = steps[index];
-                steps[index] = steps[index - 1];
-                steps[index - 1] = temp;
+                ToggleAccordion(accordionGroup, sectionKey);
+            }
+
+            // Reorder
+            GUI.enabled = index > 0;
+            if (GUILayout.Button("^", GUILayout.Width(22), GUILayout.Height(18)))
+            {
+                var temp = steps[index]; steps[index] = steps[index - 1]; steps[index - 1] = temp;
             }
             GUI.enabled = true;
 
-            // Move down button
             GUI.enabled = index < steps.Count - 1;
-            if (GUILayout.Button("↓", GUILayout.Width(25)))
+            if (GUILayout.Button("v", GUILayout.Width(22), GUILayout.Height(18)))
             {
-                var temp = steps[index];
-                steps[index] = steps[index + 1];
-                steps[index + 1] = temp;
+                var temp = steps[index]; steps[index] = steps[index + 1]; steps[index + 1] = temp;
             }
             GUI.enabled = true;
 
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
-            if (GUILayout.Button("×", GUILayout.Width(25)))
+            if (GUILayout.Button("X", GUILayout.Width(22), GUILayout.Height(18)))
             {
                 steps.RemoveAt(index);
                 GUI.backgroundColor = Color.white;
@@ -378,120 +675,111 @@ namespace WiseTwin.Editor
                 return;
             }
             GUI.backgroundColor = Color.white;
+
             EditorGUILayout.EndHorizontal();
 
-            // Target Object
-            EditorGUI.BeginChangeCheck();
-            step.targetObject = (GameObject)EditorGUILayout.ObjectField("Target Object", step.targetObject, typeof(GameObject), true);
-            if (EditorGUI.EndChangeCheck() && step.targetObject != null)
+            // Expanded content
+            if (isOpen)
             {
-                step.targetObjectName = step.targetObject.name;
-            }
-            step.targetObjectName = EditorGUILayout.TextField("Object Name", step.targetObjectName);
+                EditorGUILayout.Space(2);
 
-            // Step text (larger area with word wrap)
-            EditorGUILayout.LabelField("Text", EditorStyles.miniLabel);
-            GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
-            EditorGUILayout.LabelField("  EN:", EditorStyles.miniLabel);
-            step.textEN = EditorGUILayout.TextArea(step.textEN, textAreaStyle, GUILayout.Height(50));
-            EditorGUILayout.LabelField("  FR:", EditorStyles.miniLabel);
-            step.textFR = EditorGUILayout.TextArea(step.textFR, textAreaStyle, GUILayout.Height(50));
+                // Validation type FIRST so user picks mode before seeing irrelevant fields
+                step.validationType = (ValidationType)EditorGUILayout.EnumPopup("Validation", step.validationType);
 
-            // Highlight
-            step.highlightColor = EditorGUILayout.ColorField("Highlight Color", step.highlightColor);
-            step.useBlinking = EditorGUILayout.Toggle("Use Blinking", step.useBlinking);
+                // Target Object (only for Click - for Manual/Zone it's not relevant)
+                if (step.validationType == ValidationType.Click)
+                {
+                    EditorGUI.BeginChangeCheck();
+                    step.targetObject = (GameObject)EditorGUILayout.ObjectField("Target Object", step.targetObject, typeof(GameObject), true);
+                    if (EditorGUI.EndChangeCheck() && step.targetObject != null)
+                        step.targetObjectName = step.targetObject.name;
+                    step.targetObjectName = EditorGUILayout.TextField("Object Name", step.targetObjectName);
+                }
 
-            // Validation type
-            step.validationType = (ValidationType)EditorGUILayout.EnumPopup("Validation Type", step.validationType);
+                // Zone fields
+                if (step.validationType == ValidationType.Zone)
+                {
+                    EditorGUI.BeginChangeCheck();
+                    step.zoneObject = (GameObject)EditorGUILayout.ObjectField("Zone Object", step.zoneObject, typeof(GameObject), true);
+                    if (EditorGUI.EndChangeCheck() && step.zoneObject != null)
+                        step.zoneObjectName = step.zoneObject.name;
+                    step.zoneObjectName = EditorGUILayout.TextField("Zone Name", step.zoneObjectName);
+                }
 
-            // Zone object field (only shown when Zone validation is selected)
-            if (step.validationType == ValidationType.Zone)
-            {
+                // Step text
+                GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
+                EditorGUILayout.LabelField("Text", EditorStyles.miniBoldLabel);
                 EditorGUI.indentLevel++;
-                EditorGUI.BeginChangeCheck();
-                step.zoneObject = (GameObject)EditorGUILayout.ObjectField("Zone Object", step.zoneObject, typeof(GameObject), true);
-                if (EditorGUI.EndChangeCheck() && step.zoneObject != null)
-                {
-                    step.zoneObjectName = step.zoneObject.name;
-                }
-                step.zoneObjectName = EditorGUILayout.TextField("Zone Object Name", step.zoneObjectName);
-                EditorGUILayout.HelpBox("The zone object must have a Collider set to 'Is Trigger'. Use WiseTwin > Create Validation Zone Prefab to generate one.", MessageType.Info);
+                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
+                step.textEN = EditorGUILayout.TextArea(step.textEN, textAreaStyle, GUILayout.Height(40));
+                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
+                step.textFR = EditorGUILayout.TextArea(step.textFR, textAreaStyle, GUILayout.Height(40));
                 EditorGUI.indentLevel--;
-            }
 
-            // Image support
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Images (Optional)", EditorStyles.miniBoldLabel);
-            step.imageEN = (Sprite)EditorGUILayout.ObjectField("Image EN", step.imageEN, typeof(Sprite), false);
-            step.imageFR = (Sprite)EditorGUILayout.ObjectField("Image FR", step.imageFR, typeof(Sprite), false);
-
-            // Store image paths for JSON export
-            if (step.imageEN != null)
-            {
-                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(step.imageEN);
-                step.imagePathEN = assetPath;
-                EditorGUILayout.HelpBox($"EN Image Path: {assetPath}", MessageType.None);
-            }
-            if (step.imageFR != null)
-            {
-                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(step.imageFR);
-                step.imagePathFR = assetPath;
-                EditorGUILayout.HelpBox($"FR Image Path: {assetPath}", MessageType.None);
-            }
-
-            EditorGUILayout.Space();
-
-            // Fake Objects for this step
-            EditorGUILayout.LabelField("Fake Objects for this step", EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox("Objects that will be highlighted along with the correct one. Clicking them shows an error.", MessageType.Info);
-
-            for (int i = 0; i < step.fakeObjects.Count; i++)
-            {
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"Fake #{i + 1}", GUILayout.Width(80));
-                GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
-                if (GUILayout.Button("×", GUILayout.Width(25)))
+                // Highlight, Blink, Images, Fake Objects: only for Click validation
+                if (step.validationType == ValidationType.Click)
                 {
-                    step.fakeObjects.RemoveAt(i);
-                    GUI.backgroundColor = Color.white;
+                    EditorGUILayout.Space(2);
+
+                    // Highlight
+                    EditorGUILayout.BeginHorizontal();
+                    step.highlightColor = EditorGUILayout.ColorField("Highlight", step.highlightColor, GUILayout.Width(250));
+                    step.useBlinking = EditorGUILayout.Toggle("Blink", step.useBlinking);
                     EditorGUILayout.EndHorizontal();
-                    EditorGUILayout.EndVertical();
-                    break;
+
+                    // Images (collapsible)
+                    string imgKey = $"img_{index}_{step.GetHashCode()}";
+                    bool imgOpen = GetFoldout(imgKey, false);
+                    if (GUILayout.Button(imgOpen ? "v Images (Optional)" : "> Images (Optional)", EditorStyles.miniLabel))
+                    {
+                        SetFoldout(imgKey, !imgOpen);
+                    }
+                    if (imgOpen)
+                    {
+                        EditorGUI.indentLevel++;
+                        step.imageEN = (Sprite)EditorGUILayout.ObjectField("Image EN", step.imageEN, typeof(Sprite), false);
+                        step.imageFR = (Sprite)EditorGUILayout.ObjectField("Image FR", step.imageFR, typeof(Sprite), false);
+                        if (step.imageEN != null) step.imagePathEN = AssetDatabase.GetAssetPath(step.imageEN);
+                        if (step.imageFR != null) step.imagePathFR = AssetDatabase.GetAssetPath(step.imageFR);
+                        EditorGUI.indentLevel--;
+                    }
+
+                    // Fake objects (collapsible)
+                    string sfKey = $"sfake_{index}_{step.GetHashCode()}";
+                    bool sfOpen = GetFoldout(sfKey, false);
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(sfOpen ? $"v Fake Objects ({step.fakeObjects.Count})" : $"> Fake Objects ({step.fakeObjects.Count})", EditorStyles.miniLabel))
+                    {
+                        SetFoldout(sfKey, !sfOpen);
+                    }
+                    if (sfOpen && GUILayout.Button("+", GUILayout.Width(20), GUILayout.Height(14)))
+                    {
+                        step.fakeObjects.Add(new FakeObject());
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    if (sfOpen)
+                    {
+                        for (int i = 0; i < step.fakeObjects.Count; i++)
+                        {
+                            DrawFakeObject(step.fakeObjects[i], i, step.fakeObjects);
+                        }
+                    }
                 }
-                GUI.backgroundColor = Color.white;
-                EditorGUILayout.EndHorizontal();
-
-                EditorGUI.BeginChangeCheck();
-                step.fakeObjects[i].fakeObject = (GameObject)EditorGUILayout.ObjectField("GameObject", step.fakeObjects[i].fakeObject, typeof(GameObject), true);
-                if (EditorGUI.EndChangeCheck() && step.fakeObjects[i].fakeObject != null)
-                {
-                    step.fakeObjects[i].fakeObjectName = step.fakeObjects[i].fakeObject.name;
-                }
-                step.fakeObjects[i].fakeObjectName = EditorGUILayout.TextField("Object Name", step.fakeObjects[i].fakeObjectName);
-                step.fakeObjects[i].errorMessageEN = EditorGUILayout.TextField("Error EN", step.fakeObjects[i].errorMessageEN);
-                step.fakeObjects[i].errorMessageFR = EditorGUILayout.TextField("Error FR", step.fakeObjects[i].errorMessageFR);
-
-                EditorGUILayout.EndVertical();
-            }
-
-            if (GUILayout.Button("➕ Add Fake Object to this step", GUILayout.Height(20)))
-            {
-                step.fakeObjects.Add(new FakeObject());
             }
 
             EditorGUILayout.EndVertical();
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(1);
         }
 
         private static void DrawFakeObject(FakeObject fake, int index, List<FakeObject> fakes)
         {
             EditorGUILayout.BeginVertical("box");
-
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"Fake #{index + 1}", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Fake #{index + 1}", EditorStyles.boldLabel, GUILayout.Width(80));
+            GUILayout.FlexibleSpace();
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
-            if (GUILayout.Button("×", GUILayout.Width(25)))
+            if (GUILayout.Button("X", GUILayout.Width(20), GUILayout.Height(16)))
             {
                 fakes.RemoveAt(index);
                 GUI.backgroundColor = Color.white;
@@ -505,112 +793,150 @@ namespace WiseTwin.Editor
             EditorGUI.BeginChangeCheck();
             fake.fakeObject = (GameObject)EditorGUILayout.ObjectField("GameObject", fake.fakeObject, typeof(GameObject), true);
             if (EditorGUI.EndChangeCheck() && fake.fakeObject != null)
-            {
                 fake.fakeObjectName = fake.fakeObject.name;
-            }
             fake.fakeObjectName = EditorGUILayout.TextField("Object Name", fake.fakeObjectName);
-
-            EditorGUILayout.LabelField("Error Message", EditorStyles.miniLabel);
-            fake.errorMessageEN = EditorGUILayout.TextField("  EN", fake.errorMessageEN);
-            fake.errorMessageFR = EditorGUILayout.TextField("  FR", fake.errorMessageFR);
+            fake.errorMessageEN = EditorGUILayout.TextField("Error EN", fake.errorMessageEN);
+            fake.errorMessageFR = EditorGUILayout.TextField("Error FR", fake.errorMessageFR);
 
             EditorGUILayout.EndVertical();
-            EditorGUILayout.Space();
         }
 
-        private static void DrawDialogueEditor(DialogueScenarioData dialogue, WiseTwinEditorData data)
-        {
-            EditorGUILayout.LabelField("Dialogue Configuration", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Configure a branching dialogue tree. Use the Dialogue tab to create/edit dialogues in the visual graph editor.", MessageType.Info);
-
-            EditorGUILayout.Space();
-
-            // Select existing dialogue or create inline
-            if (data.dialogues.Count > 0)
-            {
-                // Build dropdown options
-                string[] dialogueOptions = new string[data.dialogues.Count + 1];
-                dialogueOptions[0] = "(None - configure inline)";
-                int currentSelection = 0;
-
-                for (int i = 0; i < data.dialogues.Count; i++)
-                {
-                    var d = data.dialogues[i];
-                    string title = !string.IsNullOrEmpty(d.titleEN) ? d.titleEN : d.dialogueId;
-                    dialogueOptions[i + 1] = $"{d.dialogueId} - {title}";
-
-                    if (d.dialogueId == dialogue.dialogueId)
-                        currentSelection = i + 1;
-                }
-
-                int newSelection = EditorGUILayout.Popup("Link to Dialogue", currentSelection, dialogueOptions);
-                if (newSelection != currentSelection)
-                {
-                    if (newSelection == 0)
-                    {
-                        dialogue.dialogueId = "";
-                        dialogue.graphDataJSON = "";
-                    }
-                    else
-                    {
-                        var selected = data.dialogues[newSelection - 1];
-                        dialogue.dialogueId = selected.dialogueId;
-                        dialogue.titleEN = selected.titleEN;
-                        dialogue.titleFR = selected.titleFR;
-                        dialogue.graphDataJSON = selected.graphDataJSON;
-                    }
-                }
-            }
-
-            EditorGUILayout.Space();
-
-            // Title
-            EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
-            dialogue.titleEN = EditorGUILayout.TextField("  EN", dialogue.titleEN);
-            dialogue.titleFR = EditorGUILayout.TextField("  FR", dialogue.titleFR);
-
-            EditorGUILayout.Space();
-
-            // Dialogue ID
-            dialogue.dialogueId = EditorGUILayout.TextField("Dialogue ID", dialogue.dialogueId);
-
-            EditorGUILayout.Space();
-
-            // Open graph editor button
-            GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
-            if (GUILayout.Button("Open Graph Editor", GUILayout.Height(30)))
-            {
-                WiseTwin.Editor.DialogueEditor.DialogueEditorWindow.OpenWithDialogue(dialogue);
-            }
-            GUI.backgroundColor = Color.white;
-
-            // Show status
-            if (!string.IsNullOrEmpty(dialogue.graphDataJSON))
-            {
-                EditorGUILayout.HelpBox("Graph data is configured. Open the Graph Editor to modify.", MessageType.Info);
-            }
-            else
-            {
-                EditorGUILayout.HelpBox("No graph data yet. Open the Graph Editor to create a dialogue tree.", MessageType.Warning);
-            }
-        }
+        // ============= TEXT EDITOR =============
 
         private static void DrawTextEditor(TextScenarioData text)
         {
-            EditorGUILayout.LabelField("Text/Information Configuration", EditorStyles.boldLabel);
+            string accordionGroup = "text_accordion";
 
-            EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
-            text.titleEN = EditorGUILayout.TextField("  EN", text.titleEN);
-            text.titleFR = EditorGUILayout.TextField("  FR", text.titleFR);
+            // === GENERAL SECTION ===
+            bool generalOpen = IsAccordionOpen(accordionGroup, "general");
+            DrawAccordionHeader("General (Title)", generalOpen, () => ToggleAccordion(accordionGroup, "general"));
 
-            EditorGUILayout.Space();
+            if (generalOpen)
+            {
+                Rect tgRect = EditorGUILayout.BeginVertical("box");
+                EditorGUI.DrawRect(tgRect, new Color(0.55f, 0.35f, 0.1f, 0.15f));
 
-            EditorGUILayout.LabelField("Content", EditorStyles.miniBoldLabel);
-            GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
-            EditorGUILayout.LabelField("  (English)", EditorStyles.miniLabel);
-            text.contentEN = EditorGUILayout.TextArea(text.contentEN, textAreaStyle, GUILayout.Height(150));
-            EditorGUILayout.LabelField("  (Français)", EditorStyles.miniLabel);
-            text.contentFR = EditorGUILayout.TextArea(text.contentFR, textAreaStyle, GUILayout.Height(150));
+                EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
+                EditorGUI.indentLevel++;
+                text.titleEN = EditorGUILayout.TextField("EN", text.titleEN);
+                text.titleFR = EditorGUILayout.TextField("FR", text.titleFR);
+                EditorGUI.indentLevel--;
+
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.Space(2);
+
+            // === CONTENT SECTION ===
+            bool contentOpen = IsAccordionOpen(accordionGroup, "content");
+            DrawAccordionHeader("Content", contentOpen, () => ToggleAccordion(accordionGroup, "content"));
+
+            if (contentOpen)
+            {
+                Rect tcRect = EditorGUILayout.BeginVertical("box");
+                EditorGUI.DrawRect(tcRect, new Color(0.55f, 0.35f, 0.1f, 0.15f));
+
+                GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
+                text.contentEN = EditorGUILayout.TextArea(text.contentEN, textAreaStyle, GUILayout.Height(120));
+                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
+                text.contentFR = EditorGUILayout.TextArea(text.contentFR, textAreaStyle, GUILayout.Height(120));
+                EditorGUI.indentLevel--;
+
+                EditorGUILayout.EndVertical();
+            }
+        }
+
+        // ============= DIALOGUE EDITOR =============
+
+        private static void DrawDialogueEditor(DialogueScenarioData dialogue, WiseTwinEditorData data)
+        {
+            string accordionGroup = "dialogue_accordion";
+
+            // === GENERAL SECTION ===
+            bool generalOpen = IsAccordionOpen(accordionGroup, "general");
+            DrawAccordionHeader("General (Title & Link)", generalOpen, () => ToggleAccordion(accordionGroup, "general"));
+
+            if (generalOpen)
+            {
+                Rect dgRect = EditorGUILayout.BeginVertical("box");
+                EditorGUI.DrawRect(dgRect, new Color(0.35f, 0.2f, 0.5f, 0.15f));
+
+                // Select existing dialogue
+                if (data.dialogues.Count > 0)
+                {
+                    string[] options = new string[data.dialogues.Count + 1];
+                    options[0] = "(None - configure inline)";
+                    int currentSelection = 0;
+
+                    for (int i = 0; i < data.dialogues.Count; i++)
+                    {
+                        var d = data.dialogues[i];
+                        string title = !string.IsNullOrEmpty(d.titleEN) ? d.titleEN : d.dialogueId;
+                        options[i + 1] = $"{d.dialogueId} - {title}";
+                        if (d.dialogueId == dialogue.dialogueId) currentSelection = i + 1;
+                    }
+
+                    int newSelection = EditorGUILayout.Popup("Link to Dialogue", currentSelection, options);
+                    if (newSelection != currentSelection)
+                    {
+                        if (newSelection == 0)
+                        {
+                            dialogue.dialogueId = "";
+                            dialogue.graphDataJSON = "";
+                        }
+                        else
+                        {
+                            var selected = data.dialogues[newSelection - 1];
+                            dialogue.dialogueId = selected.dialogueId;
+                            dialogue.titleEN = selected.titleEN;
+                            dialogue.titleFR = selected.titleFR;
+                            dialogue.graphDataJSON = selected.graphDataJSON;
+                        }
+                    }
+                }
+
+                EditorGUILayout.Space(2);
+
+                EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
+                EditorGUI.indentLevel++;
+                dialogue.titleEN = EditorGUILayout.TextField("EN", dialogue.titleEN);
+                dialogue.titleFR = EditorGUILayout.TextField("FR", dialogue.titleFR);
+                EditorGUI.indentLevel--;
+
+                dialogue.dialogueId = EditorGUILayout.TextField("Dialogue ID", dialogue.dialogueId);
+
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.Space(2);
+
+            // === GRAPH EDITOR SECTION ===
+            bool graphOpen = IsAccordionOpen(accordionGroup, "graph");
+            DrawAccordionHeader("Graph Editor", graphOpen, () => ToggleAccordion(accordionGroup, "graph"));
+
+            if (graphOpen)
+            {
+                Rect grRect = EditorGUILayout.BeginVertical("box");
+                EditorGUI.DrawRect(grRect, new Color(0.35f, 0.2f, 0.5f, 0.15f));
+
+                GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
+                if (GUILayout.Button("Open Graph Editor", GUILayout.Height(28)))
+                {
+                    WiseTwin.Editor.DialogueEditor.DialogueEditorWindow.OpenWithDialogue(dialogue);
+                }
+                GUI.backgroundColor = Color.white;
+
+                EditorGUILayout.Space(2);
+
+                if (!string.IsNullOrEmpty(dialogue.graphDataJSON))
+                    EditorGUILayout.HelpBox("Graph data configured. Open Graph Editor to modify.", MessageType.Info);
+                else
+                    EditorGUILayout.HelpBox("No graph data yet. Open Graph Editor to create a dialogue tree.", MessageType.Warning);
+
+                EditorGUILayout.EndVertical();
+            }
         }
     }
 
@@ -632,16 +958,16 @@ namespace WiseTwin.Editor
 
         void OnGUI()
         {
-            EditorGUILayout.LabelField("📥 Import Scenarios from JSON", EditorStyles.largeLabel);
+            EditorGUILayout.LabelField("Import Scenarios from JSON", EditorStyles.largeLabel);
             EditorGUILayout.HelpBox("Paste your scenarios JSON array below. You can import one or multiple scenarios at once.", MessageType.Info);
             EditorGUILayout.Space();
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("📋 Paste from Clipboard"))
+            if (GUILayout.Button("Paste from Clipboard"))
             {
                 jsonContent = EditorGUIUtility.systemCopyBuffer;
             }
-            if (GUILayout.Button("🧹 Clear"))
+            if (GUILayout.Button("Clear"))
             {
                 jsonContent = "";
             }
@@ -657,7 +983,7 @@ namespace WiseTwin.Editor
             EditorGUILayout.Space();
 
             GUI.backgroundColor = new Color(0.3f, 0.8f, 0.5f);
-            if (GUILayout.Button("✅ Import Scenarios", GUILayout.Height(35)))
+            if (GUILayout.Button("Import Scenarios", GUILayout.Height(35)))
             {
                 ImportScenarios();
             }
@@ -676,14 +1002,12 @@ namespace WiseTwin.Editor
             {
                 List<object> scenariosJSON = null;
 
-                // Try to parse as array first, if that fails, try as single object
                 try
                 {
                     scenariosJSON = Newtonsoft.Json.JsonConvert.DeserializeObject<List<object>>(jsonContent);
                 }
                 catch
                 {
-                    // If array parsing fails, try parsing as a single object
                     var singleScenario = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(jsonContent);
                     if (singleScenario != null)
                     {
@@ -698,7 +1022,6 @@ namespace WiseTwin.Editor
                     return;
                 }
 
-                // Use the same loading logic as the main editor
                 int importedCount = 0;
                 foreach (var scenarioObj in scenariosJSON)
                 {
@@ -713,7 +1036,6 @@ namespace WiseTwin.Editor
 
                         var scenario = new ScenarioConfiguration();
 
-                        // Load basic fields
                         if (scenarioDict.ContainsKey("id"))
                             scenario.id = scenarioDict["id"]?.ToString();
 
@@ -724,14 +1046,11 @@ namespace WiseTwin.Editor
                                 scenario.type = type;
                         }
 
-                        // Load content based on type
                         switch (scenario.type)
                         {
                             case ScenarioType.Question:
-                                // Support both "question" (single object) and "questions" (array)
                                 if (scenarioDict.ContainsKey("question"))
                                 {
-                                    // Single question
                                     scenario.questions.Clear();
                                     var questionData = new QuestionScenarioData();
                                     LoadQuestionDataFromJSON(questionData, scenarioDict["question"]);
@@ -741,7 +1060,6 @@ namespace WiseTwin.Editor
                                 }
                                 else if (scenarioDict.ContainsKey("questions"))
                                 {
-                                    // Multiple questions in one scenario
                                     var questionsArray = scenarioDict["questions"] as Newtonsoft.Json.Linq.JArray;
                                     if (questionsArray != null && questionsArray.Count > 0)
                                     {
@@ -785,12 +1103,10 @@ namespace WiseTwin.Editor
                                 }
                                 break;
                         }
-
-                        // Note: importedCount is incremented inside each case now
                     }
                     catch (System.Exception e)
                     {
-                        Debug.LogWarning($"⚠️ Failed to import scenario: {e.Message}");
+                        Debug.LogWarning($"[ScenarioImport] Failed to import scenario: {e.Message}");
                     }
                 }
 
@@ -815,7 +1131,6 @@ namespace WiseTwin.Editor
             var jObject = Newtonsoft.Json.Linq.JObject.FromObject(questionObj);
             var questionDict = jObject.ToObject<Dictionary<string, object>>();
 
-            // Load question text
             if (questionDict.ContainsKey("questionText"))
             {
                 var textDict = GetDictionary(questionDict["questionText"]);
@@ -823,7 +1138,6 @@ namespace WiseTwin.Editor
                 question.questionTextFR = GetString(textDict, "fr");
             }
 
-            // Load options
             if (questionDict.ContainsKey("options"))
             {
                 var optionsDict = GetDictionary(questionDict["options"]);
@@ -831,21 +1145,16 @@ namespace WiseTwin.Editor
                 question.optionsFR = GetStringList(optionsDict, "fr");
             }
 
-            // Load correct answers
             if (questionDict.ContainsKey("correctAnswers"))
             {
                 var correctAnswersObj = questionDict["correctAnswers"];
                 if (correctAnswersObj is Newtonsoft.Json.Linq.JArray jArray)
-                {
                     question.correctAnswers = jArray.ToObject<List<int>>();
-                }
             }
 
-            // Load flags
             if (questionDict.ContainsKey("isMultipleChoice"))
                 question.isMultipleChoice = System.Convert.ToBoolean(questionDict["isMultipleChoice"]);
 
-            // Load feedback
             if (questionDict.ContainsKey("feedback"))
             {
                 var feedbackDict = GetDictionary(questionDict["feedback"]);
@@ -860,7 +1169,6 @@ namespace WiseTwin.Editor
                 question.incorrectFeedbackFR = GetString(feedbackDict, "fr");
             }
 
-            // Load hint (reset to empty if not present)
             if (questionDict.ContainsKey("hint"))
             {
                 var hintDict = GetDictionary(questionDict["hint"]);
@@ -879,7 +1187,6 @@ namespace WiseTwin.Editor
             var jObject = Newtonsoft.Json.Linq.JObject.FromObject(procedureObj);
             var procedureDict = jObject.ToObject<Dictionary<string, object>>();
 
-            // Load title
             if (procedureDict.ContainsKey("title"))
             {
                 var titleDict = GetDictionary(procedureDict["title"]);
@@ -887,7 +1194,6 @@ namespace WiseTwin.Editor
                 procedure.titleFR = GetString(titleDict, "fr");
             }
 
-            // Load description
             if (procedureDict.ContainsKey("description"))
             {
                 var descDict = GetDictionary(procedureDict["description"]);
@@ -895,7 +1201,6 @@ namespace WiseTwin.Editor
                 procedure.descriptionFR = GetString(descDict, "fr");
             }
 
-            // Load steps
             if (procedureDict.ContainsKey("steps"))
             {
                 var stepsArray = procedureDict["steps"] as Newtonsoft.Json.Linq.JArray;
@@ -919,14 +1224,13 @@ namespace WiseTwin.Editor
                         if (stepDict.ContainsKey("highlightColor"))
                         {
                             string colorStr = stepDict["highlightColor"]?.ToString();
-                            if (UnityEngine.ColorUtility.TryParseHtmlString(colorStr, out var color))
+                            if (ColorUtility.TryParseHtmlString(colorStr, out var color))
                                 step.highlightColor = color;
                         }
 
                         if (stepDict.ContainsKey("useBlinking"))
                             step.useBlinking = System.Convert.ToBoolean(stepDict["useBlinking"]);
 
-                        // Load validation type (with backward compat for requireManualValidation)
                         if (stepDict.ContainsKey("validationType"))
                         {
                             string valTypeStr = stepDict["validationType"]?.ToString();
@@ -948,8 +1252,6 @@ namespace WiseTwin.Editor
                             var imagePathDict = GetDictionary(stepDict["imagePath"]);
                             step.imagePathEN = GetString(imagePathDict, "en");
                             step.imagePathFR = GetString(imagePathDict, "fr");
-                            // Note: We can't load Sprite objects from paths during import,
-                            // they need to be manually reassigned in the editor
                         }
 
                         if (stepDict.ContainsKey("hint"))
@@ -964,7 +1266,6 @@ namespace WiseTwin.Editor
                             step.hintFR = "";
                         }
 
-                        // NEW: Load fake objects for this step
                         if (stepDict.ContainsKey("fakeObjects"))
                         {
                             var fakesArray = stepDict["fakeObjects"] as Newtonsoft.Json.Linq.JArray;
@@ -995,7 +1296,6 @@ namespace WiseTwin.Editor
                 }
             }
 
-            // Load fake objects
             if (procedureDict.ContainsKey("fakeObjects"))
             {
                 var fakesArray = procedureDict["fakeObjects"] as Newtonsoft.Json.Linq.JArray;
@@ -1027,7 +1327,6 @@ namespace WiseTwin.Editor
             var jObject = Newtonsoft.Json.Linq.JObject.FromObject(textObj);
             var textDict = jObject.ToObject<Dictionary<string, object>>();
 
-            // Load title
             if (textDict.ContainsKey("title"))
             {
                 var titleDict = GetDictionary(textDict["title"]);
@@ -1035,7 +1334,6 @@ namespace WiseTwin.Editor
                 text.titleFR = GetString(titleDict, "fr");
             }
 
-            // Load content
             if (textDict.ContainsKey("content"))
             {
                 var contentDict = GetDictionary(textDict["content"]);
@@ -1049,7 +1347,6 @@ namespace WiseTwin.Editor
             var jObject = Newtonsoft.Json.Linq.JObject.FromObject(dialogueObj);
             var dialogueDict = jObject.ToObject<Dictionary<string, object>>();
 
-            // Load title
             if (dialogueDict.ContainsKey("title"))
             {
                 var titleDict = GetDictionary(dialogueDict["title"]);
@@ -1057,26 +1354,17 @@ namespace WiseTwin.Editor
                 dialogue.titleFR = GetString(titleDict, "fr");
             }
 
-            // Store the entire dialogue JSON for the graph editor
             dialogue.graphDataJSON = jObject.ToString(Newtonsoft.Json.Formatting.Indented);
 
-            // Generate a dialogue ID if not already set
             if (string.IsNullOrEmpty(dialogue.dialogueId))
-            {
                 dialogue.dialogueId = $"dialogue_{targetData.dialogues.Count + 1}";
-            }
         }
 
         private Dictionary<string, object> GetDictionary(object obj)
         {
             if (obj == null) return new Dictionary<string, object>();
-
-            if (obj is Dictionary<string, object> dict)
-                return dict;
-
-            if (obj is Newtonsoft.Json.Linq.JObject jObj)
-                return jObj.ToObject<Dictionary<string, object>>();
-
+            if (obj is Dictionary<string, object> dict) return dict;
+            if (obj is Newtonsoft.Json.Linq.JObject jObj) return jObj.ToObject<Dictionary<string, object>>();
             return new Dictionary<string, object>();
         }
 
@@ -1093,13 +1381,9 @@ namespace WiseTwin.Editor
             {
                 var value = dict[key];
                 if (value is Newtonsoft.Json.Linq.JArray jArray)
-                {
                     return jArray.ToObject<List<string>>();
-                }
                 else if (value is List<object> objList)
-                {
                     return objList.Select(o => o?.ToString() ?? "").ToList();
-                }
             }
             return new List<string>();
         }
