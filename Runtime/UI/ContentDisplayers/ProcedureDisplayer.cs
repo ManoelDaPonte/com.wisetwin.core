@@ -38,7 +38,7 @@ namespace WiseTwin.UI
 
         // GameObjects de la séquence
         private List<GameObject> allSequenceObjects; // Tous les objets (target + fake) de toutes les étapes
-        private Dictionary<GameObject, Material> originalMaterials;
+        private Dictionary<Renderer, Material> originalMaterials;
         private List<GameObject> currentHighlightedObjects = new List<GameObject>(); // Objets surlignés à l'étape actuelle
         private GameObject currentCorrectObject; // L'objet correct de l'étape actuelle
         private bool shouldHighlight = true; // Contrôle si on doit surligner ou non
@@ -146,7 +146,7 @@ namespace WiseTwin.UI
             }
 
             // Initialiser les matériaux originaux
-            originalMaterials = new Dictionary<GameObject, Material>();
+            originalMaterials = new Dictionary<Renderer, Material>();
             allSequenceObjects = new List<GameObject>();
 
             // Trouver les GameObjects pour chaque étape par nom
@@ -160,13 +160,7 @@ namespace WiseTwin.UI
                     if (step.targetObject != null)
                     {
                         allSequenceObjects.Add(step.targetObject);
-
-                        // Stocker le matériau original
-                        var renderer = step.targetObject.GetComponent<Renderer>();
-                        if (renderer != null)
-                        {
-                            originalMaterials[step.targetObject] = renderer.material;
-                        }
+                        StoreOriginalMaterials(step.targetObject);
 
                         Debug.Log($"[ProcedureDisplayer] Found target object for step: {step.targetObjectName}");
                     }
@@ -188,13 +182,7 @@ namespace WiseTwin.UI
                         if (fake.gameObject != null)
                         {
                             allSequenceObjects.Add(fake.gameObject);
-
-                            // Stocker le matériau original
-                            var renderer = fake.gameObject.GetComponent<Renderer>();
-                            if (renderer != null && !originalMaterials.ContainsKey(fake.gameObject))
-                            {
-                                originalMaterials[fake.gameObject] = renderer.material;
-                            }
+                            StoreOriginalMaterials(fake.gameObject);
 
                             Debug.Log($"[ProcedureDisplayer] Found step-specific fake object: {fake.objectName}");
                         }
@@ -232,13 +220,7 @@ namespace WiseTwin.UI
                     if (fake.gameObject != null)
                     {
                         allSequenceObjects.Add(fake.gameObject);
-
-                        // Stocker le matériau original
-                        var renderer = fake.gameObject.GetComponent<Renderer>();
-                        if (renderer != null && !originalMaterials.ContainsKey(fake.gameObject))
-                        {
-                            originalMaterials[fake.gameObject] = renderer.material;
-                        }
+                        StoreOriginalMaterials(fake.gameObject);
 
                         Debug.Log($"[ProcedureDisplayer] Found fake object: {fake.objectName}");
                     }
@@ -678,23 +660,39 @@ namespace WiseTwin.UI
             }
         }
 
+        /// <summary>
+        /// Stocke les matériaux originaux de tous les Renderers d'un objet et ses enfants
+        /// </summary>
+        void StoreOriginalMaterials(GameObject obj)
+        {
+            var renderers = obj.GetComponentsInChildren<Renderer>();
+            foreach (var renderer in renderers)
+            {
+                if (!originalMaterials.ContainsKey(renderer))
+                {
+                    originalMaterials[renderer] = renderer.material;
+                }
+            }
+        }
+
         void HighlightObject(GameObject obj, bool useBlinking)
         {
             if (obj == null) return;
 
-            var renderer = obj.GetComponent<Renderer>();
-            if (renderer == null) return;
+            var renderers = obj.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return;
 
-            // Créer un nouveau matériau avec émission (garde la couleur d'origine)
-            Material highlightMaterial = new Material(renderer.material);
+            foreach (var renderer in renderers)
+            {
+                // Créer un nouveau matériau avec émission (garde la couleur d'origine)
+                Material highlightMaterial = new Material(renderer.material);
 
-            // Activer l'émission
-            highlightMaterial.EnableKeyword("_EMISSION");
-            highlightMaterial.SetColor("_EmissionColor", highlightColor * highlightIntensity);
+                // Activer l'émission
+                highlightMaterial.EnableKeyword("_EMISSION");
+                highlightMaterial.SetColor("_EmissionColor", highlightColor * highlightIntensity);
 
-            // NE PAS changer la couleur de base - garder la couleur originale de l'objet
-
-            renderer.material = highlightMaterial;
+                renderer.material = highlightMaterial;
+            }
 
             // Ajouter un composant pour l'animation de pulsation UNIQUEMENT si useBlinking est activé
             if (useBlinking && pulseHighlight)
@@ -706,10 +704,10 @@ namespace WiseTwin.UI
                     DestroyImmediate(oldPulse);
                 }
 
-                // Ajouter un nouveau PulseEffect
+                // Ajouter un nouveau PulseEffect (gère tous les enfants via GetComponentsInChildren)
                 var pulse = obj.AddComponent<PulseEffect>();
                 pulse.Initialize(highlightColor, highlightIntensity, pulseSpeed);
-                Debug.Log($"[ProcedureDisplayer] Blinking enabled for object: {obj.name}");
+                Debug.Log($"[ProcedureDisplayer] Blinking enabled for object: {obj.name} ({renderers.Length} renderers)");
             }
             else
             {
@@ -721,13 +719,15 @@ namespace WiseTwin.UI
         {
             if (obj == null) return;
 
-            var renderer = obj.GetComponent<Renderer>();
-            if (renderer == null) return;
+            var renderers = obj.GetComponentsInChildren<Renderer>();
 
-            // Restaurer le matériau original
-            if (originalMaterials.ContainsKey(obj))
+            // Restaurer les matériaux originaux de tous les renderers
+            foreach (var renderer in renderers)
             {
-                renderer.material = originalMaterials[obj];
+                if (originalMaterials.ContainsKey(renderer))
+                {
+                    renderer.material = originalMaterials[renderer];
+                }
             }
 
             // Retirer l'effet de pulsation
@@ -1555,7 +1555,7 @@ namespace WiseTwin.UI
     /// </summary>
     public class PulseEffect : MonoBehaviour
     {
-        private Renderer objectRenderer;
+        private Renderer[] objectRenderers;
         private Color baseColor;
         private float intensity;
         private float speed;
@@ -1563,7 +1563,7 @@ namespace WiseTwin.UI
 
         public void Initialize(Color color, float emissionIntensity, float pulseSpeed)
         {
-            objectRenderer = GetComponent<Renderer>();
+            objectRenderers = GetComponentsInChildren<Renderer>();
             baseColor = color;
             intensity = emissionIntensity;
             speed = pulseSpeed;
@@ -1571,16 +1571,19 @@ namespace WiseTwin.UI
 
         void Update()
         {
-            if (objectRenderer == null) return;
+            if (objectRenderers == null || objectRenderers.Length == 0) return;
 
             time += Time.deltaTime * speed;
             float pulse = (Mathf.Sin(time) + 1f) / 2f; // Valeur entre 0 et 1
             // Pulse entre 0 (couleur originale) et intensité max (jaune brillant)
             float currentIntensity = Mathf.Lerp(0f, intensity, pulse);
 
-            if (objectRenderer.material.HasProperty("_EmissionColor"))
+            foreach (var renderer in objectRenderers)
             {
-                objectRenderer.material.SetColor("_EmissionColor", baseColor * currentIntensity);
+                if (renderer != null && renderer.material.HasProperty("_EmissionColor"))
+                {
+                    renderer.material.SetColor("_EmissionColor", baseColor * currentIntensity);
+                }
             }
         }
 

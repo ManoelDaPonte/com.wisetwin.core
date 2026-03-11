@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using WiseTwin.UI;
@@ -14,10 +15,8 @@ namespace WiseTwin
         private int stepIndex;
         private GameObject associatedObject; // L'objet GameObject lié à ce handler
         private bool isActive = false;
-        private Renderer objectRenderer;
-        private Color originalEmissionColor;
-        private bool hasOriginalEmission;
-        private Color highlightEmissionColor; // Couleur d'émission du highlight (avant hover)
+        private Renderer[] objectRenderers;
+        private Dictionary<Renderer, Color> highlightEmissionColors = new Dictionary<Renderer, Color>(); // Couleur d'émission du highlight par renderer
 
         // Pour gérer le feedback visuel au survol
         private bool isHovered = false;
@@ -31,21 +30,13 @@ namespace WiseTwin
             associatedObject = obj;
             isActive = true;
 
-            // Récupérer le renderer pour le feedback visuel
-            objectRenderer = GetComponent<Renderer>();
-            if (objectRenderer != null && objectRenderer.material != null)
+            // Récupérer tous les renderers (self + enfants) pour le feedback visuel
+            objectRenderers = GetComponentsInChildren<Renderer>();
+            foreach (var renderer in objectRenderers)
             {
-                // Sauvegarder l'émission originale (avant tout highlight)
-                hasOriginalEmission = objectRenderer.material.IsKeywordEnabled("_EMISSION");
-                if (hasOriginalEmission && objectRenderer.material.HasProperty("_EmissionColor"))
+                if (renderer != null && renderer.material != null && renderer.material.HasProperty("_EmissionColor"))
                 {
-                    originalEmissionColor = objectRenderer.material.GetColor("_EmissionColor");
-                }
-
-                // Sauvegarder la couleur d'émission du highlight actuel (jaune/pulse)
-                if (objectRenderer.material.HasProperty("_EmissionColor"))
-                {
-                    highlightEmissionColor = objectRenderer.material.GetColor("_EmissionColor");
+                    highlightEmissionColors[renderer] = renderer.material.GetColor("_EmissionColor");
                 }
             }
         }
@@ -107,14 +98,15 @@ namespace WiseTwin
                     pulseEffect.enabled = false;
                 }
 
-                // Changer la couleur d'émission en vert foncé
-                if (objectRenderer != null && objectRenderer.material != null &&
-                    objectRenderer.material.HasProperty("_EmissionColor"))
+                // Changer la couleur d'émission en vert foncé sur tous les renderers
+                foreach (var renderer in objectRenderers)
                 {
-                    objectRenderer.material.SetColor("_EmissionColor", hoverColor * hoverIntensity);
+                    if (renderer != null && renderer.material != null &&
+                        renderer.material.HasProperty("_EmissionColor"))
+                    {
+                        renderer.material.SetColor("_EmissionColor", hoverColor * hoverIntensity);
+                    }
                 }
-
-                // Note: Le curseur reste par défaut pour l'instant
             }
             else
             {
@@ -125,13 +117,16 @@ namespace WiseTwin
                     pulseEffect.enabled = true;
                 }
 
-                // Restaurer la couleur d'émission du highlight (jaune/pulse)
-                if (objectRenderer != null && objectRenderer.material != null &&
-                    objectRenderer.material.HasProperty("_EmissionColor"))
+                // Restaurer la couleur d'émission du highlight sur tous les renderers
+                foreach (var renderer in objectRenderers)
                 {
-                    objectRenderer.material.SetColor("_EmissionColor", highlightEmissionColor);
+                    if (renderer != null && renderer.material != null &&
+                        renderer.material.HasProperty("_EmissionColor") &&
+                        highlightEmissionColors.ContainsKey(renderer))
+                    {
+                        renderer.material.SetColor("_EmissionColor", highlightEmissionColors[renderer]);
+                    }
                 }
-
             }
         }
 
@@ -151,13 +146,17 @@ namespace WiseTwin
             // Valider l'étape dans le ProcedureDisplayer en passant l'objet cliqué
             if (procedureDisplayer != null && associatedObject != null)
             {
-                // Feedback visuel rapide
-                if (objectRenderer != null && objectRenderer.material != null)
+                // Feedback visuel rapide sur tous les renderers
+                var originalColors = new Dictionary<Renderer, Color>();
+                foreach (var renderer in objectRenderers)
                 {
-                    Color originalColor = objectRenderer.material.color;
-                    objectRenderer.material.color = Color.white;
-                    StartCoroutine(RestoreColorAfterDelay(originalColor, 0.1f));
+                    if (renderer != null && renderer.material != null)
+                    {
+                        originalColors[renderer] = renderer.material.color;
+                        renderer.material.color = Color.white;
+                    }
                 }
+                StartCoroutine(RestoreColorsAfterDelay(originalColors, 0.1f));
 
                 // Passer l'objet associé au displayer pour vérification
                 procedureDisplayer.ValidateCurrentStep(associatedObject);
@@ -168,12 +167,15 @@ namespace WiseTwin
             }
         }
 
-        System.Collections.IEnumerator RestoreColorAfterDelay(Color originalColor, float delay)
+        System.Collections.IEnumerator RestoreColorsAfterDelay(Dictionary<Renderer, Color> originalColors, float delay)
         {
             yield return new WaitForSeconds(delay);
-            if (objectRenderer != null && objectRenderer.material != null)
+            foreach (var kvp in originalColors)
             {
-                objectRenderer.material.color = originalColor;
+                if (kvp.Key != null && kvp.Key.material != null)
+                {
+                    kvp.Key.material.color = kvp.Value;
+                }
             }
         }
 
