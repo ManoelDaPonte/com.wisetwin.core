@@ -63,6 +63,14 @@ namespace WiseTwin.UI
             }
         }
 
+        void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+        }
+
         void InitializeDisplayers()
         {
             contentDisplayers = new Dictionary<ContentType, IContentDisplayer>();

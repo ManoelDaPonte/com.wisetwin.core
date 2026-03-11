@@ -498,6 +498,11 @@ namespace WiseTwin
                 metadataLoader.OnMetadataLoaded -= OnMetadataLoaded;
                 metadataLoader.OnLoadError -= OnMetadataLoadError;
             }
+
+            if (Instance == this)
+            {
+                Instance = null;
+            }
         }
         
         #region Inspector GUI (Development)

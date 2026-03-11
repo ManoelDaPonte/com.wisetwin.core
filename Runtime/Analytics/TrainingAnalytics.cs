@@ -61,6 +61,14 @@ namespace WiseTwin.Analytics
             }
         }
 
+        void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+        }
+
         void InitializeSession()
         {
             sessionId = Guid.NewGuid().ToString();

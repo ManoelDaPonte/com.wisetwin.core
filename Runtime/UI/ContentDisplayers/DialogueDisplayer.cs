@@ -253,23 +253,39 @@ namespace WiseTwin.UI
             // Add NPC bubble
             AddNpcBubble(speaker, text);
 
-            // Hide choices, show continue
-            choicesSection.style.display = DisplayStyle.None;
-            choicesContainer.Clear();
-
-            string continueText = lang == "fr" ? "Continuer" : "Continue";
-            continueButton.text = continueText;
-            continueButton.style.display = DisplayStyle.Flex;
-            continueButton.clickable = new Clickable(() =>
+            // Peek at next node: if it's a choice, merge into one view
+            DialogueNodeRuntime nextNode = null;
+            if (!string.IsNullOrEmpty(node.nextNodeId))
             {
-                if (isProcessing) return;
-                NavigateToNode(node.nextNodeId);
-            });
+                nextNode = dialogueTree.GetNode(node.nextNodeId);
+            }
+
+            if (nextNode != null && nextNode.type == "choice")
+            {
+                // Merge: show choices directly below the NPC bubble
+                currentNode = nextNode;
+                ShowChoicesForNode(nextNode, lang);
+            }
+            else
+            {
+                // Show continue button (dialogue → dialogue or dialogue → end)
+                choicesSection.style.display = DisplayStyle.None;
+                choicesContainer.Clear();
+
+                string continueText = lang == "fr" ? "Continuer" : "Continue";
+                continueButton.text = continueText;
+                continueButton.style.display = DisplayStyle.Flex;
+                continueButton.clickable = new Clickable(() =>
+                {
+                    if (isProcessing) return;
+                    NavigateToNode(node.nextNodeId);
+                });
+            }
 
             ScrollToBottom();
         }
 
-        // ========== CHOICE NODE (Player choosing) ==========
+        // ========== CHOICE NODE (standalone, for direct navigation to choice) ==========
 
         private void DisplayChoiceNode(DialogueNodeRuntime node)
         {
@@ -278,7 +294,7 @@ namespace WiseTwin.UI
             // Clear conversation area
             conversationContainer.Clear();
 
-            // Show the NPC's previous dialogue as context
+            // Show the NPC's previous dialogue as context bubble
             if (lastDialogueNode != null)
             {
                 string ctxSpeaker = GetLocalized(lastDialogueNode.speaker_en, lastDialogueNode.speaker_fr, lang);
@@ -290,6 +306,15 @@ namespace WiseTwin.UI
                 }
             }
 
+            ShowChoicesForNode(node, lang);
+            ScrollToBottom();
+        }
+
+        /// <summary>
+        /// Shows choices for a choice node (used by both merged dialogue+choice and standalone choice)
+        /// </summary>
+        private void ShowChoicesForNode(DialogueNodeRuntime node, string lang)
+        {
             // Show prompt text if present
             string prompt = GetLocalized(node.choiceText_en, node.choiceText_fr, lang);
             if (!string.IsNullOrEmpty(prompt))
@@ -326,8 +351,6 @@ namespace WiseTwin.UI
                 var choiceOption = CreateChoiceOption(choice, node, isEvaluated);
                 choicesContainer.Add(choiceOption);
             }
-
-            ScrollToBottom();
         }
 
         // ========== UI BUILDERS ==========

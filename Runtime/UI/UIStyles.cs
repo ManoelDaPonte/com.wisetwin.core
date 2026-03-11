@@ -461,14 +461,13 @@ namespace WiseTwin.UI
             scroller.style.bottom = SpaceSM;
             scroller.style.width = width;
 
-            // Hide all scroll buttons
-            var allButtons = scroller.Query<Button>().ToList();
-            foreach (var button in allButtons)
-            {
-                button.style.display = DisplayStyle.None;
-                button.style.width = 0;
-                button.style.height = 0;
-            }
+            // Hide scroller arrow buttons (RepeatButton, not Button)
+            scroller.lowButton.style.display = DisplayStyle.None;
+            scroller.lowButton.style.width = 0;
+            scroller.lowButton.style.height = 0;
+            scroller.highButton.style.display = DisplayStyle.None;
+            scroller.highButton.style.width = 0;
+            scroller.highButton.style.height = 0;
 
             // Tracker invisible
             var tracker = scroller.Q<VisualElement>("unity-tracker");

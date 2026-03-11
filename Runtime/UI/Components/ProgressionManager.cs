@@ -126,6 +126,11 @@ namespace WiseTwin
             {
                 transitionPanel.OnActionButtonClicked -= OnTransitionPanelClicked;
             }
+
+            if (Instance == this)
+            {
+                Instance = null;
+            }
         }
 
         void OnMetadataLoaded(Dictionary<string, object> metadata)

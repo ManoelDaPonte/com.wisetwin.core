@@ -103,6 +103,14 @@ public class MetadataLoader : MonoBehaviour
         }
     }
     
+    void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
     void Start()
     {
         // Debug pour vérifier la configuration

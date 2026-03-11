@@ -100,6 +100,10 @@ namespace WiseTwin
                 Debug.LogWarning("[TrainingHUD] PanelSettings is null! Please assign it in the inspector.");
             }
 
+            // Le HUD doit être au-dessus de tous les autres UIDocuments
+            // pour que le bouton reset soit toujours cliquable
+            uiDocument.sortingOrder = 100;
+
             root = uiDocument.rootVisualElement;
             if (root == null)
             {
@@ -216,14 +220,8 @@ namespace WiseTwin
             UIStyles.ApplyElevatedCardStyle(dialog, UIStyles.RadiusXL);
             UIStyles.SetBorderWidth(dialog, 2);
             UIStyles.SetBorderColor(dialog, new Color(UIStyles.Danger.r, UIStyles.Danger.g, UIStyles.Danger.b, 0.5f));
-            UIStyles.SetPadding(dialog, UIStyles.Space3XL);
+            UIStyles.SetPadding(dialog, UIStyles.Space2XL);
             dialog.style.alignItems = Align.Center;
-
-            var warningIcon = new Label("\u26A0");
-            warningIcon.style.fontSize = UIStyles.Font3XL;
-            warningIcon.style.unityTextAlign = TextAnchor.MiddleCenter;
-            warningIcon.style.marginBottom = UIStyles.SpaceLG;
-            dialog.Add(warningIcon);
 
             var messageLabel = new Label();
             messageLabel.name = "restart-message";
@@ -576,14 +574,22 @@ namespace WiseTwin
 
             ControlModeSettings.Reset();
 
-            var rootGO = transform.root.gameObject;
-            Destroy(rootGO);
+            // Détruire le WiseTwinSystem root (contient les singletons principaux)
+            var wiseTwinManager = WiseTwinManager.Instance;
+            if (wiseTwinManager != null)
+            {
+                Destroy(wiseTwinManager.transform.root.gameObject);
+            }
 
+            // Détruire les singletons standalone (pas sous WiseTwinSystem)
             var transitionPanel = FindFirstObjectByType<ScenarioTransitionPanel>();
             if (transitionPanel != null) Destroy(transitionPanel.gameObject);
 
             var tutorialUI = FindFirstObjectByType<TutorialUI>();
             if (tutorialUI != null) Destroy(tutorialUI.gameObject);
+
+            // Détruire ce HUD s'il est un objet root séparé
+            Destroy(transform.root.gameObject);
 
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }

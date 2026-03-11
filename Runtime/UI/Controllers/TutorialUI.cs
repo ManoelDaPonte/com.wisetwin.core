@@ -107,9 +107,16 @@ namespace WiseTwin
             selectedMode = ControlMode.KeyboardMouse;
             ControlModeSettings.SetMode(ControlMode.KeyboardMouse);
 
+            // Réactiver le UIDocument s'il a été désactivé
+            if (uiDocument != null && !uiDocument.enabled)
+            {
+                uiDocument.enabled = true;
+            }
+
             if (root == null)
             {
                 root = uiDocument.rootVisualElement;
+                root.pickingMode = PickingMode.Ignore;
             }
 
             if (IsDisplaying && tutorialPanel != null && tutorialPanel.style.display == DisplayStyle.Flex)
@@ -440,6 +447,12 @@ namespace WiseTwin
 
             tutorialPanel.style.display = DisplayStyle.None;
             IsDisplaying = false;
+
+            // Désactiver le UIDocument pour ne pas bloquer les clics sur le HUD
+            if (uiDocument != null)
+            {
+                uiDocument.enabled = false;
+            }
 
             PlayerControls.SetEnabled(true);
 
