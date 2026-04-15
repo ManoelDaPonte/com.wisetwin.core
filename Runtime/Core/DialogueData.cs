@@ -7,14 +7,14 @@ namespace WiseTwin
 {
     /// <summary>
     /// Runtime data structures for the dialogue system (branching conversation tree).
+    /// Mono-language: all text fields are flat strings.
     /// Parsed from metadata JSON at runtime by DialogueDisplayer.
     /// </summary>
 
     [Serializable]
     public class DialogueTreeData
     {
-        public string title_en;
-        public string title_fr;
+        public string title;
         public string startNodeId;
         public List<DialogueNodeRuntime> nodes;
 
@@ -55,29 +55,15 @@ namespace WiseTwin
             return count;
         }
 
-        /// <summary>
-        /// Parse a dialogue tree from a Dictionary (converted from JObject).
-        /// </summary>
         public static DialogueTreeData FromDictionary(Dictionary<string, object> data)
         {
             var tree = new DialogueTreeData();
 
-            // Parse title
-            if (data.TryGetValue("title", out var titleObj))
-            {
-                var titleDict = ConvertToDict(titleObj);
-                if (titleDict != null)
-                {
-                    tree.title_en = GetStr(titleDict, "en");
-                    tree.title_fr = GetStr(titleDict, "fr");
-                }
-            }
+            tree.title = LocalizedValueReader.ReadString(data, "title");
 
-            // Parse startNodeId
             if (data.TryGetValue("startNodeId", out var startObj))
                 tree.startNodeId = startObj?.ToString();
 
-            // Parse nodes
             tree.nodes = new List<DialogueNodeRuntime>();
             if (data.TryGetValue("nodes", out var nodesObj))
             {
@@ -108,12 +94,6 @@ namespace WiseTwin
             if (obj is JObject jObj) return jObj.ToObject<Dictionary<string, object>>();
             return null;
         }
-
-        private static string GetStr(Dictionary<string, object> dict, string key)
-        {
-            if (dict.TryGetValue(key, out var val)) return val?.ToString() ?? "";
-            return "";
-        }
     }
 
     [Serializable]
@@ -126,14 +106,10 @@ namespace WiseTwin
         public string nextNodeId;
 
         // For dialogue nodes
-        public string speaker_en;
-        public string speaker_fr;
-        public string text_en;
-        public string text_fr;
+        public string speaker;
+        public string text;
 
-        // For choice nodes
-        public string choiceText_en; // Prompt text
-        public string choiceText_fr;
+        // For choice nodes (prompt text is stored in 'text')
         public List<DialogueChoiceRuntime> choices;
 
         public static DialogueNodeRuntime FromDictionary(Dictionary<string, object> data)
@@ -144,35 +120,9 @@ namespace WiseTwin
             node.type = GetStr(data, "type");
             node.nextNodeId = GetStr(data, "nextNodeId");
 
-            // Parse speaker
-            if (data.TryGetValue("speaker", out var speakerObj))
-            {
-                var speakerDict = ConvertToDict(speakerObj);
-                if (speakerDict != null)
-                {
-                    node.speaker_en = GetStr(speakerDict, "en");
-                    node.speaker_fr = GetStr(speakerDict, "fr");
-                }
-            }
+            node.speaker = LocalizedValueReader.ReadString(data, "speaker");
+            node.text = LocalizedValueReader.ReadString(data, "text");
 
-            // Parse text
-            if (data.TryGetValue("text", out var textObj))
-            {
-                var textDict = ConvertToDict(textObj);
-                if (textDict != null)
-                {
-                    node.text_en = GetStr(textDict, "en");
-                    node.text_fr = GetStr(textDict, "fr");
-                }
-                // For choice nodes, this is the prompt text
-                if (node.type == "choice")
-                {
-                    node.choiceText_en = node.text_en;
-                    node.choiceText_fr = node.text_fr;
-                }
-            }
-
-            // Parse choices (for choice nodes)
             if (data.TryGetValue("choices", out var choicesObj))
             {
                 node.choices = new List<DialogueChoiceRuntime>();
@@ -215,8 +165,7 @@ namespace WiseTwin
     public class DialogueChoiceRuntime
     {
         public string id;
-        public string text_en;
-        public string text_fr;
+        public string text;
         public bool isCorrect;
         public string nextNodeId;
 
@@ -227,7 +176,6 @@ namespace WiseTwin
             choice.id = GetStr(data, "id");
             choice.nextNodeId = GetStr(data, "nextNodeId");
 
-            // Parse isCorrect
             if (data.TryGetValue("isCorrect", out var correctObj))
             {
                 if (correctObj is bool b)
@@ -236,25 +184,9 @@ namespace WiseTwin
                     bool.TryParse(correctObj?.ToString(), out choice.isCorrect);
             }
 
-            // Parse text
-            if (data.TryGetValue("text", out var textObj))
-            {
-                var textDict = ConvertToDict(textObj);
-                if (textDict != null)
-                {
-                    choice.text_en = GetStr(textDict, "en");
-                    choice.text_fr = GetStr(textDict, "fr");
-                }
-            }
+            choice.text = LocalizedValueReader.ReadString(data, "text");
 
             return choice;
-        }
-
-        private static Dictionary<string, object> ConvertToDict(object obj)
-        {
-            if (obj is Dictionary<string, object> dict) return dict;
-            if (obj is JObject jObj) return jObj.ToObject<Dictionary<string, object>>();
-            return null;
         }
 
         private static string GetStr(Dictionary<string, object> dict, string key)

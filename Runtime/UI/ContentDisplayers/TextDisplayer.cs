@@ -31,7 +31,7 @@ namespace WiseTwin.UI
             currentObjectId = objectId;
             rootElement = root;
 
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            string lang = "";
 
             string title = ExtractLocalizedText(contentData, "title", lang);
             string subtitle = ExtractLocalizedText(contentData, "subtitle", lang);
@@ -169,7 +169,7 @@ namespace WiseTwin.UI
                 buttonContainer.style.alignItems = Align.Center;
 
                 var continueButton = UIStyles.CreatePrimaryButton(
-                    LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue",
+                    "\u2192",
                     () =>
                     {
                         if (currentTextData != null)
@@ -406,33 +406,7 @@ namespace WiseTwin.UI
 
         string ExtractLocalizedText(Dictionary<string, object> data, string key, string language)
         {
-            if (!data.ContainsKey(key)) return "";
-
-            var textData = data[key];
-
-            if (textData is string simpleText) return simpleText;
-
-            if (textData is Dictionary<string, object> localizedText)
-            {
-                if (localizedText.ContainsKey(language))
-                    return localizedText[language]?.ToString() ?? "";
-                if (localizedText.ContainsKey("en"))
-                    return localizedText["en"]?.ToString() ?? "";
-            }
-            else if (textData != null && textData.GetType().FullName.Contains("JObject"))
-            {
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(textData);
-                var localizedJObject = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-                if (localizedJObject != null)
-                {
-                    if (localizedJObject.ContainsKey(language))
-                        return localizedJObject[language];
-                    if (localizedJObject.ContainsKey("en"))
-                        return localizedJObject["en"];
-                }
-            }
-
-            return "";
+            return LocalizedValueReader.ReadString(data, key);
         }
 
         bool ExtractBool(Dictionary<string, object> data, string key, bool defaultValue = false)

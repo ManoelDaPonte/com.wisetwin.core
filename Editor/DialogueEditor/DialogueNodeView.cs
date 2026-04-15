@@ -25,12 +25,9 @@ namespace WiseTwin.Editor.DialogueEditor
         private Dictionary<string, Port> choiceOutputPorts = new Dictionary<string, Port>();
 
         // Editable fields
-        private TextField speakerFieldEN;
-        private TextField speakerFieldFR;
-        private TextField textFieldEN;
-        private TextField textFieldFR;
-        private TextField promptFieldEN;
-        private TextField promptFieldFR;
+        private TextField speakerField;
+        private TextField textField;
+        private TextField promptField;
 
         // Choice data (kept in sync with UI)
         private List<DialogueChoiceEditorData> choices = new List<DialogueChoiceEditorData>();
@@ -200,77 +197,42 @@ namespace WiseTwin.Editor.DialogueEditor
 
         private void SetupDialogueContent(VisualElement container, DialogueNodeEditorData data)
         {
-            // Speaker EN
-            var speakerLabelEN = new Label("Speaker (EN):");
-            speakerLabelEN.style.fontSize = 11;
-            speakerLabelEN.style.color = new Color(0.6f, 0.8f, 1f, 1f);
-            container.Add(speakerLabelEN);
+            // Speaker
+            var speakerLabel = new Label("Speaker:");
+            speakerLabel.style.fontSize = 11;
+            speakerLabel.style.color = new Color(0.6f, 0.8f, 1f, 1f);
+            container.Add(speakerLabel);
 
-            speakerFieldEN = new TextField();
-            speakerFieldEN.value = data.speakerEN ?? "";
-            speakerFieldEN.style.marginBottom = 3;
-            container.Add(speakerFieldEN);
+            speakerField = new TextField();
+            speakerField.value = data.speaker ?? "";
+            speakerField.style.marginBottom = 5;
+            container.Add(speakerField);
 
-            // Speaker FR
-            var speakerLabelFR = new Label("Speaker (FR):");
-            speakerLabelFR.style.fontSize = 11;
-            speakerLabelFR.style.color = new Color(0.6f, 0.8f, 1f, 1f);
-            container.Add(speakerLabelFR);
+            // Text
+            var textLabel = new Label("Text:");
+            textLabel.style.fontSize = 11;
+            textLabel.style.color = new Color(0.6f, 0.8f, 1f, 1f);
+            container.Add(textLabel);
 
-            speakerFieldFR = new TextField();
-            speakerFieldFR.value = data.speakerFR ?? "";
-            speakerFieldFR.style.marginBottom = 5;
-            container.Add(speakerFieldFR);
-
-            // Text EN
-            var textLabelEN = new Label("Text (EN):");
-            textLabelEN.style.fontSize = 11;
-            textLabelEN.style.color = new Color(0.6f, 0.8f, 1f, 1f);
-            container.Add(textLabelEN);
-
-            textFieldEN = new TextField();
-            textFieldEN.multiline = true;
-            textFieldEN.value = data.textEN ?? "";
-            textFieldEN.style.minHeight = 40;
-            textFieldEN.style.marginBottom = 3;
-            container.Add(textFieldEN);
-
-            // Text FR
-            var textLabelFR = new Label("Text (FR):");
-            textLabelFR.style.fontSize = 11;
-            textLabelFR.style.color = new Color(0.6f, 0.8f, 1f, 1f);
-            container.Add(textLabelFR);
-
-            textFieldFR = new TextField();
-            textFieldFR.multiline = true;
-            textFieldFR.value = data.textFR ?? "";
-            textFieldFR.style.minHeight = 40;
-            container.Add(textFieldFR);
+            textField = new TextField();
+            textField.multiline = true;
+            textField.value = data.text ?? "";
+            textField.style.minHeight = 40;
+            container.Add(textField);
         }
 
         private void SetupChoiceContent(VisualElement container, DialogueNodeEditorData data)
         {
-            // Prompt EN
-            var promptLabelEN = new Label("Prompt (EN):");
-            promptLabelEN.style.fontSize = 11;
-            promptLabelEN.style.color = new Color(1f, 0.8f, 0.5f, 1f);
-            container.Add(promptLabelEN);
+            // Prompt
+            var promptLabel = new Label("Prompt:");
+            promptLabel.style.fontSize = 11;
+            promptLabel.style.color = new Color(1f, 0.8f, 0.5f, 1f);
+            container.Add(promptLabel);
 
-            promptFieldEN = new TextField();
-            promptFieldEN.value = data.promptTextEN ?? "";
-            promptFieldEN.style.marginBottom = 3;
-            container.Add(promptFieldEN);
-
-            // Prompt FR
-            var promptLabelFR = new Label("Prompt (FR):");
-            promptLabelFR.style.fontSize = 11;
-            promptLabelFR.style.color = new Color(1f, 0.8f, 0.5f, 1f);
-            container.Add(promptLabelFR);
-
-            promptFieldFR = new TextField();
-            promptFieldFR.value = data.promptTextFR ?? "";
-            promptFieldFR.style.marginBottom = 8;
-            container.Add(promptFieldFR);
+            promptField = new TextField();
+            promptField.value = data.promptText ?? "";
+            promptField.style.marginBottom = 8;
+            container.Add(promptField);
 
             // Choices container
             choicesContainer = new VisualElement();
@@ -297,8 +259,7 @@ namespace WiseTwin.Editor.DialogueEditor
             var choice = new DialogueChoiceEditorData
             {
                 id = $"{NodeId}_choice_{choices.Count}",
-                textEN = $"Option {choices.Count + 1}",
-                textFR = $"Option {choices.Count + 1}",
+                text = $"Option {choices.Count + 1}",
                 portName = $"choice_{choices.Count}"
             };
 
@@ -345,17 +306,11 @@ namespace WiseTwin.Editor.DialogueEditor
 
             choiceContainer.Add(header);
 
-            // Text fields
-            var textEN = new TextField("EN");
-            textEN.value = choice.textEN ?? "";
-            textEN.RegisterValueChangedCallback(evt => { choice.textEN = evt.newValue; graphView?.SetDirty(); });
-            textEN.style.marginBottom = 2;
-            choiceContainer.Add(textEN);
-
-            var textFR = new TextField("FR");
-            textFR.value = choice.textFR ?? "";
-            textFR.RegisterValueChangedCallback(evt => { choice.textFR = evt.newValue; graphView?.SetDirty(); });
-            choiceContainer.Add(textFR);
+            // Text field
+            var choiceTextField = new TextField("Text");
+            choiceTextField.value = choice.text ?? "";
+            choiceTextField.RegisterValueChangedCallback(evt => { choice.text = evt.newValue; graphView?.SetDirty(); });
+            choiceContainer.Add(choiceTextField);
 
             choicesContainer.Add(choiceContainer);
 
@@ -441,15 +396,12 @@ namespace WiseTwin.Editor.DialogueEditor
             switch (NodeType)
             {
                 case "dialogue":
-                    data.speakerEN = speakerFieldEN?.value ?? "";
-                    data.speakerFR = speakerFieldFR?.value ?? "";
-                    data.textEN = textFieldEN?.value ?? "";
-                    data.textFR = textFieldFR?.value ?? "";
+                    data.speaker = speakerField?.value ?? "";
+                    data.text = textField?.value ?? "";
                     break;
 
                 case "choice":
-                    data.promptTextEN = promptFieldEN?.value ?? "";
-                    data.promptTextFR = promptFieldFR?.value ?? "";
+                    data.promptText = promptField?.value ?? "";
                     data.choices = new List<DialogueChoiceEditorData>(choices);
                     break;
             }

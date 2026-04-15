@@ -44,12 +44,6 @@ namespace WiseTwin.UI
 
             PlayerControls.SetEnabled(false);
 
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
-                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
-            }
-
             dialogueTree = DialogueTreeData.FromDictionary(contentData);
             if (dialogueTree == null || string.IsNullOrEmpty(dialogueTree.startNodeId))
             {
@@ -120,12 +114,8 @@ namespace WiseTwin.UI
             header.style.borderBottomColor = UIStyles.BorderSubtle;
             header.style.flexShrink = 0;
 
-            string lang = GetCurrentLanguage();
-            string dialogueTitle = lang == "fr" ? dialogueTree.title_fr : dialogueTree.title_en;
-            if (string.IsNullOrEmpty(dialogueTitle))
-                dialogueTitle = lang == "fr" ? dialogueTree.title_en : dialogueTree.title_fr;
-
-            headerTitleLabel = new Label(dialogueTitle ?? (lang == "fr" ? "Conversation" : "Conversation"));
+            string dialogueTitle = dialogueTree.title ?? "";
+            headerTitleLabel = new Label(dialogueTitle);
             headerTitleLabel.style.fontSize = UIStyles.FontLG;
             headerTitleLabel.style.color = UIStyles.TextPrimary;
             headerTitleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -240,11 +230,10 @@ namespace WiseTwin.UI
 
         private void DisplayDialogueNode(DialogueNodeRuntime node)
         {
-            string lang = GetCurrentLanguage();
             lastDialogueNode = node;
 
-            string speaker = GetLocalized(node.speaker_en, node.speaker_fr, lang);
-            string text = GetLocalized(node.text_en, node.text_fr, lang);
+            string speaker = node.speaker ?? "";
+            string text = node.text ?? "";
             currentSpeakerName = speaker;
 
             // Clear previous content
@@ -264,7 +253,7 @@ namespace WiseTwin.UI
             {
                 // Merge: show choices directly below the NPC bubble
                 currentNode = nextNode;
-                ShowChoicesForNode(nextNode, lang);
+                ShowChoicesForNode(nextNode);
             }
             else
             {
@@ -272,8 +261,7 @@ namespace WiseTwin.UI
                 choicesSection.style.display = DisplayStyle.None;
                 choicesContainer.Clear();
 
-                string continueText = lang == "fr" ? "Continuer" : "Continue";
-                continueButton.text = continueText;
+                continueButton.text = "\u2192";
                 continueButton.style.display = DisplayStyle.Flex;
                 continueButton.clickable = new Clickable(() =>
                 {
@@ -289,16 +277,14 @@ namespace WiseTwin.UI
 
         private void DisplayChoiceNode(DialogueNodeRuntime node)
         {
-            string lang = GetCurrentLanguage();
-
             // Clear conversation area
             conversationContainer.Clear();
 
             // Show the NPC's previous dialogue as context bubble
             if (lastDialogueNode != null)
             {
-                string ctxSpeaker = GetLocalized(lastDialogueNode.speaker_en, lastDialogueNode.speaker_fr, lang);
-                string ctxText = GetLocalized(lastDialogueNode.text_en, lastDialogueNode.text_fr, lang);
+                string ctxSpeaker = lastDialogueNode.speaker ?? "";
+                string ctxText = lastDialogueNode.text ?? "";
 
                 if (!string.IsNullOrEmpty(ctxText))
                 {
@@ -306,17 +292,17 @@ namespace WiseTwin.UI
                 }
             }
 
-            ShowChoicesForNode(node, lang);
+            ShowChoicesForNode(node);
             ScrollToBottom();
         }
 
         /// <summary>
         /// Shows choices for a choice node (used by both merged dialogue+choice and standalone choice)
         /// </summary>
-        private void ShowChoicesForNode(DialogueNodeRuntime node, string lang)
+        private void ShowChoicesForNode(DialogueNodeRuntime node)
         {
-            // Show prompt text if present
-            string prompt = GetLocalized(node.choiceText_en, node.choiceText_fr, lang);
+            // Show prompt text if present (stored in node.text for choice nodes)
+            string prompt = node.text ?? "";
             if (!string.IsNullOrEmpty(prompt))
             {
                 var promptLabel = new Label(prompt);
@@ -336,7 +322,7 @@ namespace WiseTwin.UI
             var responseLabel = choicesSection.Q<Label>("response-label");
             if (responseLabel != null)
             {
-                responseLabel.text = lang == "fr" ? "VOTRE REPONSE" : "YOUR RESPONSE";
+                responseLabel.text = "";
             }
 
             choicesContainer.Clear();
@@ -465,9 +451,7 @@ namespace WiseTwin.UI
 
         private VisualElement CreateChoiceOption(DialogueChoiceRuntime choice, DialogueNodeRuntime parentNode, bool isEvaluated)
         {
-            string lang = GetCurrentLanguage();
-
-            string choiceText = GetLocalized(choice.text_en, choice.text_fr, lang);
+            string choiceText = choice.text ?? "";
 
             var container = UIStyles.CreateSelectableOption(UIStyles.RadiusMD);
 
@@ -560,50 +544,8 @@ namespace WiseTwin.UI
 
             OnCompleted?.Invoke(currentObjectId, success);
 
-            // Show completion state
-            string lang = GetCurrentLanguage();
-            conversationContainer.Clear();
-            choicesSection.style.display = DisplayStyle.None;
-
-            // Completion message with checkmark
-            var completionRow = new VisualElement();
-            completionRow.style.alignItems = Align.Center;
-            completionRow.style.justifyContent = Justify.Center;
-            completionRow.style.marginTop = UIStyles.Space3XL;
-            completionRow.style.marginBottom = UIStyles.SpaceXL;
-
-            var checkCircle = new VisualElement();
-            checkCircle.style.width = 56;
-            checkCircle.style.height = 56;
-            UIStyles.SetBorderRadius(checkCircle, UIStyles.RadiusPill);
-            checkCircle.style.backgroundColor = UIStyles.SuccessBg;
-            UIStyles.SetBorderWidth(checkCircle, 2);
-            UIStyles.SetBorderColor(checkCircle, UIStyles.Success);
-            checkCircle.style.alignItems = Align.Center;
-            checkCircle.style.justifyContent = Justify.Center;
-            checkCircle.style.marginBottom = UIStyles.SpaceLG;
-
-            var checkLabel = new Label("\u2713");
-            checkLabel.style.fontSize = UIStyles.Font2XL;
-            checkLabel.style.color = UIStyles.Success;
-            checkLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            checkLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            checkCircle.Add(checkLabel);
-            completionRow.Add(checkCircle);
-
-            var completeText = new Label(lang == "fr" ? "Dialogue termine" : "Dialogue complete");
-            completeText.style.fontSize = UIStyles.FontLG;
-            completeText.style.color = UIStyles.TextPrimary;
-            completeText.style.unityFontStyleAndWeight = FontStyle.Bold;
-            completeText.style.unityTextAlign = TextAnchor.MiddleCenter;
-            completionRow.Add(completeText);
-
-            conversationContainer.Add(completionRow);
-
-            string closeText = lang == "fr" ? "Fermer" : "Close";
-            continueButton.text = closeText;
-            continueButton.style.display = DisplayStyle.Flex;
-            continueButton.clickable = new Clickable(() => Close());
+            // No end card — exit the dialogue immediately and let the progression take over.
+            Close();
         }
 
         public void Close()
@@ -611,9 +553,6 @@ namespace WiseTwin.UI
             isProcessing = false;
 
             PlayerControls.SetEnabled(true);
-
-            if (LocalizationManager.Instance != null)
-                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
 
             rootElement?.Clear();
             OnClosed?.Invoke(currentObjectId);
@@ -632,48 +571,6 @@ namespace WiseTwin.UI
             }
         }
 
-        private string GetLocalized(string en, string fr, string lang)
-        {
-            string primary = lang == "fr" ? fr : en;
-            if (!string.IsNullOrEmpty(primary)) return primary;
-            string fallback = lang == "fr" ? en : fr;
-            return fallback ?? "";
-        }
-
-        private void OnLanguageChanged(string newLanguage)
-        {
-            if (currentNode == null) return;
-
-            switch (currentNode.type)
-            {
-                case "dialogue":
-                    DisplayDialogueNode(currentNode);
-                    break;
-                case "choice":
-                    DisplayChoiceNode(currentNode);
-                    break;
-            }
-
-            // Update header
-            string lang = newLanguage;
-            string dialogueTitle = GetLocalized(dialogueTree.title_en, dialogueTree.title_fr, lang);
-            if (headerTitleLabel != null && !string.IsNullOrEmpty(dialogueTitle))
-            {
-                headerTitleLabel.text = dialogueTitle;
-            }
-        }
-
-        private string GetCurrentLanguage()
-        {
-            if (LocalizationManager.Instance != null)
-                return LocalizationManager.Instance.CurrentLanguage;
-            return "en";
-        }
-
-        void OnDestroy()
-        {
-            if (LocalizationManager.Instance != null)
-                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
-        }
+        void OnDestroy() { }
     }
 }

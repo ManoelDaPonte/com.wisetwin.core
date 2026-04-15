@@ -64,6 +64,9 @@ namespace WiseTwin.UI
                 }
             }
 
+            // Must render above the TrainingHUD (sortingOrder 100) so the backdrop + card cover it.
+            uiDocument.sortingOrder = 200;
+
             rootElement = uiDocument.rootVisualElement;
 
             rootElement.style.position = Position.Absolute;
@@ -95,11 +98,9 @@ namespace WiseTwin.UI
             rootElement.Clear();
             rootElement.pickingMode = PickingMode.Position;
 
-            // Modal backdrop
             modalContainer = new VisualElement();
             UIStyles.ApplyBackdropHeavyStyle(modalContainer);
 
-            // Success card
             var card = new VisualElement();
             card.style.width = 580;
             card.style.maxWidth = Length.Percent(90);
@@ -118,57 +119,34 @@ namespace WiseTwin.UI
             closeBtn.style.right = UIStyles.SpaceLG;
             card.Add(closeBtn);
 
-            // Congrats title
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-
-            var congratsTitle = UIStyles.CreateTitle(
-                lang == "fr" ? "Félicitations !" : "Congratulations!",
-                UIStyles.Font4XL
-            );
+            // Congrats title (text only, BMP-safe)
+            var congratsTitle = UIStyles.CreateTitle("Training Completed", UIStyles.Font3XL);
             congratsTitle.style.color = UIStyles.Success;
             congratsTitle.style.marginBottom = UIStyles.SpaceLG;
+            congratsTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
             card.Add(congratsTitle);
-
-            // Success message
-            var successMsg = UIStyles.CreateSubtitle(
-                lang == "fr" ? "Formation terminée avec succès !" : "Training completed successfully!",
-                UIStyles.FontXL
-            );
-            successMsg.style.color = UIStyles.TextPrimary;
-            successMsg.style.marginBottom = UIStyles.Space2XL;
-            card.Add(successMsg);
 
             // Separator
             card.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
 
-            // Stats
+            // Stats section
             var statsContainer = new VisualElement();
             statsContainer.style.marginBottom = UIStyles.SpaceXL;
 
-            var timeLabel = UIStyles.CreateBodyText(
-                lang == "fr"
-                    ? $"Temps total : {FormatTime(totalTime)}"
-                    : $"Total time: {FormatTime(totalTime)}",
-                UIStyles.FontMD
-            );
+            var timeLabel = UIStyles.CreateBodyText($"Time: {FormatTime(totalTime)}", UIStyles.FontMD);
             timeLabel.style.color = UIStyles.TextSecondary;
             timeLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             timeLabel.style.marginBottom = UIStyles.SpaceSM;
             statsContainer.Add(timeLabel);
 
-            var modulesLabel = UIStyles.CreateBodyText(
-                lang == "fr"
-                    ? $"Modules complétés : {totalInteractions}"
-                    : $"Modules completed: {totalInteractions}",
-                UIStyles.FontMD
-            );
+            var modulesLabel = UIStyles.CreateBodyText($"Modules: {totalInteractions}", UIStyles.FontMD);
             modulesLabel.style.color = UIStyles.TextSecondary;
             modulesLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             statsContainer.Add(modulesLabel);
 
             card.Add(statsContainer);
 
-            // Score & analytics
+            // Score + analytics
             float finalScore = 100f;
             int analyticsInteractions = 0;
             int successfulInteractionsCount = 0;
@@ -191,28 +169,19 @@ namespace WiseTwin.UI
                 UIStyles.SetPadding(detailBox, UIStyles.SpaceLG);
                 detailBox.style.marginBottom = UIStyles.SpaceXL;
 
-                var detailTitle = UIStyles.CreateMutedText(
-                    lang == "fr" ? "Détails des interactions" : "Interaction details",
-                    UIStyles.FontBase
-                );
+                var detailTitle = UIStyles.CreateMutedText("Interaction Details", UIStyles.FontBase);
                 detailTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
                 detailTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
                 detailTitle.style.marginBottom = UIStyles.SpaceSM;
                 detailBox.Add(detailTitle);
 
-                var totalLabel = UIStyles.CreateBodyText(
-                    lang == "fr" ? $"Total : {analyticsInteractions}" : $"Total: {analyticsInteractions}",
-                    UIStyles.FontBase
-                );
+                var totalLabel = UIStyles.CreateBodyText($"Total: {analyticsInteractions}", UIStyles.FontBase);
                 totalLabel.style.color = UIStyles.TextSecondary;
                 totalLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
                 totalLabel.style.marginBottom = UIStyles.SpaceXS;
                 detailBox.Add(totalLabel);
 
-                var successLabel = UIStyles.CreateBodyText(
-                    lang == "fr" ? $"Réussies : {successfulInteractionsCount}" : $"Successful: {successfulInteractionsCount}",
-                    UIStyles.FontBase
-                );
+                var successLabel = UIStyles.CreateBodyText($"Successful: {successfulInteractionsCount}", UIStyles.FontBase);
                 successLabel.style.color = UIStyles.Success;
                 successLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
                 successLabel.style.marginBottom = UIStyles.SpaceXS;
@@ -220,10 +189,7 @@ namespace WiseTwin.UI
 
                 if (failedInteractionsCount > 0)
                 {
-                    var failedLabel = UIStyles.CreateBodyText(
-                        lang == "fr" ? $"Ratées : {failedInteractionsCount}" : $"Failed: {failedInteractionsCount}",
-                        UIStyles.FontBase
-                    );
+                    var failedLabel = UIStyles.CreateBodyText($"Failed: {failedInteractionsCount}", UIStyles.FontBase);
                     failedLabel.style.color = UIStyles.Danger;
                     failedLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
                     detailBox.Add(failedLabel);
@@ -244,28 +210,19 @@ namespace WiseTwin.UI
             scoreLabel.style.fontSize = UIStyles.Font4XL + 6;
             scoreLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             scoreLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-
-            if (finalScore >= 90f)
-                scoreLabel.style.color = UIStyles.Success;
-            else if (finalScore >= 70f)
-                scoreLabel.style.color = UIStyles.Warning;
-            else
-                scoreLabel.style.color = UIStyles.Danger;
-
+            if (finalScore >= 90f) scoreLabel.style.color = UIStyles.Success;
+            else if (finalScore >= 70f) scoreLabel.style.color = UIStyles.Warning;
+            else scoreLabel.style.color = UIStyles.Danger;
             scoreBox.Add(scoreLabel);
 
-            string scoreMessage;
-            if (finalScore >= 100f)
-                scoreMessage = lang == "fr" ? "Score parfait !" : "Perfect score!";
-            else if (finalScore >= 90f)
-                scoreMessage = lang == "fr" ? "Excellent travail !" : "Excellent work!";
-            else if (finalScore >= 70f)
-                scoreMessage = lang == "fr" ? "Bon travail !" : "Good job!";
-            else
-                scoreMessage = lang == "fr" ? "Peut mieux faire" : "Room for improvement";
-
-            var scoreText = UIStyles.CreateSubtitle(scoreMessage, UIStyles.FontBase);
+            string ratingMessage;
+            if (finalScore >= 100f) ratingMessage = "Perfect score!";
+            else if (finalScore >= 90f) ratingMessage = "Excellent work!";
+            else if (finalScore >= 70f) ratingMessage = "Good job!";
+            else ratingMessage = "Room for improvement";
+            var scoreText = UIStyles.CreateSubtitle(ratingMessage, UIStyles.FontBase);
             scoreText.style.color = UIStyles.TextSecondary;
+            scoreText.style.unityTextAlign = TextAnchor.MiddleCenter;
             scoreBox.Add(scoreText);
 
             card.Add(scoreBox);
@@ -277,12 +234,10 @@ namespace WiseTwin.UI
             UIStyles.SetPadding(infoBox, UIStyles.SpaceLG);
 
             var infoText = UIStyles.CreateMutedText(
-                lang == "fr"
-                    ? "Vous pouvez maintenant fermer cette fenêtre pour explorer l'environnement 3D ou quitter la formation."
-                    : "You can now close this window to explore the 3D environment or quit the training.",
-                UIStyles.FontSM
-            );
+                "You can now close this window to explore the 3D environment, or quit the training.",
+                UIStyles.FontSM);
             infoText.style.unityTextAlign = TextAnchor.MiddleCenter;
+            infoText.style.whiteSpace = WhiteSpace.Normal;
             infoBox.Add(infoText);
 
             card.Add(infoBox);

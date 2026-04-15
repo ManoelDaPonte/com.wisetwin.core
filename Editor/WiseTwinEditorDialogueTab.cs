@@ -24,8 +24,7 @@ namespace WiseTwin.Editor
                 var newDialogue = new DialogueScenarioData
                 {
                     dialogueId = $"dialogue_{data.dialogues.Count + 1}",
-                    titleEN = "New Dialogue",
-                    titleFR = "Nouveau Dialogue"
+                    title = "New Dialogue"
                 };
                 data.dialogues.Add(newDialogue);
                 data.selectedDialogueIndex = data.dialogues.Count - 1;
@@ -51,7 +50,7 @@ namespace WiseTwin.Editor
                 // Select/Toggle button
                 bool isSelected = (data.selectedDialogueIndex == i);
                 GUI.backgroundColor = isSelected ? new Color(0.4f, 0.8f, 1f) : Color.white;
-                string title = !string.IsNullOrEmpty(dialogue.titleEN) ? dialogue.titleEN : dialogue.dialogueId;
+                string title = !string.IsNullOrEmpty(dialogue.title) ? dialogue.title : dialogue.dialogueId;
                 string hasGraph = !string.IsNullOrEmpty(dialogue.graphDataJSON) ? " [Graph]" : "";
                 string buttonText = isSelected ? $"v {i + 1}. {title}{hasGraph}" : $"> {i + 1}. {title}{hasGraph}";
                 if (GUILayout.Button(buttonText, GUILayout.Height(25)))
@@ -104,9 +103,7 @@ namespace WiseTwin.Editor
             dialogue.dialogueId = EditorGUILayout.TextField("Dialogue ID", dialogue.dialogueId);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
-            dialogue.titleEN = EditorGUILayout.TextField("  EN", dialogue.titleEN);
-            dialogue.titleFR = EditorGUILayout.TextField("  FR", dialogue.titleFR);
+            dialogue.title = EditorGUILayout.TextField("Title", dialogue.title);
             if (EditorGUI.EndChangeCheck())
             {
                 WiseTwinEditor.OnRequestDialogueSave?.Invoke();

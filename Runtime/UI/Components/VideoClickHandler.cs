@@ -74,7 +74,7 @@ namespace WiseTwin
                 return;
             }
 
-            string videoUrl = triggerData.GetVideoUrl();
+            string videoUrl = triggerData.videoUrl;
             if (string.IsNullOrEmpty(videoUrl))
             {
                 DebugLog($"No video URL available for {gameObject.name}");

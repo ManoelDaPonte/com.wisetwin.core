@@ -23,19 +23,14 @@ namespace WiseTwin.Editor
             EditorGUI.EndDisabledGroup();
             EditorGUILayout.HelpBox($"Metadata will be saved as: {data.sceneId}-metadata.json", MessageType.Info);
 
-            // Titre multilingue
+            // Title
             EditorGUILayout.Space(5);
-            EditorGUILayout.LabelField("📝 Title (Multilingual)", EditorStyles.boldLabel);
-            data.projectTitleEN = EditorGUILayout.TextField("🇬🇧 English", data.projectTitleEN);
-            data.projectTitleFR = EditorGUILayout.TextField("🇫🇷 Français", data.projectTitleFR);
+            data.projectTitle = EditorGUILayout.TextField("Title", data.projectTitle);
 
-            // Description multilingue
+            // Description
             EditorGUILayout.Space(5);
-            EditorGUILayout.LabelField("📄 Description (Multilingual)", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("🇬🇧 English", EditorStyles.miniLabel);
-            data.projectDescriptionEN = EditorGUILayout.TextArea(data.projectDescriptionEN, GUILayout.Height(60));
-            EditorGUILayout.LabelField("🇫🇷 Français", EditorStyles.miniLabel);
-            data.projectDescriptionFR = EditorGUILayout.TextArea(data.projectDescriptionFR, GUILayout.Height(60));
+            EditorGUILayout.LabelField("Description", EditorStyles.miniLabel);
+            data.projectDescription = EditorGUILayout.TextArea(data.projectDescription, GUILayout.Height(60));
 
             data.projectVersion = EditorGUILayout.TextField("Version", data.projectVersion);
 

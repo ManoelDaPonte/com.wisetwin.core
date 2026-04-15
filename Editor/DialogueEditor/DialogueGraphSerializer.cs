@@ -67,7 +67,7 @@ namespace WiseTwin.Editor.DialogueEditor
             {
                 // First check if this is runtime format (has "startNodeId" key)
                 // Runtime format won't deserialize correctly into editor format
-                // because the field names differ (speakerEN vs speaker, etc.)
+                // because the structure differs (flat nodes array with nextNodeId references).
                 var peek = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
                 if (peek != null && peek.ContainsKey("startNodeId"))
                 {
@@ -94,16 +94,12 @@ namespace WiseTwin.Editor.DialogueEditor
         /// Convert editor graph data to runtime JSON format (for metadata export).
         /// This produces the format consumed by DialogueDisplayer at runtime.
         /// </summary>
-        public static Dictionary<string, object> ConvertToRuntimeFormat(DialogueGraphEditorData graphData, string titleEN, string titleFR)
+        public static Dictionary<string, object> ConvertToRuntimeFormat(DialogueGraphEditorData graphData, string title)
         {
             var result = new Dictionary<string, object>();
 
             // Title
-            result["title"] = new Dictionary<string, string>
-            {
-                ["en"] = titleEN ?? "",
-                ["fr"] = titleFR ?? ""
-            };
+            result["title"] = title ?? "";
 
             // Build edge lookup: fromNodeId+fromPortName -> toNodeId
             var edgeLookup = new Dictionary<string, string>();
@@ -133,27 +129,15 @@ namespace WiseTwin.Editor.DialogueEditor
                         break;
 
                     case "dialogue":
-                        nodeDict["speaker"] = new Dictionary<string, string>
-                        {
-                            ["en"] = node.speakerEN ?? "",
-                            ["fr"] = node.speakerFR ?? ""
-                        };
-                        nodeDict["text"] = new Dictionary<string, string>
-                        {
-                            ["en"] = node.textEN ?? "",
-                            ["fr"] = node.textFR ?? ""
-                        };
+                        nodeDict["speaker"] = node.speaker ?? "";
+                        nodeDict["text"] = node.text ?? "";
                         string dialogueNext = GetNextNodeId(edgeLookup, node.id, "output");
                         if (!string.IsNullOrEmpty(dialogueNext))
                             nodeDict["nextNodeId"] = dialogueNext;
                         break;
 
                     case "choice":
-                        nodeDict["text"] = new Dictionary<string, string>
-                        {
-                            ["en"] = node.promptTextEN ?? "",
-                            ["fr"] = node.promptTextFR ?? ""
-                        };
+                        nodeDict["text"] = node.promptText ?? "";
                         var choicesJson = new List<object>();
                         for (int i = 0; i < node.choices.Count; i++)
                         {
@@ -164,11 +148,7 @@ namespace WiseTwin.Editor.DialogueEditor
                             choicesJson.Add(new Dictionary<string, object>
                             {
                                 ["id"] = choice.id ?? $"choice_{i}",
-                                ["text"] = new Dictionary<string, string>
-                                {
-                                    ["en"] = choice.textEN ?? "",
-                                    ["fr"] = choice.textFR ?? ""
-                                },
+                                ["text"] = choice.text ?? "",
                                 ["isCorrect"] = choice.isCorrect,
                                 ["nextNodeId"] = choiceNext ?? ""
                             });
@@ -245,15 +225,11 @@ namespace WiseTwin.Editor.DialogueEditor
                         case "dialogue":
                             if (nodeDict.ContainsKey("speaker"))
                             {
-                                var speakerDict = GetLocDict(nodeDict["speaker"]);
-                                node.speakerEN = GetStr(speakerDict, "en");
-                                node.speakerFR = GetStr(speakerDict, "fr");
+                                node.speaker = GetFlatString(nodeDict["speaker"]);
                             }
                             if (nodeDict.ContainsKey("text"))
                             {
-                                var textDict = GetLocDict(nodeDict["text"]);
-                                node.textEN = GetStr(textDict, "en");
-                                node.textFR = GetStr(textDict, "fr");
+                                node.text = GetFlatString(nodeDict["text"]);
                             }
                             if (nodeDict.ContainsKey("nextNodeId"))
                             {
@@ -274,9 +250,7 @@ namespace WiseTwin.Editor.DialogueEditor
                         case "choice":
                             if (nodeDict.ContainsKey("text"))
                             {
-                                var textDict = GetLocDict(nodeDict["text"]);
-                                node.promptTextEN = GetStr(textDict, "en");
-                                node.promptTextFR = GetStr(textDict, "fr");
+                                node.promptText = GetFlatString(nodeDict["text"]);
                             }
                             if (nodeDict.ContainsKey("choices"))
                             {
@@ -292,9 +266,7 @@ namespace WiseTwin.Editor.DialogueEditor
 
                                         if (choiceDict.ContainsKey("text"))
                                         {
-                                            var ctextDict = GetLocDict(choiceDict["text"]);
-                                            choice.textEN = GetStr(ctextDict, "en");
-                                            choice.textFR = GetStr(ctextDict, "fr");
+                                            choice.text = GetFlatString(choiceDict["text"]);
                                         }
                                         if (choiceDict.ContainsKey("isCorrect"))
                                         {
@@ -348,16 +320,29 @@ namespace WiseTwin.Editor.DialogueEditor
             return edgeLookup.TryGetValue(key, out var nextId) ? nextId : null;
         }
 
-        private static Dictionary<string, object> GetLocDict(object obj)
+        /// <summary>
+        /// Read a string value from a JSON token. Accepts a flat string (current format)
+        /// or a legacy multi-language object {en, fr} (uses "en" if present, else "fr").
+        /// </summary>
+        private static string GetFlatString(object obj)
         {
-            if (obj is Dictionary<string, object> dict) return dict;
-            if (obj is Newtonsoft.Json.Linq.JObject jObj) return jObj.ToObject<Dictionary<string, object>>();
-            return new Dictionary<string, object>();
-        }
-
-        private static string GetStr(Dictionary<string, object> dict, string key)
-        {
-            return dict.TryGetValue(key, out var val) ? val?.ToString() ?? "" : "";
+            if (obj == null) return "";
+            if (obj is string s) return s;
+            if (obj is Newtonsoft.Json.Linq.JValue jv) return jv.Value?.ToString() ?? "";
+            if (obj is Newtonsoft.Json.Linq.JObject jObj)
+            {
+                var en = jObj["en"]?.ToString();
+                if (!string.IsNullOrEmpty(en)) return en;
+                var fr = jObj["fr"]?.ToString();
+                return fr ?? "";
+            }
+            if (obj is Dictionary<string, object> dict)
+            {
+                if (dict.TryGetValue("en", out var ven) && ven != null) return ven.ToString();
+                if (dict.TryGetValue("fr", out var vfr) && vfr != null) return vfr.ToString();
+                return "";
+            }
+            return obj.ToString() ?? "";
         }
     }
 }

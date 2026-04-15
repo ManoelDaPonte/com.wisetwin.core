@@ -116,8 +116,7 @@ public class WiseTwinEditor : EditorWindow
                 dialoguesList.Add(new Dictionary<string, string>
                 {
                     ["dialogueId"] = d.dialogueId ?? "",
-                    ["titleEN"] = d.titleEN ?? "",
-                    ["titleFR"] = d.titleFR ?? "",
+                    ["title"] = d.title ?? "",
                     ["graphDataJSON"] = d.graphDataJSON ?? ""
                 });
             }
@@ -142,11 +141,16 @@ public class WiseTwinEditor : EditorWindow
 
             foreach (var dict in dialoguesList)
             {
+                // Backward compat: old format stored "titleEN" / "titleFR"
+                string title = "";
+                if (dict.ContainsKey("title")) title = dict["title"];
+                else if (dict.ContainsKey("titleEN") && !string.IsNullOrEmpty(dict["titleEN"])) title = dict["titleEN"];
+                else if (dict.ContainsKey("titleFR")) title = dict["titleFR"];
+
                 var dialogue = new WiseTwin.Editor.DialogueScenarioData
                 {
                     dialogueId = dict.ContainsKey("dialogueId") ? dict["dialogueId"] : "",
-                    titleEN = dict.ContainsKey("titleEN") ? dict["titleEN"] : "",
-                    titleFR = dict.ContainsKey("titleFR") ? dict["titleFR"] : "",
+                    title = title,
                     graphDataJSON = dict.ContainsKey("graphDataJSON") ? dict["graphDataJSON"] : ""
                 };
                 data.dialogues.Add(dialogue);
@@ -244,62 +248,56 @@ public class WiseTwinEditor : EditorWindow
     {
         try
         {
-            var metadata = JsonConvert.DeserializeObject<FormationMetadataComplete>(jsonContent);
+            // Parse as raw JObject first so we can accept both flat strings and legacy {en, fr} objects
+            var root = Newtonsoft.Json.Linq.JObject.Parse(jsonContent);
 
-            // Load basic data - gérer les objets multilingues
-            if (metadata.title != null)
-            {
-                data.projectTitleEN = metadata.title.en ?? "Training Test";
-                data.projectTitleFR = metadata.title.fr ?? "Formation Test";
-            }
-            if (metadata.description != null)
-            {
-                data.projectDescriptionEN = metadata.description.en ?? "Training description";
-                data.projectDescriptionFR = metadata.description.fr ?? "Description de la formation";
-            }
-            if (!string.IsNullOrEmpty(metadata.version)) data.projectVersion = metadata.version;
-            if (!string.IsNullOrEmpty(metadata.imageUrl)) data.imageUrl = metadata.imageUrl;
+            // Top-level localized fields (flat strings, backward compat with multi-lang)
+            data.projectTitle = GetFlatString(root["title"]) ?? data.projectTitle;
+            data.projectDescription = GetFlatString(root["description"]) ?? data.projectDescription;
 
-            // Parse duration (extract numbers)
-            if (!string.IsNullOrEmpty(metadata.duration))
-            {
-                ParseDurationFromString(metadata.duration);
-            }
+            var version = root["version"]?.ToString();
+            if (!string.IsNullOrEmpty(version)) data.projectVersion = version;
 
-            // Parse difficulty (find index)
-            if (!string.IsNullOrEmpty(metadata.difficulty))
-            {
-                ParseDifficultyFromString(metadata.difficulty);
-            }
+            var imageUrl = root["imageUrl"]?.ToString();
+            if (!string.IsNullOrEmpty(imageUrl)) data.imageUrl = imageUrl;
 
-            // Load lists
-            if (metadata.tags != null && metadata.tags.Count > 0)
-                data.tags = new List<string>(metadata.tags);
+            var durationStr = root["duration"]?.ToString();
+            if (!string.IsNullOrEmpty(durationStr)) ParseDurationFromString(durationStr);
 
-            // 🎯 IMPORTANT: Extract Unity section (object content)
-            if (metadata.unity != null)
+            var difficultyStr = root["difficulty"]?.ToString();
+            if (!string.IsNullOrEmpty(difficultyStr)) ParseDifficultyFromString(difficultyStr);
+
+            var tagsToken = root["tags"] as Newtonsoft.Json.Linq.JArray;
+            if (tagsToken != null && tagsToken.Count > 0)
+                data.tags = tagsToken.ToObject<List<string>>();
+
+            // Unity legacy section
+            var unityToken = root["unity"] as Newtonsoft.Json.Linq.JObject;
+            if (unityToken != null)
             {
-                // Convert Unity content directly to formatted JSON
-                data.unityContentJSON = JsonConvert.SerializeObject(metadata.unity, Formatting.Indented);
+                data.unityContentJSON = unityToken.ToString(Formatting.Indented);
                 ValidateUnityContent();
-
             }
             else
             {
                 InitializeUnityContent();
             }
 
-            // 🎯 NEW: Load scenarios if present
-            if (metadata.scenarios != null && metadata.scenarios.Count > 0)
+            // Scenarios (new format)
+            var scenariosToken = root["scenarios"] as Newtonsoft.Json.Linq.JArray;
+            if (scenariosToken != null && scenariosToken.Count > 0)
             {
-                LoadScenariosFromJSON(metadata.scenarios);
+                var scenariosList = scenariosToken.ToObject<List<object>>();
+                LoadScenariosFromJSON(scenariosList);
                 Debug.Log($"✅ Loaded {data.scenarios.Count} scenarios from metadata");
             }
 
-            // 🎬 Load video triggers if present
-            if (metadata.videoTriggers != null && metadata.videoTriggers.Count > 0)
+            // Video triggers
+            var videoTriggersToken = root["videoTriggers"] as Newtonsoft.Json.Linq.JArray;
+            if (videoTriggersToken != null && videoTriggersToken.Count > 0)
             {
-                LoadVideoTriggersFromJSON(metadata.videoTriggers);
+                var triggersList = videoTriggersToken.ToObject<List<object>>();
+                LoadVideoTriggersFromJSON(triggersList);
                 Debug.Log($"✅ Loaded {data.videoTriggers.Count} video triggers from metadata");
             }
         }
@@ -333,28 +331,10 @@ public class WiseTwinEditor : EditorWindow
                     trigger.targetObjectName = triggerDict["targetObjectName"]?.ToString() ?? "";
                 }
 
-                // Load video URLs
+                // Load video URL (flat string, with backward compat for {en, fr})
                 if (triggerDict.ContainsKey("videoUrl"))
                 {
-                    var urlObj = triggerDict["videoUrl"];
-                    Dictionary<string, object> urlDict = null;
-
-                    if (urlObj is Newtonsoft.Json.Linq.JObject jUrlObj)
-                    {
-                        urlDict = jUrlObj.ToObject<Dictionary<string, object>>();
-                    }
-                    else if (urlObj is Dictionary<string, object> dict)
-                    {
-                        urlDict = dict;
-                    }
-
-                    if (urlDict != null)
-                    {
-                        if (urlDict.ContainsKey("en"))
-                            trigger.videoUrlEN = urlDict["en"]?.ToString() ?? "";
-                        if (urlDict.ContainsKey("fr"))
-                            trigger.videoUrlFR = urlDict["fr"]?.ToString() ?? "";
-                    }
+                    trigger.videoUrl = GetFlatString(triggerDict["videoUrl"]);
                 }
 
                 data.videoTriggers.Add(trigger);
@@ -455,17 +435,13 @@ public class WiseTwinEditor : EditorWindow
         // Load question text
         if (questionDict.ContainsKey("questionText"))
         {
-            var textDict = GetDictionary(questionDict["questionText"]);
-            question.questionTextEN = GetString(textDict, "en");
-            question.questionTextFR = GetString(textDict, "fr");
+            question.questionText = GetFlatString(questionDict["questionText"]);
         }
 
         // Load options
         if (questionDict.ContainsKey("options"))
         {
-            var optionsDict = GetDictionary(questionDict["options"]);
-            question.optionsEN = GetStringList(optionsDict, "en");
-            question.optionsFR = GetStringList(optionsDict, "fr");
+            question.options = GetFlatStringList(questionDict["options"]);
         }
 
         // Load correct answers
@@ -485,29 +461,22 @@ public class WiseTwinEditor : EditorWindow
         // Load feedback
         if (questionDict.ContainsKey("feedback"))
         {
-            var feedbackDict = GetDictionary(questionDict["feedback"]);
-            question.feedbackEN = GetString(feedbackDict, "en");
-            question.feedbackFR = GetString(feedbackDict, "fr");
+            question.feedback = GetFlatString(questionDict["feedback"]);
         }
 
         if (questionDict.ContainsKey("incorrectFeedback"))
         {
-            var feedbackDict = GetDictionary(questionDict["incorrectFeedback"]);
-            question.incorrectFeedbackEN = GetString(feedbackDict, "en");
-            question.incorrectFeedbackFR = GetString(feedbackDict, "fr");
+            question.incorrectFeedback = GetFlatString(questionDict["incorrectFeedback"]);
         }
 
         // Load hint (reset to empty if not present)
         if (questionDict.ContainsKey("hint"))
         {
-            var hintDict = GetDictionary(questionDict["hint"]);
-            question.hintEN = GetString(hintDict, "en");
-            question.hintFR = GetString(hintDict, "fr");
+            question.hint = GetFlatString(questionDict["hint"]);
         }
         else
         {
-            question.hintEN = "";
-            question.hintFR = "";
+            question.hint = "";
         }
     }
 
@@ -519,17 +488,13 @@ public class WiseTwinEditor : EditorWindow
         // Load title
         if (procedureDict.ContainsKey("title"))
         {
-            var titleDict = GetDictionary(procedureDict["title"]);
-            procedure.titleEN = GetString(titleDict, "en");
-            procedure.titleFR = GetString(titleDict, "fr");
+            procedure.title = GetFlatString(procedureDict["title"]);
         }
 
         // Load description
         if (procedureDict.ContainsKey("description"))
         {
-            var descDict = GetDictionary(procedureDict["description"]);
-            procedure.descriptionEN = GetString(descDict, "en");
-            procedure.descriptionFR = GetString(descDict, "fr");
+            procedure.description = GetFlatString(procedureDict["description"]);
         }
 
         // Load steps
@@ -559,9 +524,7 @@ public class WiseTwinEditor : EditorWindow
                 // Load text
                 if (stepDict.ContainsKey("text"))
                 {
-                    var textDict = GetDictionary(stepDict["text"]);
-                    step.textEN = GetString(textDict, "en");
-                    step.textFR = GetString(textDict, "fr");
+                    step.text = GetFlatString(stepDict["text"]);
                 }
 
                 // Load target object name
@@ -598,26 +561,21 @@ public class WiseTwinEditor : EditorWindow
                 if (stepDict.ContainsKey("zoneObjectName"))
                     step.zoneObjectName = stepDict["zoneObjectName"]?.ToString();
 
-                // Load image paths
+                // Load image path
                 if (stepDict.ContainsKey("imagePath"))
                 {
-                    var imagePathDict = GetDictionary(stepDict["imagePath"]);
-                    step.imagePathEN = GetString(imagePathDict, "en");
-                    step.imagePathFR = GetString(imagePathDict, "fr");
-                    // Note: Actual Sprite objects need to be loaded manually in editor from these paths
+                    step.imagePath = GetFlatString(stepDict["imagePath"]);
+                    // Note: Actual Sprite objects need to be loaded manually in editor from this path
                 }
 
                 // Load hint (reset to empty if not present)
                 if (stepDict.ContainsKey("hint"))
                 {
-                    var hintDict = GetDictionary(stepDict["hint"]);
-                    step.hintEN = GetString(hintDict, "en");
-                    step.hintFR = GetString(hintDict, "fr");
+                    step.hint = GetFlatString(stepDict["hint"]);
                 }
                 else
                 {
-                    step.hintEN = "";
-                    step.hintFR = "";
+                    step.hint = "";
                 }
 
                 // NEW: Load fake objects for this step
@@ -649,9 +607,7 @@ public class WiseTwinEditor : EditorWindow
                 // Load error message
                 if (fakeDict.ContainsKey("errorMessage"))
                 {
-                    var errorDict = GetDictionary(fakeDict["errorMessage"]);
-                    fake.errorMessageEN = GetString(errorDict, "en");
-                    fake.errorMessageFR = GetString(errorDict, "fr");
+                    fake.errorMessage = GetFlatString(fakeDict["errorMessage"]);
                 }
 
                 fakeObjects.Add(fake);
@@ -667,17 +623,13 @@ public class WiseTwinEditor : EditorWindow
         // Load title
         if (textDict.ContainsKey("title"))
         {
-            var titleDict = GetDictionary(textDict["title"]);
-            text.titleEN = GetString(titleDict, "en");
-            text.titleFR = GetString(titleDict, "fr");
+            text.title = GetFlatString(textDict["title"]);
         }
 
         // Load content
         if (textDict.ContainsKey("content"))
         {
-            var contentDict = GetDictionary(textDict["content"]);
-            text.contentEN = GetString(contentDict, "en");
-            text.contentFR = GetString(contentDict, "fr");
+            text.content = GetFlatString(textDict["content"]);
         }
     }
 
@@ -689,9 +641,7 @@ public class WiseTwinEditor : EditorWindow
         // Load title
         if (dialogueDict.ContainsKey("title"))
         {
-            var titleDict = GetDictionary(dialogueDict["title"]);
-            dialogue.titleEN = GetString(titleDict, "en");
-            dialogue.titleFR = GetString(titleDict, "fr");
+            dialogue.title = GetFlatString(dialogueDict["title"]);
         }
 
         // Store the entire dialogue JSON for the graph editor
@@ -711,8 +661,7 @@ public class WiseTwinEditor : EditorWindow
             {
                 exists = true;
                 // Update existing
-                d.titleEN = dialogue.titleEN;
-                d.titleFR = dialogue.titleFR;
+                d.title = dialogue.title;
                 d.graphDataJSON = dialogue.graphDataJSON;
                 break;
             }
@@ -722,39 +671,64 @@ public class WiseTwinEditor : EditorWindow
             data.dialogues.Add(new WiseTwin.Editor.DialogueScenarioData
             {
                 dialogueId = dialogue.dialogueId,
-                titleEN = dialogue.titleEN,
-                titleFR = dialogue.titleFR,
+                title = dialogue.title,
                 graphDataJSON = dialogue.graphDataJSON
             });
         }
     }
 
     // Helper methods for JSON parsing
-    Dictionary<string, object> GetDictionary(object obj)
-    {
-        if (obj is Dictionary<string, object> dict)
-            return dict;
 
+    /// <summary>
+    /// Read a string value from a JSON token. Accepts a flat string (current format)
+    /// or a legacy multi-language object {en, fr} (uses "en" if present, else "fr").
+    /// </summary>
+    string GetFlatString(object obj)
+    {
+        if (obj == null) return "";
+        if (obj is string s) return s;
+        if (obj is Newtonsoft.Json.Linq.JValue jv) return jv.Value?.ToString() ?? "";
         if (obj is Newtonsoft.Json.Linq.JObject jObj)
-            return jObj.ToObject<Dictionary<string, object>>();
-
-        return new Dictionary<string, object>();
+        {
+            var en = jObj["en"]?.ToString();
+            if (!string.IsNullOrEmpty(en)) return en;
+            var fr = jObj["fr"]?.ToString();
+            return fr ?? "";
+        }
+        if (obj is Dictionary<string, object> dict)
+        {
+            if (dict.TryGetValue("en", out var ven) && ven != null) return ven.ToString();
+            if (dict.TryGetValue("fr", out var vfr) && vfr != null) return vfr.ToString();
+            return "";
+        }
+        return obj.ToString() ?? "";
     }
 
-    string GetString(Dictionary<string, object> dict, string key)
+    /// <summary>
+    /// Read a string list from a JSON token. Accepts a flat array (current format)
+    /// or a legacy multi-language object {en: [...], fr: [...]} (prefers "en").
+    /// </summary>
+    List<string> GetFlatStringList(object obj)
     {
-        return dict.ContainsKey(key) ? dict[key]?.ToString() ?? "" : "";
-    }
-
-    List<string> GetStringList(Dictionary<string, object> dict, string key)
-    {
-        if (!dict.ContainsKey(key))
-            return new List<string>();
-
-        var obj = dict[key];
+        if (obj == null) return new List<string>();
         if (obj is Newtonsoft.Json.Linq.JArray jArray)
             return jArray.ToObject<List<string>>();
-
+        if (obj is List<object> objList)
+            return objList.Select(o => o?.ToString() ?? "").ToList();
+        if (obj is Newtonsoft.Json.Linq.JObject jObj)
+        {
+            var en = jObj["en"] as Newtonsoft.Json.Linq.JArray;
+            if (en != null && en.Count > 0) return en.ToObject<List<string>>();
+            var fr = jObj["fr"] as Newtonsoft.Json.Linq.JArray;
+            if (fr != null) return fr.ToObject<List<string>>();
+        }
+        if (obj is Dictionary<string, object> dict)
+        {
+            if (dict.TryGetValue("en", out var ven) && ven is Newtonsoft.Json.Linq.JArray jen)
+                return jen.ToObject<List<string>>();
+            if (dict.TryGetValue("fr", out var vfr) && vfr is Newtonsoft.Json.Linq.JArray jfr)
+                return jfr.ToObject<List<string>>();
+        }
         return new List<string>();
     }
     
@@ -922,8 +896,8 @@ public class WiseTwinEditor : EditorWindow
         var metadata = new FormationMetadataComplete
         {
             id = data.sceneId,
-            title = new LocalizedString(data.projectTitleEN, data.projectTitleFR),
-            description = new LocalizedString(data.projectDescriptionEN, data.projectDescriptionFR),
+            title = data.projectTitle,
+            description = data.projectDescription,
             version = data.projectVersion,
             duration = $"{data.durationMinutes} minutes", // Auto formatting
             difficulty = data.difficultyOptions[data.difficultyIndex], // Get from dropdown (déjà en français)
@@ -987,18 +961,14 @@ public class WiseTwinEditor : EditorWindow
             if (string.IsNullOrEmpty(trigger.targetObjectName))
                 continue;
 
-            // Skip if no URLs
-            if (string.IsNullOrEmpty(trigger.videoUrlEN) && string.IsNullOrEmpty(trigger.videoUrlFR))
+            // Skip if no URL
+            if (string.IsNullOrEmpty(trigger.videoUrl))
                 continue;
 
             videoTriggersJSON.Add(new Dictionary<string, object>
             {
                 ["targetObjectName"] = trigger.targetObjectName,
-                ["videoUrl"] = new Dictionary<string, string>
-                {
-                    ["en"] = trigger.videoUrlEN ?? "",
-                    ["fr"] = trigger.videoUrlFR ?? ""
-                }
+                ["videoUrl"] = trigger.videoUrl
             });
         }
 
@@ -1060,47 +1030,27 @@ public class WiseTwinEditor : EditorWindow
     {
         var questionDict = new Dictionary<string, object>
         {
-            ["questionText"] = new Dictionary<string, string>
-            {
-                ["en"] = question.questionTextEN,
-                ["fr"] = question.questionTextFR
-            },
-            ["options"] = new Dictionary<string, object>
-            {
-                ["en"] = new List<string>(question.optionsEN),
-                ["fr"] = new List<string>(question.optionsFR)
-            },
+            ["questionText"] = question.questionText ?? "",
+            ["options"] = new List<string>(question.options),
             ["correctAnswers"] = new List<int>(question.correctAnswers),
             ["isMultipleChoice"] = question.isMultipleChoice
         };
 
         // Add feedback if provided
-        if (!string.IsNullOrEmpty(question.feedbackEN) || !string.IsNullOrEmpty(question.feedbackFR))
+        if (!string.IsNullOrEmpty(question.feedback))
         {
-            questionDict["feedback"] = new Dictionary<string, string>
-            {
-                ["en"] = question.feedbackEN,
-                ["fr"] = question.feedbackFR
-            };
+            questionDict["feedback"] = question.feedback;
         }
 
-        if (!string.IsNullOrEmpty(question.incorrectFeedbackEN) || !string.IsNullOrEmpty(question.incorrectFeedbackFR))
+        if (!string.IsNullOrEmpty(question.incorrectFeedback))
         {
-            questionDict["incorrectFeedback"] = new Dictionary<string, string>
-            {
-                ["en"] = question.incorrectFeedbackEN,
-                ["fr"] = question.incorrectFeedbackFR
-            };
+            questionDict["incorrectFeedback"] = question.incorrectFeedback;
         }
 
         // Add hint if provided
-        if (!string.IsNullOrEmpty(question.hintEN) || !string.IsNullOrEmpty(question.hintFR))
+        if (!string.IsNullOrEmpty(question.hint))
         {
-            questionDict["hint"] = new Dictionary<string, string>
-            {
-                ["en"] = question.hintEN,
-                ["fr"] = question.hintFR
-            };
+            questionDict["hint"] = question.hint;
         }
 
         return questionDict;
@@ -1110,16 +1060,8 @@ public class WiseTwinEditor : EditorWindow
     {
         var procedureDict = new Dictionary<string, object>
         {
-            ["title"] = new Dictionary<string, string>
-            {
-                ["en"] = procedure.titleEN,
-                ["fr"] = procedure.titleFR
-            },
-            ["description"] = new Dictionary<string, string>
-            {
-                ["en"] = procedure.descriptionEN,
-                ["fr"] = procedure.descriptionFR
-            },
+            ["title"] = procedure.title ?? "",
+            ["description"] = procedure.description ?? "",
             ["steps"] = ConvertProcedureStepsToJSON(procedure.steps)
         };
 
@@ -1140,11 +1082,7 @@ public class WiseTwinEditor : EditorWindow
         {
             var stepDict = new Dictionary<string, object>
             {
-                ["text"] = new Dictionary<string, string>
-                {
-                    ["en"] = step.textEN,
-                    ["fr"] = step.textFR
-                },
+                ["text"] = step.text ?? "",
                 ["targetObjectName"] = step.targetObjectName,
                 ["highlightColor"] = ColorToHex(step.highlightColor),
                 ["useBlinking"] = step.useBlinking,
@@ -1157,14 +1095,10 @@ public class WiseTwinEditor : EditorWindow
                 stepDict["zoneObjectName"] = step.zoneObjectName;
             }
 
-            // Add image paths if they exist
-            if (!string.IsNullOrEmpty(step.imagePathEN) || !string.IsNullOrEmpty(step.imagePathFR))
+            // Add image path if it exists
+            if (!string.IsNullOrEmpty(step.imagePath))
             {
-                stepDict["imagePath"] = new Dictionary<string, string>
-                {
-                    ["en"] = step.imagePathEN ?? "",
-                    ["fr"] = step.imagePathFR ?? ""
-                };
+                stepDict["imagePath"] = step.imagePath;
             }
 
             // Note: Hints removed for procedures - not exported to JSON anymore
@@ -1193,11 +1127,7 @@ public class WiseTwinEditor : EditorWindow
             fakeObjectsJSON.Add(new Dictionary<string, object>
             {
                 ["objectName"] = fake.fakeObjectName,
-                ["errorMessage"] = new Dictionary<string, string>
-                {
-                    ["en"] = fake.errorMessageEN,
-                    ["fr"] = fake.errorMessageFR
-                }
+                ["errorMessage"] = fake.errorMessage ?? ""
             });
         }
 
@@ -1208,16 +1138,8 @@ public class WiseTwinEditor : EditorWindow
     {
         return new Dictionary<string, object>
         {
-            ["title"] = new Dictionary<string, string>
-            {
-                ["en"] = text.titleEN,
-                ["fr"] = text.titleFR
-            },
-            ["content"] = new Dictionary<string, string>
-            {
-                ["en"] = text.contentEN,
-                ["fr"] = text.contentFR
-            }
+            ["title"] = text.title ?? "",
+            ["content"] = text.content ?? ""
         };
     }
 
@@ -1233,7 +1155,7 @@ public class WiseTwinEditor : EditorWindow
                 {
                     // Convert editor format to runtime format for metadata export
                     return WiseTwin.Editor.DialogueEditor.DialogueGraphSerializer.ConvertToRuntimeFormat(
-                        editorData, dialogue.titleEN, dialogue.titleFR);
+                        editorData, dialogue.title);
                 }
 
                 // Fallback: try as raw runtime format (backward compatibility)
@@ -1250,11 +1172,7 @@ public class WiseTwinEditor : EditorWindow
         // Fallback: create a minimal dialogue structure
         return new Dictionary<string, object>
         {
-            ["title"] = new Dictionary<string, string>
-            {
-                ["en"] = dialogue.titleEN,
-                ["fr"] = dialogue.titleFR
-            },
+            ["title"] = dialogue.title ?? "",
             ["startNodeId"] = "node_001",
             ["nodes"] = new List<object>
             {

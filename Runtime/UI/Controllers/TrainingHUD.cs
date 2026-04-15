@@ -59,20 +59,10 @@ namespace WiseTwin
             }
 
             SetupUIDocument();
-
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
-            }
         }
 
         void OnDestroy()
         {
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
-            }
-
             if (Instance == this)
             {
                 Instance = null;
@@ -258,26 +248,23 @@ namespace WiseTwin
         {
             if (confirmationOverlay == null) return;
 
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-
             var messageLabel = confirmationOverlay.Q<Label>("restart-message");
             if (messageLabel != null)
             {
-                messageLabel.text = lang == "fr"
-                    ? "Voulez-vous vraiment recommencer ?\nToute la progression sera perdue."
-                    : "Are you sure you want to restart?\nAll progress will be lost.";
+                // Warning icon only (mono-language)
+                messageLabel.text = "\u26A0";
             }
 
             var cancelBtn = confirmationOverlay.Q<Button>("cancel-restart-button");
             if (cancelBtn != null)
             {
-                cancelBtn.text = lang == "fr" ? "Annuler" : "Cancel";
+                cancelBtn.text = "\u2715";
             }
 
             var restartBtn = confirmationOverlay.Q<Button>("confirm-restart-button");
             if (restartBtn != null)
             {
-                restartBtn.text = lang == "fr" ? "Recommencer" : "Restart";
+                restartBtn.text = "\u21BB";
             }
         }
 
@@ -596,10 +583,5 @@ namespace WiseTwin
 
         #endregion
 
-        void OnLanguageChanged(string newLanguage)
-        {
-            UpdateConfirmationTexts();
-            if (debugMode) Debug.Log($"[TrainingHUD] Language changed to: {newLanguage}");
-        }
     }
 }

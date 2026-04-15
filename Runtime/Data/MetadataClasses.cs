@@ -1,43 +1,14 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-// Classe pour les textes multilingues
-[System.Serializable]
-public class LocalizedString
-{
-    public string en;
-    public string fr;
-
-    // Constructeur par défaut
-    public LocalizedString() { }
-
-    // Constructeur avec valeurs
-    public LocalizedString(string english, string french)
-    {
-        en = english;
-        fr = french;
-    }
-
-    // Méthode helper pour obtenir le texte dans une langue
-    public string Get(string language)
-    {
-        return language == "fr" ? fr : en;
-    }
-
-    // Conversion implicite depuis string (pour compatibilité)
-    public static implicit operator LocalizedString(string value)
-    {
-        return new LocalizedString(value, value);
-    }
-}
-
-// Classes partagées entre Editor et Runtime
+// Classes partagées entre Editor et Runtime.
+// Mono-language: all text fields are flat strings.
 [System.Serializable]
 public class FormationMetadataComplete
 {
     public string id;
-    public LocalizedString title;
-    public LocalizedString description;
+    public string title;
+    public string description;
     public string version;
     public string duration;
     public string difficulty;
@@ -46,23 +17,21 @@ public class FormationMetadataComplete
     public List<object> modules;
     public string createdAt;
     public string updatedAt;
-    public Dictionary<string, Dictionary<string, object>> unity; // SIMPLIFIÉ : directement les objets
-
-    // New scenario-based system fields
-    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-    public List<object> scenarios; // Scenario configurations
+    public Dictionary<string, Dictionary<string, object>> unity;
 
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-    public Dictionary<string, object> settings; // Training settings (allowPause, showTimer, showProgress)
+    public List<object> scenarios;
 
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-    public LocalizedString disclaimer; // Custom disclaimer text
+    public Dictionary<string, object> settings;
 
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-    public List<object> videoTriggers; // Video triggers for 3D objects
+    public string disclaimer;
+
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public List<object> videoTriggers;
 }
 
-// Classe pour la réponse API
 [System.Serializable]
 public class ApiResponse
 {

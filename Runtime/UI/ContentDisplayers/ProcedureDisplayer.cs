@@ -120,8 +120,7 @@ namespace WiseTwin.UI
                 keepProgressOnOtherClick = false; // Par défaut, on reset
             }
 
-            // Obtenir la langue actuelle
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            string lang = "";
 
             // Trouver la clé de la procédure (la première clé qui commence par "procedure_")
             procedureKey = contentData.Keys.FirstOrDefault(k => k.StartsWith("procedure_"));
@@ -358,12 +357,7 @@ namespace WiseTwin.UI
             imageElement.RegisterCallback<ClickEvent>(OnImageClicked);
             imageContainer.Add(imageElement);
 
-            var imageHintLabel = UIStyles.CreateMutedText(
-                LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "Cliquez sur l'image pour agrandir"
-                    : "Click on image to zoom",
-                UIStyles.FontXS
-            );
+            var imageHintLabel = UIStyles.CreateMutedText("+", UIStyles.FontXS);
             imageHintLabel.name = "image-hint";
             imageHintLabel.style.marginTop = UIStyles.SpaceXS;
             imageContainer.Add(imageHintLabel);
@@ -384,33 +378,23 @@ namespace WiseTwin.UI
 
             instructionPanel.Add(mainSection);
 
-            // Bottom buttons section
+            // Bottom buttons section (only shown for manual validation steps)
             var buttonSection = new VisualElement();
+            buttonSection.name = "button-section";
             buttonSection.style.paddingTop = UIStyles.SpaceLG;
             buttonSection.style.paddingBottom = UIStyles.SpaceLG;
             buttonSection.style.paddingLeft = UIStyles.SpaceXL;
             buttonSection.style.paddingRight = UIStyles.SpaceXL;
             buttonSection.style.borderTopWidth = 1;
             buttonSection.style.borderTopColor = UIStyles.BorderSubtle;
+            buttonSection.style.display = DisplayStyle.None;
 
-            var infoLabel = new Label();
-            infoLabel.name = "instruction-label";
-            infoLabel.style.fontSize = UIStyles.FontSM;
-            infoLabel.style.color = UIStyles.TextMuted;
-            infoLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            infoLabel.style.whiteSpace = WhiteSpace.Normal;
-            UIStyles.SetPadding(infoLabel, UIStyles.SpaceSM);
-            infoLabel.style.backgroundColor = UIStyles.BgElevated;
-            UIStyles.SetBorderRadius(infoLabel, UIStyles.RadiusSM);
-            buttonSection.Add(infoLabel);
-
-            // Manual validation button
-            validateButton = UIStyles.CreatePrimaryButton(
-                LocalizationManager.Instance?.CurrentLanguage == "fr" ? "\u2713 Valider l'\u00e9tape" : "\u2713 Validate Step"
-            );
-            validateButton.style.marginTop = UIStyles.SpaceLG;
-            validateButton.style.alignSelf = Align.Stretch;
-            validateButton.style.display = DisplayStyle.None;
+            // Manual validation button (icon only, compact)
+            validateButton = UIStyles.CreatePrimaryButton("\u2713");
+            validateButton.style.alignSelf = Align.Center;
+            validateButton.style.width = 80;
+            validateButton.style.height = 44;
+            validateButton.style.fontSize = UIStyles.FontLG;
             validateButton.clicked += OnValidateButtonClicked;
             buttonSection.Add(validateButton);
 
@@ -438,10 +422,8 @@ namespace WiseTwin.UI
                 errorFeedbackLabel.style.display = DisplayStyle.None;
             }
 
-            // Mettre à jour l'UI
-            progressLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                ? $"Étape {currentStepIndex + 1} / {steps.Count}"
-                : $"Step {currentStepIndex + 1} / {steps.Count}";
+            // Numeric progress only (language-neutral)
+            progressLabel.text = $"{currentStepIndex + 1} / {steps.Count}";
 
             // Afficher le titre de l'étape si présent, suivi de l'instruction
             if (!string.IsNullOrEmpty(currentStep.title))
@@ -456,7 +438,7 @@ namespace WiseTwin.UI
             // Ajouter le hint si présent
             if (!string.IsNullOrEmpty(currentStep.hint))
             {
-                stepLabel.text += $"\n\n💡 {currentStep.hint}";
+                stepLabel.text += $"\n\n{currentStep.hint}";
             }
 
             // NEW: Show/hide image if available
@@ -470,22 +452,20 @@ namespace WiseTwin.UI
             }
 
             // Show/hide manual validation button (only for manual validation type)
-            if (currentStep.validationType == "manual")
+            // Footer is only shown for manual validation steps
+            var buttonSection = modalContainer?.Q<VisualElement>("button-section");
+            if (buttonSection != null)
             {
-                if (validateButton != null)
-                {
-                    validateButton.style.display = DisplayStyle.Flex;
-                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                        ? "✓ Valider l'étape"
-                        : "✓ Validate Step";
-                }
+                buttonSection.style.display = currentStep.validationType == "manual"
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
             }
-            else
+            if (validateButton != null)
             {
-                if (validateButton != null)
-                {
-                    validateButton.style.display = DisplayStyle.None;
-                }
+                validateButton.style.display = currentStep.validationType == "manual"
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+                validateButton.text = "\u2713";
             }
 
             // Mettre à jour la barre de progression
@@ -601,64 +581,9 @@ namespace WiseTwin.UI
             }
         }
 
-        void UpdateInstructionLabel(ProcedureStep step)
-        {
-            // Trouver le label d'instruction
-            var instructionLabel = modalContainer?.Q<Label>("instruction-label");
-            if (instructionLabel == null) return;
-
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-
-            switch (step.validationType)
-            {
-                case "manual":
-                    instructionLabel.text = lang == "fr"
-                        ? "Lisez les instructions et cliquez sur 'Valider l'étape' pour passer à la suite."
-                        : "Read the instructions and click 'Validate Step' to continue.";
-                    break;
-
-                case "zone":
-                    instructionLabel.text = lang == "fr"
-                        ? "Dirigez-vous vers la zone indiquée pour valider l'étape."
-                        : "Walk to the indicated zone to validate the step.";
-                    break;
-
-                default: // "click"
-                    bool hasFakeObjects = (step.fakeObjects != null && step.fakeObjects.Count > 0);
-
-                    if (hasFakeObjects)
-                    {
-                        if (shouldHighlight && step.useBlinking)
-                        {
-                            instructionLabel.text = lang == "fr"
-                                ? "⚠️ Cliquez sur le bon objet. Attention, plusieurs objets clignotent, choisissez le bon !"
-                                : "⚠️ Click on the correct object. Beware, multiple objects are blinking, choose the right one!";
-                        }
-                        else
-                        {
-                            instructionLabel.text = lang == "fr"
-                                ? "⚠️ Trouvez et cliquez sur le bon objet."
-                                : "⚠️ Find and click on the correct object.";
-                        }
-                    }
-                    else
-                    {
-                        if (shouldHighlight && step.useBlinking)
-                        {
-                            instructionLabel.text = lang == "fr"
-                                ? "💡 Cliquez sur l'objet qui clignote pour valider l'étape."
-                                : "💡 Click on the blinking object to validate the step.";
-                        }
-                        else
-                        {
-                            instructionLabel.text = lang == "fr"
-                                ? "💡 Trouvez et cliquez sur l'objet demandé pour valider l'étape."
-                                : "💡 Find and click on the requested object to validate the step.";
-                        }
-                    }
-                    break;
-            }
-        }
+        // Instruction label was removed from the procedure UI (footer hidden for click/zone).
+        // Kept as a no-op stub to avoid touching every caller.
+        void UpdateInstructionLabel(ProcedureStep step) { }
 
         /// <summary>
         /// Stocke les matériaux originaux de tous les Renderers d'un objet et ses enfants
@@ -755,17 +680,14 @@ namespace WiseTwin.UI
 
             string message;
 
-            // Use custom message if provided, otherwise use generic one
+            // Use custom message if provided, otherwise minimal icon-only feedback
             if (!string.IsNullOrEmpty(customMessage))
             {
-                message = $"{customMessage} (Erreurs: {wrongClicksCount})";
+                message = $"{customMessage}  \u2717 {wrongClicksCount}";
             }
             else
             {
-                // Message d'erreur sans révéler la bonne réponse
-                message = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? $"Mauvaise réponse ! Réessayez. (Erreurs: {wrongClicksCount})"
-                    : $"Wrong answer! Try again. (Errors: {wrongClicksCount})";
+                message = $"\u2717 {wrongClicksCount}";
             }
 
             errorFeedbackLabel.text = message;
@@ -1148,11 +1070,9 @@ namespace WiseTwin.UI
                 zoomedImage.style.backgroundPositionX = new BackgroundPosition(BackgroundPositionKeyword.Center);
                 zoomedImage.style.backgroundPositionY = new BackgroundPosition(BackgroundPositionKeyword.Center);
 
-                // Add close instruction
+                // Close hint (icon only)
                 var closeLabel = new Label();
-                closeLabel.text = LocalizationManager.Instance?.CurrentLanguage == "fr"
-                    ? "✕ Cliquez n'importe où pour fermer"
-                    : "✕ Click anywhere to close";
+                closeLabel.text = "\u2715";
                 closeLabel.style.position = Position.Absolute;
                 closeLabel.style.top = 20;
                 closeLabel.style.right = 20;
@@ -1512,36 +1432,10 @@ namespace WiseTwin.UI
             }
         }
 
-        // Méthodes utilitaires
+        // Flat string extraction (mono-language, with legacy {en, fr} backward compat)
         string ExtractLocalizedText(Dictionary<string, object> data, string key, string language)
         {
-            if (!data.ContainsKey(key)) return "";
-
-            var textData = data[key];
-
-            if (textData is string simpleText) return simpleText;
-
-            if (textData is Dictionary<string, object> localizedText)
-            {
-                if (localizedText.ContainsKey(language))
-                    return localizedText[language]?.ToString() ?? "";
-                if (localizedText.ContainsKey("en"))
-                    return localizedText["en"]?.ToString() ?? "";
-            }
-            else if (textData != null && textData.GetType().FullName.Contains("JObject"))
-            {
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(textData);
-                var localizedJObject = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-                if (localizedJObject != null)
-                {
-                    if (localizedJObject.ContainsKey(language))
-                        return localizedJObject[language];
-                    if (localizedJObject.ContainsKey("en"))
-                        return localizedJObject["en"];
-                }
-            }
-
-            return "";
+            return LocalizedValueReader.ReadString(data, key);
         }
 
         string ExtractString(Dictionary<string, object> data, string key)

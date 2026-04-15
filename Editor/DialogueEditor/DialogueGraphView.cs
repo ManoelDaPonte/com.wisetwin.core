@@ -118,15 +118,13 @@ namespace WiseTwin.Editor.DialogueEditor
                 nodeData.choices.Add(new DialogueChoiceEditorData
                 {
                     id = $"{nodeId}_choice_0",
-                    textEN = "Option 1",
-                    textFR = "Option 1",
+                    text = "Option 1",
                     portName = "choice_0"
                 });
                 nodeData.choices.Add(new DialogueChoiceEditorData
                 {
                     id = $"{nodeId}_choice_1",
-                    textEN = "Option 2",
-                    textFR = "Option 2",
+                    text = "Option 2",
                     portName = "choice_1"
                 });
             }

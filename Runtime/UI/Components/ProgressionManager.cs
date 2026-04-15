@@ -154,25 +154,64 @@ namespace WiseTwin
 
             if (debugMode) Debug.Log($"[ProgressionManager] Loaded {scenarios.Count} scenarios from metadata");
 
-            // Initialize HUD with total scenarios
-            if (TrainingHUD.Instance != null)
-            {
-                TrainingHUD.Instance.InitializeForScenarios();
-            }
-
-            // Créer le panneau de transition
             EnsureTransitionPanel();
 
-            // Start progression if auto-start is enabled
             if (autoStartFirstScenario)
             {
-                StartProgression();
+                // Show the onboarding tutorial (welcome + control mode selection + Play button)
+                // When the user clicks Play, the tutorial fires OnTutorialCompleted → StartProgression.
+                ShowTutorialOrStart();
             }
             else
             {
-                // Le démarrage initial est géré par LanguageSelectionUI → Tutorial → TrainingHUD
-                if (debugMode) Debug.Log("[ProgressionManager] Waiting for user to start via existing UI flow");
+                if (debugMode) Debug.Log("[ProgressionManager] Waiting for external trigger");
             }
+        }
+
+        /// <summary>
+        /// Displays the onboarding tutorial before launching the training.
+        /// Creates a TutorialUI instance on the fly if one isn't already in the scene
+        /// and borrows PanelSettings from the TrainingHUD's UIDocument.
+        /// </summary>
+        void ShowTutorialOrStart()
+        {
+            var tutorial = TutorialUI.Instance;
+            if (tutorial == null)
+            {
+                var tutorialGO = new GameObject("TutorialUI");
+                tutorial = tutorialGO.AddComponent<TutorialUI>();
+
+                // Borrow panel settings from the HUD so the UIDocument can render
+                var hud = TrainingHUD.Instance;
+                if (hud != null)
+                {
+                    var hudDoc = hud.GetComponent<UnityEngine.UIElements.UIDocument>();
+                    if (hudDoc != null && hudDoc.panelSettings != null)
+                    {
+                        tutorial.SetPanelSettings(hudDoc.panelSettings);
+                    }
+                }
+            }
+
+            tutorial.OnTutorialCompleted -= OnTutorialCompleted;
+            tutorial.OnTutorialCompleted += OnTutorialCompleted;
+            tutorial.Show();
+        }
+
+        void OnTutorialCompleted()
+        {
+            var tutorial = TutorialUI.Instance;
+            if (tutorial != null) tutorial.OnTutorialCompleted -= OnTutorialCompleted;
+
+            // Show the training HUD and hand over to the progression
+            if (TrainingHUD.Instance != null)
+            {
+                TrainingHUD.Instance.InitializeForScenarios();
+                TrainingHUD.Instance.Show();
+            }
+            PlayerControls.SetEnabled(true);
+
+            StartProgression();
         }
 
         /// <summary>
@@ -203,11 +242,7 @@ namespace WiseTwin
                 TrainingHUD.Instance.UpdateProgress(0);
             }
 
-            // Créer le panneau de transition (pour les transitions entre scénarios)
             EnsureTransitionPanel();
-
-            // Lancer le premier scénario directement
-            // Le démarrage initial est géré par le flow existant (langue → infos → tuto)
             MoveToNextScenario();
         }
 
@@ -333,11 +368,13 @@ namespace WiseTwin
                     TrainingHUD.Instance.SetNextButtonVisible(false);
                 }
 
-                // Afficher le panneau de transition
+                // Afficher le panneau de transition avec le nom du prochain scénario
                 if (transitionPanel != null)
                 {
-                    transitionPanel.ShowTransitionPanel(currentScenarioIndex, scenarios.Count);
-                    if (debugMode) Debug.Log($"[ProgressionManager] Showing transition panel: scenario {currentScenarioIndex + 1}/{scenarios.Count}");
+                    int nextIndex = currentScenarioIndex + 1;
+                    string nextScenarioName = (nextIndex >= 0 && nextIndex < scenarios.Count) ? scenarios[nextIndex].id : "";
+                    transitionPanel.ShowTransitionPanel(currentScenarioIndex, scenarios.Count, nextScenarioName);
+                    if (debugMode) Debug.Log($"[ProgressionManager] Showing transition panel: scenario {currentScenarioIndex + 1}/{scenarios.Count} → {nextScenarioName}");
                 }
             }
         }
@@ -399,48 +436,25 @@ namespace WiseTwin
         }
 
         /// <summary>
-        /// Extract a display title from a scenario's content data
+        /// Extract a display title from a scenario's content data.
+        /// For question scenarios, always returns scenario.id (questions have no meaningful title).
+        /// Accepts flat strings (mono-language) and legacy {en, fr} objects for other types.
         /// </summary>
         string GetScenarioDisplayTitle(ScenarioData scenario)
         {
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            if (scenario == null) return "";
+
+            // Questions: HUD shows the scenario id (questionText is too long/noisy)
+            if (scenario.type == "question") return scenario.id;
+
             var content = scenario.GetContentData();
             if (content == null) return scenario.id;
 
-            // Try "title" field (procedure, text, dialogue)
             var titleToken = content["title"];
-            if (titleToken != null)
-            {
-                if (titleToken.Type == Newtonsoft.Json.Linq.JTokenType.Object)
-                {
-                    var localized = titleToken[lang]?.ToString() ?? titleToken["en"]?.ToString();
-                    if (!string.IsNullOrEmpty(localized)) return localized;
-                }
-                else if (titleToken.Type == Newtonsoft.Json.Linq.JTokenType.String)
-                {
-                    return titleToken.ToString();
-                }
-            }
+            string title = LocalizedValueReader.Flatten(titleToken);
+            if (!string.IsNullOrEmpty(title)) return title;
 
-            // Try "questionText" for single questions
-            var questionText = content["questionText"];
-            if (questionText != null)
-            {
-                if (questionText.Type == Newtonsoft.Json.Linq.JTokenType.Object)
-                {
-                    var localized = questionText[lang]?.ToString() ?? questionText["en"]?.ToString();
-                    if (!string.IsNullOrEmpty(localized))
-                        return localized.Length > 60 ? localized.Substring(0, 57) + "..." : localized;
-                }
-                else if (questionText.Type == Newtonsoft.Json.Linq.JTokenType.String)
-                {
-                    var text = questionText.ToString();
-                    return text.Length > 60 ? text.Substring(0, 57) + "..." : text;
-                }
-            }
-
-            // Fallback: capitalize type
-            return scenario.type?.Substring(0, 1).ToUpper() + scenario.type?.Substring(1) ?? scenario.id;
+            return scenario.id;
         }
 
         #region Transition Panel

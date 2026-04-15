@@ -9,7 +9,7 @@ namespace WiseTwin.Editor.DialogueEditor
     /// <summary>
     /// Editor-side data model for the dialogue graph.
     /// Stores nodes, edges, and positions for the visual editor.
-    /// Serialized to/from JSON for persistence.
+    /// Mono-language: all text fields are flat strings.
     /// </summary>
 
     [Serializable]
@@ -27,14 +27,11 @@ namespace WiseTwin.Editor.DialogueEditor
         public Vector2 position;
 
         // Dialogue node fields
-        public string speakerEN = "";
-        public string speakerFR = "";
-        public string textEN = "";
-        public string textFR = "";
+        public string speaker = "";
+        public string text = "";
 
         // Choice node fields
-        public string promptTextEN = "";
-        public string promptTextFR = "";
+        public string promptText = "";
         public List<DialogueChoiceEditorData> choices = new List<DialogueChoiceEditorData>();
     }
 
@@ -42,8 +39,7 @@ namespace WiseTwin.Editor.DialogueEditor
     public class DialogueChoiceEditorData
     {
         public string id;
-        public string textEN = "";
-        public string textFR = "";
+        public string text = "";
         public bool isCorrect = false;
 
         // The port name for this choice (used for edge mapping)

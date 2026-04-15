@@ -136,7 +136,7 @@ namespace WiseTwin
             
             Debug.Log($"[WiseTwinUIManager] Root element exists. Current children: {root.childCount}");
 
-            // Don't clear if there's already content (like LanguageSelectionUI)
+            // Don't clear if there's already content
             if (root.childCount == 0)
             {
                 SetupUIStructure();

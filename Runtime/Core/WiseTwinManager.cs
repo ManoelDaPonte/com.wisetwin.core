@@ -408,39 +408,6 @@ namespace WiseTwin
         }
         
         /// <summary>
-        /// Set preferred language for training content
-        /// </summary>
-        /// <param name="languageCode">Language code (e.g. "en", "fr")</param>
-        public void SetPreferredLanguage(string languageCode)
-        {
-            PlayerPrefs.SetString("WiseTwin_Language", languageCode);
-            PlayerPrefs.Save();
-            DebugLog($"🌐 Language preference set to: {languageCode}");
-        }
-        
-        /// <summary>
-        /// Get preferred language for training content
-        /// </summary>
-        /// <returns>Language code or system default</returns>
-        public string GetPreferredLanguage()
-        {
-            string savedLanguage = PlayerPrefs.GetString("WiseTwin_Language", "");
-            if (!string.IsNullOrEmpty(savedLanguage))
-            {
-                return savedLanguage;
-            }
-            
-            // Fallback to system language
-            SystemLanguage systemLang = Application.systemLanguage;
-            switch (systemLang)
-            {
-                case SystemLanguage.French:
-                    return "fr";
-                default:
-                    return "en";
-            }
-        }
-        /// <summary>
         /// Get current scene name
         /// </summary>
         /// <returns>Scene name</returns>

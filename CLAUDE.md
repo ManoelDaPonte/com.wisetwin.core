@@ -2,7 +2,7 @@
 
 ## Package Overview
 
-**WiseTwin Core** (`com.wisetwin.core`) is a Unity package for creating interactive training/learning experiences. It supports questions, step-by-step procedures, text content, interactive dialogues (branching conversation trees), video triggers, and multi-language (EN/FR). The package integrates with Azure for metadata loading in production and provides comprehensive analytics tracking.
+**WiseTwin Core** (`com.wisetwin.core`) is a Unity package for creating interactive training/learning experiences. It supports questions, step-by-step procedures, text content, interactive dialogues (branching conversation trees), and video triggers. The package is **mono-language**: content strings are flat text edited directly in the target language of each client (one build = one language). System UI is fully icon-based — zero hardcoded English visible to the player. The package integrates with Azure for metadata loading in production and provides comprehensive analytics tracking.
 
 - **Unity Version**: 2021.3+
 - **Package Format**: Unity Package Manager (UPM)
@@ -24,7 +24,6 @@ Three core singletons auto-discover each other at runtime. They are placed as ch
 | `TrainingCompletionNotifier` | WebGL communication with parent web app |
 
 Additional singletons:
-- `LocalizationManager` - Language management (EN/FR), persists via PlayerPrefs
 - `TrainingAnalytics` - Collects interaction data, exports JSON
 
 ### Data Flow
@@ -56,9 +55,8 @@ TrainingAnalytics → tracks all interactions → exports JSON
 - `WiseTwinManager.cs` - Main manager singleton, events: `OnMetadataReady`, `OnMetadataError`, `OnTrainingCompleted`
 - `MetadataLoader.cs` - Loads metadata from local/Azure, supports legacy + scenario formats
 - `ScenarioData.cs` - `ScenarioData` class (id, type, question/procedure/text/dialogue JObjects), `TrainingSettings`
-- `DialogueData.cs` - Runtime dialogue structures: `DialogueTreeData`, `DialogueNodeRuntime`, `DialogueChoiceRuntime` (parsed from JSON at runtime)
-- `LocalizationManager.cs` - Language singleton, `CurrentLanguage`, `OnLanguageChanged` event
-- `VideoTriggerData.cs` - Runtime data for video triggers, language-aware URL selection
+- `DialogueData.cs` - Runtime dialogue structures: `DialogueTreeData`, `DialogueNodeRuntime`, `DialogueChoiceRuntime` (flat string fields, mono-language)
+- `VideoTriggerData.cs` - Runtime data for video triggers (flat `videoUrl` string)
 - `VideoTriggerManager.cs` - Sets up `VideoClickHandler` on target GameObjects
 - `CharacterSwapper.cs` - Singleton on Player, manages character model swapping at runtime (pre-placed children)
 - `WiseTwinSystemManager.cs` - Optional system manager
@@ -68,7 +66,7 @@ TrainingAnalytics → tracks all interactions → exports JSON
 - `InteractionData.cs` - Data structures: `InteractionData`, `QuestionInteractionData`, `ProcedureInteractionData`, `ProcedureStepData`, `TextInteractionData`, `DialogueInteractionData`, `DialogueChoiceRecord`
 
 ### Data (`Runtime/Data/`)
-- `MetadataClasses.cs` - `FormationMetadataComplete`, `LocalizedString`, `ApiResponse`
+- `MetadataClasses.cs` - `FormationMetadataComplete`, `ApiResponse`
 - `ContentTypes.cs` - Enums: `ContentType` (Question, Procedure, Text, Dialogue), `QuestionType`, `MediaType`, `DifficultyLevel`, `ProgressState`
 - `TrainingAnalyticsData.cs` - Export data format
 
@@ -84,8 +82,7 @@ TrainingAnalytics → tracks all interactions → exports JSON
 ### UI Controllers (`Runtime/UI/Controllers/`)
 - `WiseTwinUIManager.cs` - Main UI coordination
 - `TrainingHUD.cs` - HUD overlay (timer, progress bar)
-- `LanguageSelectionUI.cs` - Language picker
-- `TutorialUI.cs` - Tutorial display
+- `TutorialUI.cs` - Icon-based tutorial (WASD/mouse/click icons)
 - `ScenarioTransitionPanel.cs` - Centered transition panel between scenarios (title, subtitle, action button, fade animations)
 
 ### UI Components (`Runtime/UI/Components/`)
@@ -189,50 +186,35 @@ Zone validation uses `ProcedureZoneTrigger` component added at runtime to the zo
 
 ### Complete Structure
 
+**Mono-language format**: all text fields are flat strings written directly in the target language of the client (English, French, Hungarian, whatever). The package is language-agnostic for content; the system UI is icon-based.
+
 ```json
 {
   "id": "scene-name",
-  "title": { "en": "Training Title", "fr": "Titre Formation" },
-  "description": { "en": "...", "fr": "..." },
+  "title": "Training Title",
+  "description": "Short description of the training",
   "version": "1.0.0",
   "duration": "30 minutes",
   "difficulty": "Intermediate",
   "tags": ["safety", "training"],
   "imageUrl": "",
   "scenarios": [
-    {
-      "id": "scenario_1",
-      "type": "question",
-      "question": { ... }
-    },
-    {
-      "id": "scenario_2",
-      "type": "procedure",
-      "procedure": { ... }
-    },
-    {
-      "id": "scenario_3",
-      "type": "text",
-      "text": { ... }
-    },
-    {
-      "id": "scenario_4",
-      "type": "dialogue",
-      "dialogue": { ... }
-    }
+    { "id": "scenario_1", "type": "question",  "question":  { ... } },
+    { "id": "scenario_2", "type": "procedure", "procedure": { ... } },
+    { "id": "scenario_3", "type": "text",      "text":      { ... } },
+    { "id": "scenario_4", "type": "dialogue",  "dialogue":  { ... } }
   ],
   "videoTriggers": [
     {
       "targetObjectName": "Tower_1",
-      "videoUrl": { "en": "https://example.com/en.mp4", "fr": "https://example.com/fr.mp4" }
+      "videoUrl": "https://example.com/video.mp4"
     }
   ],
   "settings": {
     "allowPause": true,
     "showTimer": true,
     "showProgress": true
-  },
-  "unity": { ... }
+  }
 }
 ```
 
@@ -243,16 +225,13 @@ Zone validation uses `ProcedureZoneTrigger` component added at runtime to the zo
   "id": "quiz_1",
   "type": "question",
   "question": {
-    "questionText": { "en": "What is...?", "fr": "Qu'est-ce que...?" },
-    "options": {
-      "en": ["Option A", "Option B", "Option C"],
-      "fr": ["Option A", "Option B", "Option C"]
-    },
+    "questionText": "What is...?",
+    "options": ["Option A", "Option B", "Option C"],
     "correctAnswers": [1],
     "isMultipleChoice": false,
-    "feedback": { "en": "Correct!", "fr": "Correct !" },
-    "incorrectFeedback": { "en": "Try again", "fr": "Réessayez" },
-    "hint": { "en": "Think about...", "fr": "Pensez à..." }
+    "feedback": "Correct!",
+    "incorrectFeedback": "Try again",
+    "hint": "Think about..."
   }
 }
 ```
@@ -266,33 +245,30 @@ Multiple questions in one scenario use `"questions": [...]` array instead of `"q
   "id": "proc_1",
   "type": "procedure",
   "procedure": {
-    "title": { "en": "Safety Procedure", "fr": "Procédure de sécurité" },
-    "description": { "en": "Follow these steps", "fr": "Suivez ces étapes" },
+    "title": "Safety Procedure",
+    "description": "Follow these steps",
     "steps": [
       {
-        "text": { "en": "Click the valve", "fr": "Cliquez sur la vanne" },
+        "text": "Click the valve",
         "targetObjectName": "Valve_01",
         "validationType": "click",
         "highlightColor": "#FFFF00",
         "useBlinking": true,
         "fakeObjects": [
-          {
-            "objectName": "Valve_02",
-            "errorMessage": { "en": "Wrong valve!", "fr": "Mauvaise vanne !" }
-          }
+          { "objectName": "Valve_02", "errorMessage": "Wrong valve!" }
         ]
       },
       {
-        "text": { "en": "Walk to safety zone", "fr": "Dirigez-vous vers la zone" },
+        "text": "Walk to safety zone",
         "targetObjectName": "",
         "validationType": "zone",
         "zoneObjectName": "SafetyZone_1"
       },
       {
-        "text": { "en": "Read the instructions", "fr": "Lisez les instructions" },
+        "text": "Read the instructions",
         "targetObjectName": "",
         "validationType": "manual",
-        "imagePath": { "en": "instructions_en.png", "fr": "instructions_fr.png" }
+        "imagePath": "instructions.png"
       }
     ],
     "fakeObjects": []
@@ -309,8 +285,8 @@ Multiple questions in one scenario use `"questions": [...]` array instead of `"q
   "id": "info_1",
   "type": "text",
   "text": {
-    "title": { "en": "Safety Info", "fr": "Info Sécurité" },
-    "content": { "en": "Important information...", "fr": "Information importante..." }
+    "title": "Safety Info",
+    "content": "Important information..."
   }
 }
 ```
@@ -322,46 +298,32 @@ Multiple questions in one scenario use `"questions": [...]` array instead of `"q
   "id": "dialogue_1",
   "type": "dialogue",
   "dialogue": {
-    "title": { "en": "Safety Briefing", "fr": "Briefing sécurité" },
+    "title": "Safety Briefing",
     "startNodeId": "node_001",
     "nodes": [
-      {
-        "id": "node_001",
-        "type": "start",
-        "nextNodeId": "node_002"
-      },
+      { "id": "node_001", "type": "start", "nextNodeId": "node_002" },
       {
         "id": "node_002",
         "type": "dialogue",
-        "speaker": { "en": "Safety Officer", "fr": "Agent de sécurité" },
-        "text": { "en": "Are you ready?", "fr": "Êtes-vous prêt ?" },
+        "speaker": "Safety Officer",
+        "text": "Are you ready?",
         "nextNodeId": "node_003"
       },
       {
         "id": "node_003",
         "type": "choice",
-        "text": { "en": "How do you respond?", "fr": "Comment répondez-vous ?" },
+        "text": "How do you respond?",
         "choices": [
-          {
-            "id": "choice_a",
-            "text": { "en": "Yes, ready!", "fr": "Oui, prêt !" },
-            "isCorrect": true,
-            "nextNodeId": "node_004"
-          },
-          {
-            "id": "choice_b",
-            "text": { "en": "I don't care", "fr": "Je m'en fiche" },
-            "isCorrect": false,
-            "nextNodeId": "node_005"
-          }
+          { "id": "choice_a", "text": "Yes, ready!",    "isCorrect": true,  "nextNodeId": "node_004" },
+          { "id": "choice_b", "text": "I don't care",   "isCorrect": false, "nextNodeId": "node_005" }
         ]
       },
       { "id": "node_004", "type": "end" },
       {
         "id": "node_005",
         "type": "dialogue",
-        "speaker": { "en": "Safety Officer", "fr": "Agent de sécurité" },
-        "text": { "en": "Let me ask again...", "fr": "Laissez-moi reposer la question..." },
+        "speaker": "Safety Officer",
+        "text": "Let me ask again...",
         "nextNodeId": "node_003"
       }
     ]
@@ -382,7 +344,6 @@ WiseTwinManager.Instance.CompleteTraining(name)   // Complete training + notify 
 WiseTwinManager.Instance.ReloadMetadata()         // Reload from source
 WiseTwinManager.Instance.SavePlayerSpawnPosition()
 WiseTwinManager.Instance.ResetPlayerPosition()
-WiseTwinManager.Instance.SetPreferredLanguage("fr")
 ```
 
 ### MetadataLoader
@@ -392,14 +353,6 @@ MetadataLoader.Instance.GetScenario(index)         // ScenarioData
 MetadataLoader.Instance.GetSettings()              // TrainingSettings
 MetadataLoader.Instance.GetVideoTriggers()         // List<object>
 MetadataLoader.Instance.IsLoaded                   // bool
-```
-
-### LocalizationManager
-```csharp
-LocalizationManager.Instance.CurrentLanguage       // "en" or "fr"
-LocalizationManager.Instance.SetLanguage("fr")
-LocalizationManager.Instance.OnLanguageChanged += (lang) => { ... };
-LocalizationManager.Instance.GetLocalizedText(data, fallback)
 ```
 
 ### TrainingAnalytics
@@ -440,12 +393,12 @@ public interface IContentDisplayer
 
 ## Language System
 
-All text uses localized dictionaries: `{"en": "English text", "fr": "Texte français"}`
+Mono-language by design:
 
-- `LocalizationManager.Instance.CurrentLanguage` for current language code
-- `OnLanguageChanged` event triggers UI refresh
-- UI components subscribe and update displayed content
-- Video triggers fall back to other language if current is empty
+- All text is stored as **flat strings** in the metadata (e.g. `"title": "Safety Briefing"`), in the target language of the client
+- System UI (buttons, HUD, transitions, tutorial, completion screen, feedback) is **fully icon-based** — no hardcoded English visible to the player
+- One build = one language. To support another client language, duplicate the project, edit strings via WiseTwin Editor, rebuild
+- No `LocalizationManager`, no language selector, no `OnLanguageChanged` event
 
 ---
 
@@ -497,7 +450,7 @@ Accessed via `WiseTwin > Dialogue Graph Editor` menu or "Open Graph Editor" butt
 
 - **Toolbar**: Colored buttons to add Start (green), Dialogue (blue), Choice (orange), End (red) nodes + Save button
 - **Canvas**: Zoom (scroll), pan (middle mouse or right mouse drag), grid background, minimap
-- **Nodes**: Inline editable fields for speaker, text, choices (EN/FR). Choice nodes support dynamic add/remove of options with correct toggle
+- **Nodes**: Inline editable fields for speaker, text, choices (flat strings, mono-language). Choice nodes support dynamic add/remove of options with correct toggle
 - **Save**: Converts graph to runtime JSON format stored in `DialogueScenarioData.graphDataJSON`
 - **Import**: Automatically imports runtime JSON format back into editor graph with auto-layout
 

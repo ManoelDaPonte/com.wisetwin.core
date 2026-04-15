@@ -64,15 +64,7 @@ namespace WiseTwin.UI
             // Block player controls during question display
             PlayerControls.SetEnabled(false);
 
-            // Store content data for language changes
             storedContentData = contentData;
-
-            // Subscribe to language changes
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
-                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
-            }
 
             // Si contentData contient déjà les données de question directement (nouveau format)
             if (contentData.ContainsKey("questionText") || contentData.ContainsKey("options"))
@@ -171,7 +163,7 @@ namespace WiseTwin.UI
             }
 
             // Obtenir la langue actuelle
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            string lang = "";
 
             // Extraire les données de la question (nouveau format uniquement)
             string questionText = ExtractLocalizedText(contentData, "questionText", lang);
@@ -358,14 +350,14 @@ namespace WiseTwin.UI
             feedbackContainer.Add(feedbackLabel);
             questionBox.Add(feedbackContainer);
 
-            // Validate button
-            validateButton = UIStyles.CreatePrimaryButton(
-                LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate",
-                ValidateAnswer
-            );
+            // Compact validate button (icon only)
+            validateButton = UIStyles.CreatePrimaryButton("\u2713", ValidateAnswer);
             validateButton.name = "validate-button";
             validateButton.style.marginTop = UIStyles.SpaceLG;
-            validateButton.style.alignSelf = Align.Stretch;
+            validateButton.style.alignSelf = Align.Center;
+            validateButton.style.width = 64;
+            validateButton.style.height = 44;
+            validateButton.style.fontSize = UIStyles.FontLG;
             validateButton.SetEnabled(false);
             validateButton.style.opacity = 0.5f;
             questionBox.Add(validateButton);
@@ -457,7 +449,7 @@ namespace WiseTwin.UI
                 if (questionDict != null)
                 {
                     // Obtenir la langue actuelle
-                    string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+                    string lang = "";
 
                     // Extraire les données de la question (nouveau format uniquement)
                     string questionText = ExtractLocalizedText(questionDict, "questionText", lang);
@@ -587,7 +579,7 @@ namespace WiseTwin.UI
                     feedbackContainer.style.display = DisplayStyle.None;
 
                     // Réinitialiser le bouton valider
-                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate";
+                    validateButton.text = "\u2713";
                     validateButton.style.backgroundColor = UIStyles.Accent;
                     validateButton.clicked -= NextQuestion;
                     validateButton.clicked -= ValidateAnswer;
@@ -662,7 +654,7 @@ namespace WiseTwin.UI
             instructionLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             instructionLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
 
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
+            string lang = "";
             if (isMultipleChoice)
             {
                 instructionLabel.text = lang == "fr"
@@ -695,14 +687,14 @@ namespace WiseTwin.UI
 
             questionBox.Add(feedbackContainer);
 
-            // Validate button
-            validateButton = UIStyles.CreatePrimaryButton(
-                LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Valider" : "Validate",
-                ValidateAnswer
-            );
+            // Compact validate button (icon only)
+            validateButton = UIStyles.CreatePrimaryButton("\u2713", ValidateAnswer);
             validateButton.name = "validate-button";
             validateButton.style.marginTop = UIStyles.SpaceLG;
-            validateButton.style.alignSelf = Align.Stretch;
+            validateButton.style.alignSelf = Align.Center;
+            validateButton.style.width = 64;
+            validateButton.style.height = 44;
+            validateButton.style.fontSize = UIStyles.FontLG;
             validateButton.SetEnabled(false);
             validateButton.style.opacity = 0.5f;
 
@@ -1048,17 +1040,15 @@ namespace WiseTwin.UI
                 // Si on a plusieurs questions, passer à la suivante
                 if (questionKeys != null && questionKeys.Count > 1)
                 {
-                    // Afficher un bouton "Question suivante" au lieu de valider
-                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1
-                        ? (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Question suivante" : "Next Question")
-                        : (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Terminer" : "Finish");
+                    // Icon-only: arrow for next, check for finish
+                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1 ? "\u2192" : "\u2713";
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += NextQuestion;
                 }
                 else
                 {
-                    // Question unique - changer le bouton en "Continuer"
-                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+                    // Question unique - bouton icône continue
+                    validateButton.text = "\u2192";
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += () => {
                         OnCompleted?.Invoke(currentObjectId, true);
@@ -1094,17 +1084,15 @@ namespace WiseTwin.UI
                 // Changer le bouton en "Suivant" - pas de retry
                 if (questionKeys != null && questionKeys.Count > 1)
                 {
-                    // Afficher un bouton "Question suivante" au lieu de valider
-                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1
-                        ? (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Question suivante" : "Next Question")
-                        : (LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Terminer" : "Finish");
+                    // Icon-only: arrow for next, check for finish
+                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1 ? "\u2192" : "\u2713";
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += NextQuestion;
                 }
                 else
                 {
-                    // Question unique - changer le bouton en "Continuer"
-                    validateButton.text = LocalizationManager.Instance?.CurrentLanguage == "fr" ? "Continuer" : "Continue";
+                    // Question unique - bouton icône continue
+                    validateButton.text = "\u2192";
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += () => {
                         OnCompleted?.Invoke(currentObjectId, true);
@@ -1222,184 +1210,17 @@ namespace WiseTwin.UI
             OnClosed?.Invoke(currentObjectId);
         }
 
-        void OnDestroy()
-        {
-            // Unsubscribe from language changes
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
-            }
-        }
+        void OnDestroy() { }
 
-        /// <summary>
-        /// Called when language changes - updates question text and options
-        /// </summary>
-        void OnLanguageChanged(string newLanguage)
-        {
-            // Don't update if already answered or if no question data stored
-            if (hasAnswered || currentQuestionData_Raw == null)
-                return;
-
-            if (ContentDisplayManager.Instance?.DebugMode ?? false)
-            {
-                LogDebug($"Language changed to {newLanguage}, updating question display");
-            }
-
-            // Extract updated texts with new language
-            string questionText = ExtractLocalizedText(currentQuestionData_Raw, "questionText", newLanguage);
-            List<string> options = ExtractLocalizedList(currentQuestionData_Raw, "options", newLanguage);
-
-            // Update UI elements
-            if (questionLabel != null)
-            {
-                questionLabel.text = questionText;
-            }
-
-            // Update options
-            if (optionsContainer != null && options.Count > 0)
-            {
-                var optionButtons = optionsContainer.Query<Button>().ToList();
-                for (int i = 0; i < options.Count && i < optionButtons.Count; i++)
-                {
-                    var button = optionButtons[i];
-                    var label = button.Q<Label>();
-                    if (label != null)
-                    {
-                        label.text = options[i];
-                    }
-                }
-            }
-
-            // Update validate button text
-            if (validateButton != null)
-            {
-                validateButton.text = newLanguage == "fr" ? "Valider" : "Validate";
-            }
-        }
-
-        // Méthodes utilitaires pour extraire les données
+        // Flat string extraction (mono-language, with legacy {en, fr} backward compat)
         string ExtractLocalizedText(Dictionary<string, object> data, string key, string language)
         {
-            // Format: key: { "en": "...", "fr": "..." }
-            if (data.ContainsKey(key))
-            {
-                var value = data[key];
-
-                // Handle JObject (nested localization)
-                if (value is JObject jobj)
-                {
-                    if (jobj.ContainsKey(language))
-                    {
-                        return jobj[language]?.ToString() ?? "";
-                    }
-                    if (jobj.ContainsKey("en"))
-                    {
-                        return jobj["en"]?.ToString() ?? "";
-                    }
-                }
-                // Handle Dictionary<string, object> (nested localization)
-                else if (value is Dictionary<string, object> dict)
-                {
-                    if (dict.ContainsKey(language))
-                    {
-                        return dict[language]?.ToString() ?? "";
-                    }
-                    if (dict.ContainsKey("en"))
-                    {
-                        return dict["en"]?.ToString() ?? "";
-                    }
-                }
-                // Handle direct string value (non-localized)
-                else if (value is string str)
-                {
-                    return str;
-                }
-            }
-
-            return "";
+            return LocalizedValueReader.ReadString(data, key);
         }
 
         List<string> ExtractLocalizedList(Dictionary<string, object> data, string key, string language)
         {
-            var result = new List<string>();
-
-            // Format: key: { "en": [...], "fr": [...] }
-            if (data.ContainsKey(key))
-            {
-                var value = data[key];
-
-                // Handle JObject with nested arrays
-                if (value is JObject jobj)
-                {
-                    JArray arrayData = null;
-                    if (jobj.ContainsKey(language))
-                    {
-                        arrayData = jobj[language] as JArray;
-                    }
-                    else if (jobj.ContainsKey("en"))
-                    {
-                        arrayData = jobj["en"] as JArray;
-                    }
-
-                    if (arrayData != null)
-                    {
-                        foreach (var item in arrayData)
-                        {
-                            result.Add(item?.ToString() ?? "");
-                        }
-                    }
-                }
-                // Handle Dictionary with nested arrays
-                else if (value is Dictionary<string, object> dict)
-                {
-                    object arrayData = null;
-                    if (dict.ContainsKey(language))
-                    {
-                        arrayData = dict[language];
-                    }
-                    else if (dict.ContainsKey("en"))
-                    {
-                        arrayData = dict["en"];
-                    }
-
-                    if (arrayData is JArray jarray)
-                    {
-                        foreach (var item in jarray)
-                        {
-                            result.Add(item?.ToString() ?? "");
-                        }
-                    }
-                    else if (arrayData is List<object> list)
-                    {
-                        foreach (var item in list)
-                        {
-                            result.Add(item?.ToString() ?? "");
-                        }
-                    }
-                }
-                // Handle direct array (non-localized)
-                else if (value is JArray jarray)
-                {
-                    foreach (var item in jarray)
-                    {
-                        result.Add(item?.ToString() ?? "");
-                    }
-                }
-                else if (value is List<object> list)
-                {
-                    foreach (var item in list)
-                    {
-                        result.Add(item?.ToString() ?? "");
-                    }
-                }
-            }
-
-            if (ContentDisplayManager.Instance?.DebugMode ?? false)
-            {
-                LogDebug($"ExtractLocalizedList for '{key}' in '{language}': found {result.Count} items");
-            }
-
-            return result;
+            return LocalizedValueReader.ReadStringList(data, key);
         }
 
         int ExtractInt(Dictionary<string, object> data, string key)

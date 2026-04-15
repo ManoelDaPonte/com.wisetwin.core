@@ -122,33 +122,22 @@ namespace WiseTwin
 
             backdrop.Add(panel);
             root.Add(backdrop);
-
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
-            }
         }
 
         public void ShowStartPanel(int totalScenarios)
         {
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-
-            titleLabel.text = GetLocalizedText("start_title", lang);
-            subtitleLabel.text = GetLocalizedText("start_subtitle", lang);
-            actionButton.text = GetLocalizedText("start_button", lang);
+            titleLabel.text = "\u25B6";
+            subtitleLabel.text = "";
+            actionButton.text = "\u25B6";
 
             ShowInternal();
         }
 
-        public void ShowTransitionPanel(int completedIndex, int totalScenarios)
+        public void ShowTransitionPanel(int completedIndex, int totalScenarios, string nextScenarioName = "")
         {
-            string lang = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-
-            string titleTemplate = GetLocalizedText("transition_title", lang);
-            titleLabel.text = string.Format(titleTemplate, completedIndex + 1, totalScenarios);
-
-            subtitleLabel.text = GetLocalizedText("transition_subtitle", lang);
-            actionButton.text = GetLocalizedText("transition_button", lang);
+            titleLabel.text = $"{completedIndex + 1} / {totalScenarios}";
+            subtitleLabel.text = nextScenarioName ?? "";
+            actionButton.text = "\u2192";
 
             ShowInternal();
         }
@@ -190,11 +179,6 @@ namespace WiseTwin
             PlayerControls.SetEnabled(enabled);
         }
 
-        void OnLanguageChanged(string newLanguage)
-        {
-            // Les textes seront corrects au prochain Show
-        }
-
         IEnumerator FadeIn()
         {
             if (backdrop == null) yield break;
@@ -231,61 +215,5 @@ namespace WiseTwin
             fadeCoroutine = null;
         }
 
-        // Dictionnaire de traductions
-        static readonly Dictionary<string, Dictionary<string, string>> Translations = new Dictionary<string, Dictionary<string, string>>
-        {
-            {
-                "start_title", new Dictionary<string, string>
-                {
-                    { "en", "Ready to Begin" },
-                    { "fr", "Pr\u00eat \u00e0 commencer" }
-                }
-            },
-            {
-                "start_subtitle", new Dictionary<string, string>
-                {
-                    { "en", "Click to start training" },
-                    { "fr", "Cliquez pour d\u00e9marrer" }
-                }
-            },
-            {
-                "start_button", new Dictionary<string, string>
-                {
-                    { "en", "Start Training" },
-                    { "fr", "D\u00e9marrer la formation" }
-                }
-            },
-            {
-                "transition_title", new Dictionary<string, string>
-                {
-                    { "en", "Scenario {0}/{1} Complete" },
-                    { "fr", "Sc\u00e9nario {0}/{1} termin\u00e9" }
-                }
-            },
-            {
-                "transition_subtitle", new Dictionary<string, string>
-                {
-                    { "en", "Click to continue" },
-                    { "fr", "Cliquez pour continuer" }
-                }
-            },
-            {
-                "transition_button", new Dictionary<string, string>
-                {
-                    { "en", "Continue" },
-                    { "fr", "Continuer" }
-                }
-            }
-        };
-
-        string GetLocalizedText(string key, string lang)
-        {
-            if (Translations.TryGetValue(key, out var dict))
-            {
-                if (dict.TryGetValue(lang, out var text)) return text;
-                if (dict.TryGetValue("en", out var fallback)) return fallback;
-            }
-            return key;
-        }
     }
 }

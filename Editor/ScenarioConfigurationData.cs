@@ -5,7 +5,8 @@ using UnityEngine;
 namespace WiseTwin.Editor
 {
     /// <summary>
-    /// Data classes for scenario configuration in WiseTwinEditor
+    /// Data classes for scenario configuration in WiseTwinEditor.
+    /// Mono-language: all text fields are flat strings edited in the target language.
     /// </summary>
 
     [Serializable]
@@ -31,21 +32,13 @@ namespace WiseTwin.Editor
         public string id = "scenario_1";
         public ScenarioType type = ScenarioType.Question;
 
-        // Question data - now supports multiple questions per scenario
         public List<QuestionScenarioData> questions = new List<QuestionScenarioData>();
-
-        // Procedure data
         public ProcedureScenarioData procedureData = new ProcedureScenarioData();
-
-        // Text data
         public TextScenarioData textData = new TextScenarioData();
-
-        // Dialogue data
         public DialogueScenarioData dialogueData = new DialogueScenarioData();
 
         public ScenarioConfiguration()
         {
-            // Initialize with one empty question by default
             questions = new List<QuestionScenarioData> { new QuestionScenarioData() };
             procedureData = new ProcedureScenarioData();
             textData = new TextScenarioData();
@@ -56,27 +49,20 @@ namespace WiseTwin.Editor
     [Serializable]
     public class QuestionScenarioData
     {
-        public string questionTextEN = "";
-        public string questionTextFR = "";
-        public List<string> optionsEN = new List<string> { "Option 1", "Option 2" };
-        public List<string> optionsFR = new List<string> { "Option 1", "Option 2" };
+        public string questionText = "";
+        public List<string> options = new List<string> { "Option 1", "Option 2" };
         public List<int> correctAnswers = new List<int> { 0 };
         public bool isMultipleChoice = false;
-        public string feedbackEN = "";
-        public string feedbackFR = "";
-        public string incorrectFeedbackEN = "";
-        public string incorrectFeedbackFR = "";
-        public string hintEN = "";
-        public string hintFR = "";
+        public string feedback = "";
+        public string incorrectFeedback = "";
+        public string hint = "";
     }
 
     [Serializable]
     public class ProcedureScenarioData
     {
-        public string titleEN = "";
-        public string titleFR = "";
-        public string descriptionEN = "";
-        public string descriptionFR = "";
+        public string title = "";
+        public string description = "";
         public List<ProcedureStep> steps = new List<ProcedureStep>();
         public List<FakeObject> fakeObjects = new List<FakeObject>();
     }
@@ -84,25 +70,17 @@ namespace WiseTwin.Editor
     [Serializable]
     public class ProcedureStep
     {
-        public string textEN = "";
-        public string textFR = "";
+        public string text = "";
         public GameObject targetObject = null;
         public string targetObjectName = "";
         public Color highlightColor = Color.yellow;
         public bool useBlinking = true;
-        public string hintEN = "";
-        public string hintFR = "";
-        // Validation type for this step (Click, Manual, Zone)
+        public string hint = "";
         public ValidationType validationType = ValidationType.Click;
-        // Zone trigger object (used when validationType == Zone)
         public GameObject zoneObject = null;
         public string zoneObjectName = "";
-        // NEW: Image support for this step
-        public Sprite imageEN = null;  // Image for English
-        public Sprite imageFR = null;  // Image for French
-        public string imagePathEN = "";  // Path to store in JSON
-        public string imagePathFR = "";  // Path to store in JSON
-        // NEW: Fake objects specific to this step
+        public Sprite image = null;
+        public string imagePath = "";
         public List<FakeObject> fakeObjects = new List<FakeObject>();
     }
 
@@ -111,38 +89,33 @@ namespace WiseTwin.Editor
     {
         public GameObject fakeObject = null;
         public string fakeObjectName = "";
-        public string errorMessageEN = "Wrong object!";
-        public string errorMessageFR = "Mauvais objet !";
+        public string errorMessage = "Wrong object!";
     }
 
     [Serializable]
     public class TextScenarioData
     {
-        public string titleEN = "";
-        public string titleFR = "";
-        public string contentEN = "";
-        public string contentFR = "";
+        public string title = "";
+        public string content = "";
     }
 
     [Serializable]
     public class DialogueScenarioData
     {
         public string dialogueId = "";
-        public string titleEN = "";
-        public string titleFR = "";
+        public string title = "";
         // Serialized graph data JSON from the visual editor
         public string graphDataJSON = "";
     }
 
     /// <summary>
-    /// Configuration for video triggers - click on 3D object to play video
+    /// Configuration for video triggers - click on 3D object to play video.
     /// </summary>
     [Serializable]
     public class VideoTriggerConfiguration
     {
         public GameObject targetObject = null;
         public string targetObjectName = "";
-        public string videoUrlEN = "";
-        public string videoUrlFR = "";
+        public string videoUrl = "";
     }
 }

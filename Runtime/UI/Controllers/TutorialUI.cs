@@ -1,14 +1,19 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections;
+using System.Collections.Generic;
 using WiseTwin.UI;
 
 namespace WiseTwin
 {
     /// <summary>
-    /// Displays tutorial instructions after the disclaimer.
-    /// Includes control mode selection (keyboard+mouse vs mouse-only).
-    /// Shows controls and interface explanations before training starts.
+    /// Training onboarding UI shown before the first scenario starts.
+    /// Two panels:
+    ///   1. Welcome — formation title + description (from metadata).
+    ///   2. Tutorial — control mode selection (keyboard+mouse / mouse only) + Play button.
+    ///
+    /// Fires <see cref="OnTutorialCompleted"/> when the user clicks Play. The
+    /// ProgressionManager subscribes to that event to actually launch the training.
     /// </summary>
     public class TutorialUI : MonoBehaviour
     {
@@ -18,25 +23,27 @@ namespace WiseTwin
         [Header("Debug")]
         [SerializeField] private bool debugMode = false;
 
-        // UI References
         private UIDocument uiDocument;
         private VisualElement root;
+        private VisualElement overlay;
+
+        private VisualElement welcomePanel;
         private VisualElement tutorialPanel;
 
-        // State
-        private string currentLanguage = "en";
         private ControlMode selectedMode = ControlMode.KeyboardMouse;
         public bool IsDisplaying { get; private set; } = false;
 
-        // UI references for dynamic updates
         private VisualElement keyboardCard;
         private VisualElement mouseCard;
-        private Label movementDescLabel;
+        private Label explanationLabel;
 
-        // Events
+        const string ExplanationKeyboard =
+            "WASD or arrow keys to move.\nHold right-click and drag to look around.\nScroll wheel to zoom.";
+        const string ExplanationMouse =
+            "Left-click on the ground to walk there.\nHold right-click and drag to look around.\nScroll wheel to zoom.";
+
         public System.Action OnTutorialCompleted;
 
-        // Singleton
         public static TutorialUI Instance { get; private set; }
 
         void Awake()
@@ -65,24 +72,11 @@ namespace WiseTwin
             {
                 uiDocument.visualTreeAsset = null;
             }
-
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
-            }
         }
 
         void OnDestroy()
         {
-            if (Instance == this)
-            {
-                Instance = null;
-            }
-
-            if (LocalizationManager.Instance != null)
-            {
-                LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
-            }
+            if (Instance == this) Instance = null;
         }
 
         public void SetPanelSettings(PanelSettings settings)
@@ -95,19 +89,9 @@ namespace WiseTwin
 
         public void Show(string languageCode = "")
         {
-            if (string.IsNullOrEmpty(languageCode))
-            {
-                currentLanguage = LocalizationManager.Instance?.CurrentLanguage ?? "en";
-            }
-            else
-            {
-                currentLanguage = languageCode;
-            }
-
             selectedMode = ControlMode.KeyboardMouse;
             ControlModeSettings.SetMode(ControlMode.KeyboardMouse);
 
-            // Réactiver le UIDocument s'il a été désactivé
             if (uiDocument != null && !uiDocument.enabled)
             {
                 uiDocument.enabled = true;
@@ -116,27 +100,31 @@ namespace WiseTwin
             if (root == null)
             {
                 root = uiDocument.rootVisualElement;
-                root.pickingMode = PickingMode.Ignore;
+                if (root == null)
+                {
+                    Debug.LogError("[TutorialUI] Root visual element is null — missing PanelSettings?");
+                    return;
+                }
+                root.pickingMode = PickingMode.Position;
+                root.style.flexGrow = 1;
             }
 
-            if (IsDisplaying && tutorialPanel != null && tutorialPanel.style.display == DisplayStyle.Flex)
+            if (IsDisplaying && overlay != null && overlay.style.display == DisplayStyle.Flex)
             {
                 return;
             }
 
-            if (tutorialPanel != null && tutorialPanel.parent != null)
-            {
-                root.Remove(tutorialPanel);
-            }
+            root.Clear();
 
             PlayerControls.SetEnabled(false);
 
-            CreateTutorialPanel();
+            CreateOverlay();
+            ShowWelcomePanel();
+
             IsDisplaying = true;
+            StartCoroutine(FadeIn(overlay));
 
-            StartCoroutine(FadeIn());
-
-            if (debugMode) Debug.Log($"[TutorialUI] Tutorial shown in {currentLanguage}");
+            if (debugMode) Debug.Log("[TutorialUI] Shown");
         }
 
         public void Hide()
@@ -144,107 +132,115 @@ namespace WiseTwin
             StartCoroutine(FadeOutAndHide());
         }
 
-        void CreateTutorialPanel()
+        // ==========================================================================
+        // Overlay setup
+        // ==========================================================================
+
+        void CreateOverlay()
         {
-            tutorialPanel = new VisualElement();
-            tutorialPanel.name = "tutorial-panel";
-            tutorialPanel.style.position = Position.Absolute;
-            tutorialPanel.style.width = Length.Percent(100);
-            tutorialPanel.style.height = Length.Percent(100);
-            tutorialPanel.style.backgroundColor = UIStyles.BgDeep;
-            tutorialPanel.style.alignItems = Align.Center;
-            tutorialPanel.style.justifyContent = Justify.Center;
-            tutorialPanel.pickingMode = PickingMode.Position;
+            overlay = new VisualElement();
+            overlay.name = "tutorial-overlay";
+            overlay.style.position = Position.Absolute;
+            overlay.style.width = Length.Percent(100);
+            overlay.style.height = Length.Percent(100);
+            overlay.style.backgroundColor = UIStyles.BgDeep;
+            overlay.style.alignItems = Align.Center;
+            overlay.style.justifyContent = Justify.Center;
+            overlay.pickingMode = PickingMode.Position;
 
-            var contentContainer = new VisualElement();
-            contentContainer.style.width = 720;
-            contentContainer.style.maxWidth = Length.Percent(90);
-            contentContainer.style.maxHeight = Length.Percent(90);
-            UIStyles.ApplyCardStyle(contentContainer, UIStyles.RadiusXL);
+            welcomePanel = BuildWelcomePanel();
+            tutorialPanel = BuildTutorialPanel();
 
-            var scrollView = new ScrollView(ScrollViewMode.Vertical);
-            scrollView.style.flexGrow = 1;
-            scrollView.verticalScrollerVisibility = ScrollerVisibility.Auto;
-            scrollView.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            welcomePanel.style.display = DisplayStyle.None;
+            tutorialPanel.style.display = DisplayStyle.None;
 
-            // Setup minimal scrollbar
-            scrollView.RegisterCallback<AttachToPanelEvent>(evt => UIStyles.ApplyMinimalScrollbar(scrollView));
-            scrollView.RegisterCallback<GeometryChangedEvent>(evt => UIStyles.ApplyMinimalScrollbar(scrollView));
-
-            var scrollContent = new VisualElement();
-            scrollContent.style.paddingTop = UIStyles.Space3XL;
-            scrollContent.style.paddingBottom = UIStyles.Space3XL;
-            scrollContent.style.paddingLeft = UIStyles.Space3XL;
-            scrollContent.style.paddingRight = UIStyles.Space3XL;
-
-            // Title
-            var titleLabel = UIStyles.CreateTitle(GetText("title"), UIStyles.Font2XL);
-            titleLabel.style.marginBottom = UIStyles.SpaceXL;
-            scrollContent.Add(titleLabel);
-
-            // Control mode selection
-            CreateControlModeSelection(scrollContent);
-
-            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
-
-            // Movement section
-            var movementSection = new VisualElement();
-            movementSection.style.marginBottom = UIStyles.SpaceLG;
-
-            var moveTitleLabel = CreateSectionTitle(GetText("movement_title"));
-            movementSection.Add(moveTitleLabel);
-
-            movementDescLabel = UIStyles.CreateBodyText(GetMovementDesc(), UIStyles.FontBase);
-            movementDescLabel.style.color = UIStyles.TextSecondary;
-            movementSection.Add(movementDescLabel);
-            scrollContent.Add(movementSection);
-
-            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
-
-            // Procedures
-            CreateSection(scrollContent, GetText("procedures_title"), GetText("procedures_desc"));
-            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
-
-            // Questions
-            CreateSection(scrollContent, GetText("questions_title"), GetText("questions_desc"));
-            scrollContent.Add(UIStyles.CreateSeparator(UIStyles.SpaceLG));
-
-            // Interface
-            CreateSection(scrollContent, GetText("interface_title"), GetText("interface_desc"));
-
-            // Next button
-            var buttonContainer = new VisualElement();
-            buttonContainer.style.alignItems = Align.Center;
-            buttonContainer.style.marginTop = UIStyles.Space2XL;
-
-            var startButton = UIStyles.CreatePrimaryButton(GetText("start_button"), () => OnStartButtonClicked());
-            startButton.style.width = 280;
-            startButton.style.height = 52;
-            buttonContainer.Add(startButton);
-
-            scrollContent.Add(buttonContainer);
-            scrollView.Add(scrollContent);
-            contentContainer.Add(scrollView);
-            tutorialPanel.Add(contentContainer);
-            root.Add(tutorialPanel);
+            overlay.Add(welcomePanel);
+            overlay.Add(tutorialPanel);
+            root.Add(overlay);
         }
 
-        void CreateControlModeSelection(VisualElement parent)
-        {
-            var modeLabel = CreateSectionTitle(GetText("control_mode_title"));
-            modeLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            parent.Add(modeLabel);
+        // ==========================================================================
+        // Panel 1: Welcome (title + description from metadata)
+        // ==========================================================================
 
+        VisualElement BuildWelcomePanel()
+        {
+            var panel = new VisualElement();
+            panel.name = "welcome-panel";
+            panel.style.width = 640;
+            panel.style.maxWidth = Length.Percent(90);
+            panel.style.maxHeight = Length.Percent(90);
+            UIStyles.ApplyCardStyle(panel, UIStyles.RadiusXL);
+            UIStyles.SetPadding(panel, UIStyles.Space3XL);
+            panel.style.alignItems = Align.Center;
+
+            string title = "";
+            string description = "";
+            var loader = MetadataLoader.Instance;
+            if (loader != null && loader.IsLoaded)
+            {
+                var meta = loader.GetMetadata();
+                if (meta != null)
+                {
+                    if (meta.TryGetValue("title", out var t)) title = LocalizedValueReader.Flatten(t);
+                    if (meta.TryGetValue("description", out var d)) description = LocalizedValueReader.Flatten(d);
+                }
+            }
+
+            var titleLabel = UIStyles.CreateTitle(title, UIStyles.Font3XL);
+            titleLabel.style.marginBottom = UIStyles.SpaceLG;
+            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            panel.Add(titleLabel);
+
+            var descLabel = UIStyles.CreateBodyText(description, UIStyles.FontMD);
+            descLabel.style.color = UIStyles.TextSecondary;
+            descLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            descLabel.style.whiteSpace = WhiteSpace.Normal;
+            descLabel.style.marginBottom = UIStyles.Space2XL;
+            panel.Add(descLabel);
+
+            var nextButton = UIStyles.CreatePrimaryButton("\u2192", ShowTutorialPanel);
+            nextButton.style.width = 140;
+            nextButton.style.height = 52;
+            nextButton.style.fontSize = UIStyles.Font2XL;
+            panel.Add(nextButton);
+
+            return panel;
+        }
+
+        void ShowWelcomePanel()
+        {
+            if (welcomePanel != null) welcomePanel.style.display = DisplayStyle.Flex;
+            if (tutorialPanel != null) tutorialPanel.style.display = DisplayStyle.None;
+        }
+
+        // ==========================================================================
+        // Panel 2: Tutorial (control mode + Play button)
+        // ==========================================================================
+
+        VisualElement BuildTutorialPanel()
+        {
+            var panel = new VisualElement();
+            panel.name = "tutorial-panel-content";
+            panel.style.width = 720;
+            panel.style.maxWidth = Length.Percent(90);
+            panel.style.maxHeight = Length.Percent(90);
+            UIStyles.ApplyCardStyle(panel, UIStyles.RadiusXL);
+            UIStyles.SetPadding(panel, UIStyles.Space3XL);
+            panel.style.alignItems = Align.Center;
+
+            var header = UIStyles.CreateTitle("Choose your controls", UIStyles.FontXL);
+            header.style.marginBottom = UIStyles.SpaceLG;
+            header.style.unityTextAlign = TextAnchor.MiddleCenter;
+            panel.Add(header);
+
+            // Control mode cards row
             var cardsRow = new VisualElement();
             cardsRow.style.flexDirection = FlexDirection.Row;
             cardsRow.style.justifyContent = Justify.Center;
-            cardsRow.style.marginBottom = UIStyles.SpaceMD;
+            cardsRow.style.marginBottom = UIStyles.SpaceLG;
 
-            keyboardCard = CreateControlModeCard(
-                GetText("mode_keyboard_title"),
-                "WASD",
-                true
-            );
+            keyboardCard = BuildKeyboardCard(true);
             keyboardCard.RegisterCallback<ClickEvent>(evt =>
             {
                 evt.StopPropagation();
@@ -253,14 +249,10 @@ namespace WiseTwin
             cardsRow.Add(keyboardCard);
 
             var spacer = new VisualElement();
-            spacer.style.width = UIStyles.SpaceLG;
+            spacer.style.width = UIStyles.Space2XL;
             cardsRow.Add(spacer);
 
-            mouseCard = CreateControlModeCard(
-                GetText("mode_mouse_title"),
-                GetText("mode_mouse_icon"),
-                false
-            );
+            mouseCard = BuildMouseCard(false);
             mouseCard.RegisterCallback<ClickEvent>(evt =>
             {
                 evt.StopPropagation();
@@ -268,38 +260,195 @@ namespace WiseTwin
             });
             cardsRow.Add(mouseCard);
 
-            parent.Add(cardsRow);
+            panel.Add(cardsRow);
+
+            // Explanation label (updates when a card is selected)
+            explanationLabel = new Label(ExplanationKeyboard);
+            explanationLabel.style.fontSize = UIStyles.FontBase;
+            explanationLabel.style.color = UIStyles.TextSecondary;
+            explanationLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            explanationLabel.style.whiteSpace = WhiteSpace.Normal;
+            explanationLabel.style.marginTop = UIStyles.SpaceLG;
+            explanationLabel.style.marginBottom = UIStyles.SpaceXL;
+            explanationLabel.style.paddingTop = UIStyles.SpaceMD;
+            explanationLabel.style.paddingBottom = UIStyles.SpaceMD;
+            explanationLabel.style.paddingLeft = UIStyles.SpaceLG;
+            explanationLabel.style.paddingRight = UIStyles.SpaceLG;
+            explanationLabel.style.backgroundColor = UIStyles.BgElevated;
+            UIStyles.SetBorderRadius(explanationLabel, UIStyles.RadiusSM);
+            explanationLabel.style.minWidth = 520;
+            panel.Add(explanationLabel);
+
+            // Back + Play buttons
+            var buttonRow = new VisualElement();
+            buttonRow.style.flexDirection = FlexDirection.Row;
+            buttonRow.style.justifyContent = Justify.Center;
+            buttonRow.style.marginTop = UIStyles.SpaceLG;
+
+            var backButton = UIStyles.CreateSecondaryButton("\u2190", ShowWelcomePanel);
+            backButton.style.width = 100;
+            backButton.style.height = 48;
+            backButton.style.fontSize = UIStyles.FontXL;
+            backButton.style.marginRight = UIStyles.SpaceLG;
+            buttonRow.Add(backButton);
+
+            var playButton = UIStyles.CreatePrimaryButton("\u25B6", OnPlayButtonClicked);
+            playButton.style.width = 140;
+            playButton.style.height = 52;
+            playButton.style.fontSize = UIStyles.Font2XL;
+            buttonRow.Add(playButton);
+
+            panel.Add(buttonRow);
+
+            return panel;
         }
 
-        VisualElement CreateControlModeCard(string title, string icon, bool isSelected)
+        // ==========================================================================
+        // Visual control mode cards (keyboard keys + mouse shape drawn with VisualElements)
+        // ==========================================================================
+
+        VisualElement BuildKeyboardCard(bool isSelected)
+        {
+            var card = MakeCardShell(isSelected);
+
+            var visual = new VisualElement();
+            visual.style.alignItems = Align.Center;
+            visual.style.justifyContent = Justify.Center;
+            visual.style.marginBottom = UIStyles.SpaceMD;
+
+            // Top row: [W]
+            var topRow = new VisualElement();
+            topRow.style.flexDirection = FlexDirection.Row;
+            topRow.style.justifyContent = Justify.Center;
+            topRow.style.marginBottom = 4;
+            topRow.Add(BuildKey("W"));
+            visual.Add(topRow);
+
+            // Bottom row: [A] [S] [D]
+            var bottomRow = new VisualElement();
+            bottomRow.style.flexDirection = FlexDirection.Row;
+            bottomRow.style.justifyContent = Justify.Center;
+            bottomRow.Add(BuildKey("A"));
+            bottomRow.Add(BuildKey("S"));
+            bottomRow.Add(BuildKey("D"));
+            visual.Add(bottomRow);
+
+            card.Add(visual);
+
+            var label = new Label("Keyboard + Mouse");
+            label.style.fontSize = UIStyles.FontBase;
+            label.style.color = UIStyles.TextPrimary;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.pickingMode = PickingMode.Ignore;
+            card.Add(label);
+
+            return card;
+        }
+
+        VisualElement BuildMouseCard(bool isSelected)
+        {
+            var card = MakeCardShell(isSelected);
+
+            // Mouse shape: a rounded vertical rectangle with two chambers on top + a small scroll dot.
+            var mouseBody = new VisualElement();
+            mouseBody.style.width = 60;
+            mouseBody.style.height = 90;
+            mouseBody.style.backgroundColor = UIStyles.BgDeep;
+            UIStyles.SetBorderRadius(mouseBody, 30);
+            UIStyles.SetBorderWidth(mouseBody, 2);
+            UIStyles.SetBorderColor(mouseBody, UIStyles.TextSecondary);
+            mouseBody.style.marginBottom = UIStyles.SpaceMD;
+            mouseBody.pickingMode = PickingMode.Ignore;
+
+            // Left/Right button divider (top half)
+            var divider = new VisualElement();
+            divider.style.position = Position.Absolute;
+            divider.style.left = 29;
+            divider.style.top = 2;
+            divider.style.width = 2;
+            divider.style.height = 34;
+            divider.style.backgroundColor = UIStyles.TextSecondary;
+            mouseBody.Add(divider);
+
+            // Horizontal separator between buttons and body
+            var horizSep = new VisualElement();
+            horizSep.style.position = Position.Absolute;
+            horizSep.style.left = 2;
+            horizSep.style.right = 2;
+            horizSep.style.top = 36;
+            horizSep.style.height = 1;
+            horizSep.style.backgroundColor = UIStyles.TextSecondary;
+            mouseBody.Add(horizSep);
+
+            // Scroll wheel (small pill in the middle)
+            var wheel = new VisualElement();
+            wheel.style.position = Position.Absolute;
+            wheel.style.left = 26;
+            wheel.style.top = 16;
+            wheel.style.width = 8;
+            wheel.style.height = 14;
+            wheel.style.backgroundColor = UIStyles.Accent;
+            UIStyles.SetBorderRadius(wheel, 4);
+            mouseBody.Add(wheel);
+
+            card.Add(mouseBody);
+
+            var label = new Label("Mouse only");
+            label.style.fontSize = UIStyles.FontBase;
+            label.style.color = UIStyles.TextPrimary;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.pickingMode = PickingMode.Ignore;
+            card.Add(label);
+
+            return card;
+        }
+
+        VisualElement MakeCardShell(bool isSelected)
         {
             var card = new VisualElement();
-            card.style.width = 260;
+            card.style.width = 220;
+            card.style.height = 200;
             UIStyles.SetPadding(card, UIStyles.SpaceLG);
             UIStyles.SetBorderRadius(card, UIStyles.RadiusMD);
             UIStyles.SetBorderWidth(card, 2);
             card.style.alignItems = Align.Center;
+            card.style.justifyContent = Justify.Center;
             card.pickingMode = PickingMode.Position;
-
             ApplyControlCardStyle(card, isSelected);
-
-            var iconLabel = new Label(icon);
-            iconLabel.style.fontSize = UIStyles.FontXL;
-            iconLabel.style.color = UIStyles.TextPrimary;
-            iconLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            iconLabel.style.marginBottom = UIStyles.SpaceSM;
-            iconLabel.pickingMode = PickingMode.Ignore;
-            card.Add(iconLabel);
-
-            var titleLabel = new Label(title);
-            titleLabel.style.fontSize = UIStyles.FontBase;
-            titleLabel.style.color = UIStyles.TextPrimary;
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            titleLabel.pickingMode = PickingMode.Ignore;
-            card.Add(titleLabel);
-
             return card;
+        }
+
+        VisualElement BuildKey(string letter)
+        {
+            var key = new VisualElement();
+            key.style.width = 38;
+            key.style.height = 38;
+            key.style.marginLeft = 3;
+            key.style.marginRight = 3;
+            key.style.alignItems = Align.Center;
+            key.style.justifyContent = Justify.Center;
+            key.style.backgroundColor = UIStyles.BgDeep;
+            UIStyles.SetBorderRadius(key, UIStyles.RadiusSM);
+            UIStyles.SetBorderWidth(key, 2);
+            UIStyles.SetBorderColor(key, UIStyles.TextSecondary);
+            key.pickingMode = PickingMode.Ignore;
+
+            var label = new Label(letter);
+            label.style.fontSize = UIStyles.FontMD;
+            label.style.color = UIStyles.TextPrimary;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.pickingMode = PickingMode.Ignore;
+            key.Add(label);
+
+            return key;
+        }
+
+        void ShowTutorialPanel()
+        {
+            if (welcomePanel != null) welcomePanel.style.display = DisplayStyle.None;
+            if (tutorialPanel != null) tutorialPanel.style.display = DisplayStyle.Flex;
         }
 
         void ApplyControlCardStyle(VisualElement card, bool isSelected)
@@ -316,139 +465,65 @@ namespace WiseTwin
             selectedMode = mode;
             ControlModeSettings.SetMode(mode);
 
-            if (keyboardCard != null)
-                ApplyControlCardStyle(keyboardCard, mode == ControlMode.KeyboardMouse);
-            if (mouseCard != null)
-                ApplyControlCardStyle(mouseCard, mode == ControlMode.MouseOnly);
-
-            if (movementDescLabel != null)
-                movementDescLabel.text = GetMovementDesc();
-
-            if (debugMode) Debug.Log($"[TutorialUI] Control mode selected: {mode}");
-        }
-
-        string GetMovementDesc()
-        {
-            if (selectedMode == ControlMode.MouseOnly)
+            if (keyboardCard != null) ApplyControlCardStyle(keyboardCard, mode == ControlMode.KeyboardMouse);
+            if (mouseCard != null) ApplyControlCardStyle(mouseCard, mode == ControlMode.MouseOnly);
+            if (explanationLabel != null)
             {
-                return currentLanguage == "fr"
-                    ? "Clic gauche sur le sol pour vous deplacer. Clic droit maintenu pour tourner la camera. Molette pour zoomer."
-                    : "Left-click on the ground to move. Hold right-click to orbit the camera. Scroll wheel to zoom.";
+                explanationLabel.text = mode == ControlMode.KeyboardMouse ? ExplanationKeyboard : ExplanationMouse;
             }
-            return GetText("movement_desc");
+
+            if (debugMode) Debug.Log($"[TutorialUI] Control mode: {mode}");
         }
 
-        Label CreateSectionTitle(string text)
+        // ==========================================================================
+        // Actions
+        // ==========================================================================
+
+        void OnPlayButtonClicked()
         {
-            var label = new Label(text);
-            label.style.fontSize = UIStyles.FontMD;
-            label.style.color = UIStyles.Info;
-            label.style.unityFontStyleAndWeight = FontStyle.Bold;
-            label.style.marginBottom = UIStyles.SpaceSM;
-            return label;
-        }
-
-        void CreateSection(VisualElement parent, string title, string description)
-        {
-            var section = new VisualElement();
-            section.style.marginBottom = UIStyles.SpaceLG;
-
-            section.Add(CreateSectionTitle(title));
-
-            var descLabel = UIStyles.CreateBodyText(description, UIStyles.FontBase);
-            descLabel.style.color = UIStyles.TextSecondary;
-            section.Add(descLabel);
-
-            parent.Add(section);
-        }
-
-        string GetText(string key)
-        {
-            if (currentLanguage == "fr")
-            {
-                return key switch
-                {
-                    "title" => "Comment utiliser la formation",
-                    "control_mode_title" => "Mode de controle",
-                    "mode_keyboard_title" => "Clavier + Souris",
-                    "mode_mouse_title" => "Souris uniquement",
-                    "mode_mouse_icon" => "Clic",
-                    "movement_title" => "Deplacement & Camera",
-                    "movement_desc" => "WASD ou fleches pour se deplacer. Clic droit maintenu pour regarder autour. Molette pour zoomer.",
-                    "procedures_title" => "Procedures",
-                    "procedures_desc" => "Cliquez sur les objets qui clignotent pour valider les etapes. Si plusieurs clignotent, trouvez le bon !",
-                    "questions_title" => "Questions",
-                    "questions_desc" => "Lisez attentivement. L'indication sous les reponses precise si c'est un choix unique ou multiple.",
-                    "interface_title" => "Interface",
-                    "interface_desc" => "La barre en haut montre votre progression. Le bouton rouge permet de recommencer la formation.",
-                    "start_button" => "Suivant",
-                    _ => key
-                };
-            }
-            else
-            {
-                return key switch
-                {
-                    "title" => "How to Use the Training",
-                    "control_mode_title" => "Control mode",
-                    "mode_keyboard_title" => "Keyboard + Mouse",
-                    "mode_mouse_title" => "Mouse Only",
-                    "mode_mouse_icon" => "Click",
-                    "movement_title" => "Movement & Camera",
-                    "movement_desc" => "WASD or arrow keys to move. Hold right-click to look around. Scroll wheel to zoom.",
-                    "procedures_title" => "Procedures",
-                    "procedures_desc" => "Click on blinking objects to validate steps. If multiple are blinking, find the correct one!",
-                    "questions_title" => "Questions",
-                    "questions_desc" => "Read carefully. The label below answers indicates single choice or multiple choice.",
-                    "interface_title" => "Interface",
-                    "interface_desc" => "The top bar shows your progress. The red button lets you restart the training.",
-                    "start_button" => "Next",
-                    _ => key
-                };
-            }
-        }
-
-        void OnStartButtonClicked()
-        {
-            if (debugMode) Debug.Log("[TutorialUI] Next button clicked");
+            if (debugMode) Debug.Log("[TutorialUI] Play clicked → completing tutorial");
+            ControlModeSettings.ApplyToPlayer();
             OnTutorialCompleted?.Invoke();
             Hide();
         }
 
-        IEnumerator FadeIn()
+        IEnumerator FadeIn(VisualElement element)
         {
-            if (tutorialPanel == null) yield break;
-
-            tutorialPanel.style.opacity = 0;
-            tutorialPanel.style.display = DisplayStyle.Flex;
+            if (element == null) yield break;
+            element.style.opacity = 0;
+            element.style.display = DisplayStyle.Flex;
 
             float elapsed = 0;
             while (elapsed < animationDuration)
             {
                 elapsed += Time.deltaTime;
-                tutorialPanel.style.opacity = Mathf.Lerp(0, 1, elapsed / animationDuration);
+                element.style.opacity = Mathf.Lerp(0, 1, elapsed / animationDuration);
                 yield return null;
             }
-
-            tutorialPanel.style.opacity = 1;
+            element.style.opacity = 1;
         }
 
         IEnumerator FadeOutAndHide()
         {
-            if (tutorialPanel == null) yield break;
+            if (overlay == null) yield break;
 
             float elapsed = 0;
             while (elapsed < animationDuration)
             {
                 elapsed += Time.deltaTime;
-                tutorialPanel.style.opacity = Mathf.Lerp(1, 0, elapsed / animationDuration);
+                overlay.style.opacity = Mathf.Lerp(1, 0, elapsed / animationDuration);
                 yield return null;
             }
 
-            tutorialPanel.style.display = DisplayStyle.None;
+            overlay.style.display = DisplayStyle.None;
             IsDisplaying = false;
 
-            // Désactiver le UIDocument pour ne pas bloquer les clics sur le HUD
+            if (root != null)
+            {
+                root.style.display = DisplayStyle.None;
+                root.pickingMode = PickingMode.Ignore;
+            }
+
             if (uiDocument != null)
             {
                 uiDocument.enabled = false;
@@ -456,23 +531,7 @@ namespace WiseTwin
 
             PlayerControls.SetEnabled(true);
 
-            if (debugMode) Debug.Log("[TutorialUI] Tutorial hidden");
-        }
-
-        void OnLanguageChanged(string newLanguage)
-        {
-            currentLanguage = newLanguage;
-
-            if (IsDisplaying && tutorialPanel != null && tutorialPanel.style.display == DisplayStyle.Flex)
-            {
-                if (tutorialPanel.parent != null)
-                {
-                    root.Remove(tutorialPanel);
-                }
-
-                CreateTutorialPanel();
-                tutorialPanel.style.opacity = 1;
-            }
+            if (debugMode) Debug.Log("[TutorialUI] Hidden");
         }
     }
 }

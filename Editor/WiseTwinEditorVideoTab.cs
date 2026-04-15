@@ -7,8 +7,8 @@ using System.Collections.Generic;
 namespace WiseTwin.Editor
 {
     /// <summary>
-    /// Video Configuration tab for WiseTwinEditor
-    /// Allows configuring video triggers on 3D objects
+    /// Video Configuration tab for WiseTwinEditor.
+    /// Mono-language: single videoUrl per trigger.
     /// </summary>
     public static class WiseTwinEditorVideoTab
     {
@@ -17,12 +17,10 @@ namespace WiseTwin.Editor
             EditorGUILayout.LabelField("Video Configuration", EditorStyles.largeLabel);
             EditorGUILayout.HelpBox(
                 "Configure videos to play when clicking on 3D objects. " +
-                "Drag & drop GameObjects from your scene, then add video URLs for each language. " +
-                "If one language is missing, the other will be used as fallback.",
+                "Drag & drop GameObjects from your scene, then add a video URL.",
                 MessageType.Info);
             EditorGUILayout.Space();
 
-            // Add video trigger button
             if (GUILayout.Button("+ Add Video Trigger", GUILayout.Height(30)))
             {
                 data.videoTriggers.Add(new VideoTriggerConfiguration());
@@ -37,7 +35,6 @@ namespace WiseTwin.Editor
                 return;
             }
 
-            // Video triggers list
             EditorGUILayout.LabelField($"Video Triggers ({data.videoTriggers.Count})", EditorStyles.boldLabel);
 
             for (int i = 0; i < data.videoTriggers.Count; i++)
@@ -47,7 +44,6 @@ namespace WiseTwin.Editor
 
             EditorGUILayout.Space();
 
-            // Edit selected video trigger
             if (data.selectedVideoTriggerIndex >= 0 && data.selectedVideoTriggerIndex < data.videoTriggers.Count)
             {
                 DrawVideoTriggerEditor(data.videoTriggers[data.selectedVideoTriggerIndex]);
@@ -60,7 +56,6 @@ namespace WiseTwin.Editor
 
             EditorGUILayout.BeginHorizontal("box");
 
-            // Select/Toggle button
             bool isSelected = (data.selectedVideoTriggerIndex == index);
             GUI.backgroundColor = isSelected ? new Color(0.4f, 0.8f, 1f) : Color.white;
 
@@ -73,16 +68,11 @@ namespace WiseTwin.Editor
             }
             GUI.backgroundColor = Color.white;
 
-            // Status indicators
-            bool hasEN = !string.IsNullOrEmpty(trigger.videoUrlEN);
-            bool hasFR = !string.IsNullOrEmpty(trigger.videoUrlFR);
-
+            bool hasUrl = !string.IsNullOrEmpty(trigger.videoUrl);
             GUIStyle statusStyle = new GUIStyle(EditorStyles.miniLabel);
-            statusStyle.normal.textColor = (hasEN || hasFR) ? Color.green : Color.gray;
-            EditorGUILayout.LabelField(hasEN ? "EN" : "--", statusStyle, GUILayout.Width(25));
-            EditorGUILayout.LabelField(hasFR ? "FR" : "--", statusStyle, GUILayout.Width(25));
+            statusStyle.normal.textColor = hasUrl ? Color.green : Color.gray;
+            EditorGUILayout.LabelField(hasUrl ? "OK" : "--", statusStyle, GUILayout.Width(30));
 
-            // Delete button
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("X", GUILayout.Width(25), GUILayout.Height(25)))
             {
@@ -107,7 +97,6 @@ namespace WiseTwin.Editor
             EditorGUI.DrawRect(EditorGUILayout.GetControlRect(false, 1), Color.gray);
             EditorGUILayout.Space();
 
-            // Target Object (drag & drop)
             EditorGUILayout.LabelField("Target Object", EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox("Drag a GameObject from your scene here. When clicked during training, the video will play.", MessageType.None);
 
@@ -122,37 +111,26 @@ namespace WiseTwin.Editor
                 trigger.targetObjectName = trigger.targetObject.name;
             }
 
-            // Object name field (for manual edit or display)
             trigger.targetObjectName = EditorGUILayout.TextField("Object Name", trigger.targetObjectName);
 
             EditorGUILayout.Space();
 
-            // Video URLs
-            EditorGUILayout.LabelField("Video URLs", EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox("Enter public video URLs. If one language is missing, the other will be used as fallback.", MessageType.None);
-
-            GUIStyle urlStyle = new GUIStyle(EditorStyles.textField);
-            urlStyle.wordWrap = false;
-
-            EditorGUILayout.LabelField("  English Video URL:", EditorStyles.miniLabel);
-            trigger.videoUrlEN = EditorGUILayout.TextField(trigger.videoUrlEN);
-
-            EditorGUILayout.LabelField("  French Video URL:", EditorStyles.miniLabel);
-            trigger.videoUrlFR = EditorGUILayout.TextField(trigger.videoUrlFR);
+            EditorGUILayout.LabelField("Video URL", EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox("Enter a public video URL.", MessageType.None);
+            trigger.videoUrl = EditorGUILayout.TextField(trigger.videoUrl);
 
             EditorGUILayout.Space();
 
-            // Validation status
             bool hasObject = !string.IsNullOrEmpty(trigger.targetObjectName);
-            bool hasAnyUrl = !string.IsNullOrEmpty(trigger.videoUrlEN) || !string.IsNullOrEmpty(trigger.videoUrlFR);
+            bool hasUrl = !string.IsNullOrEmpty(trigger.videoUrl);
 
             if (!hasObject)
             {
                 EditorGUILayout.HelpBox("Please assign a target object.", MessageType.Warning);
             }
-            else if (!hasAnyUrl)
+            else if (!hasUrl)
             {
-                EditorGUILayout.HelpBox("Please add at least one video URL.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Please add a video URL.", MessageType.Warning);
             }
             else
             {

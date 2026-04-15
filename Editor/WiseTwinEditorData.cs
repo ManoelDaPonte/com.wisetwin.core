@@ -22,10 +22,8 @@ namespace WiseTwin.Editor
         public string buildType = "wisetrainer";
 
         // ============= METADATA CONFIG =============
-        public string projectTitleEN = "Training Test";
-        public string projectTitleFR = "Formation Test";
-        public string projectDescriptionEN = "Training description";
-        public string projectDescriptionFR = "Description de la formation";
+        public string projectTitle = "Training Test";
+        public string projectDescription = "Training description";
         public string projectVersion = "1.0.0";
         public int durationMinutes = 30;
         public int difficultyIndex = 1;

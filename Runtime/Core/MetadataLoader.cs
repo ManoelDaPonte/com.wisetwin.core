@@ -544,35 +544,15 @@ public class MetadataLoader : MonoBehaviour
     }
 
     /// <summary>
-    /// Get localized disclaimer text
+    /// Get the disclaimer text (flat string, mono-language)
     /// </summary>
-    public string GetDisclaimer(string languageCode = "en")
+    public string GetDisclaimer()
     {
         if (loadedMetadata != null && loadedMetadata.ContainsKey("disclaimer"))
         {
-            try
-            {
-                var disclaimerObj = JsonConvert.DeserializeObject<Dictionary<string, string>>(
-                    JsonConvert.SerializeObject(loadedMetadata["disclaimer"]));
-
-                if (disclaimerObj.ContainsKey(languageCode))
-                {
-                    return disclaimerObj[languageCode];
-                }
-
-                // Fallback to English if requested language not found
-                if (disclaimerObj.ContainsKey("en"))
-                {
-                    return disclaimerObj["en"];
-                }
-            }
-            catch (System.Exception e)
-            {
-                DebugLog($"⚠️ Error parsing disclaimer: {e.Message}");
-            }
+            return loadedMetadata["disclaimer"]?.ToString();
         }
-
-        return null; // No disclaimer in metadata
+        return null;
     }
     
     public string GetProjectInfo(string key)

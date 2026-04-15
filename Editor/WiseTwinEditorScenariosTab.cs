@@ -85,21 +85,15 @@ namespace WiseTwin.Editor
                     return $"{qCount} question{(qCount > 1 ? "s" : "")}";
                 case ScenarioType.Procedure:
                     int sCount = scenario.procedureData?.steps?.Count ?? 0;
-                    string title = !string.IsNullOrEmpty(scenario.procedureData?.titleFR)
-                        ? scenario.procedureData.titleFR
-                        : scenario.procedureData?.titleEN ?? "";
+                    string title = scenario.procedureData?.title ?? "";
                     if (title.Length > 30) title = title.Substring(0, 27) + "...";
                     return $"{sCount} step{(sCount > 1 ? "s" : "")}" + (title != "" ? $" - {title}" : "");
                 case ScenarioType.Text:
-                    string tTitle = !string.IsNullOrEmpty(scenario.textData?.titleFR)
-                        ? scenario.textData.titleFR
-                        : scenario.textData?.titleEN ?? "";
+                    string tTitle = scenario.textData?.title ?? "";
                     if (tTitle.Length > 40) tTitle = tTitle.Substring(0, 37) + "...";
                     return tTitle != "" ? tTitle : "(empty)";
                 case ScenarioType.Dialogue:
-                    string dTitle = !string.IsNullOrEmpty(scenario.dialogueData?.titleFR)
-                        ? scenario.dialogueData.titleFR
-                        : scenario.dialogueData?.titleEN ?? "";
+                    string dTitle = scenario.dialogueData?.title ?? "";
                     if (dTitle.Length > 40) dTitle = dTitle.Substring(0, 37) + "...";
                     return dTitle != "" ? dTitle : "(empty)";
                 default:
@@ -367,9 +361,7 @@ namespace WiseTwin.Editor
 
             EditorGUILayout.BeginHorizontal();
             string arrow = isOpen ? "v" : ">";
-            string previewText = !string.IsNullOrEmpty(question.questionTextFR)
-                ? question.questionTextFR
-                : question.questionTextEN;
+            string previewText = question.questionText ?? "";
             if (previewText.Length > 60) previewText = previewText.Substring(0, 57) + "...";
             if (string.IsNullOrEmpty(previewText)) previewText = "(empty question)";
 
@@ -433,12 +425,7 @@ namespace WiseTwin.Editor
 
             // Question text
             EditorGUILayout.LabelField("Question Text", EditorStyles.miniBoldLabel);
-            EditorGUI.indentLevel++;
-            EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
-            question.questionTextEN = EditorGUILayout.TextArea(question.questionTextEN, textAreaStyle, GUILayout.Height(50));
-            EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
-            question.questionTextFR = EditorGUILayout.TextArea(question.questionTextFR, textAreaStyle, GUILayout.Height(50));
-            EditorGUI.indentLevel--;
+            question.questionText = EditorGUILayout.TextArea(question.questionText, textAreaStyle, GUILayout.Height(50));
 
             EditorGUILayout.Space(4);
 
@@ -449,13 +436,10 @@ namespace WiseTwin.Editor
 
             // Options
             EditorGUILayout.LabelField("Answer Options", EditorStyles.miniBoldLabel);
-            int optionsCount = Mathf.Max(question.optionsEN.Count, question.optionsFR.Count);
+            int optionsCount = question.options.Count;
 
             for (int i = 0; i < optionsCount; i++)
             {
-                while (question.optionsEN.Count <= i) question.optionsEN.Add("");
-                while (question.optionsFR.Count <= i) question.optionsFR.Add("");
-
                 bool isCorrect = question.correctAnswers.Contains(i);
 
                 // Option row with colored indicator
@@ -490,8 +474,7 @@ namespace WiseTwin.Editor
                 GUI.backgroundColor = new Color(1f, 0.5f, 0.5f);
                 if (optionsCount > 2 && GUILayout.Button("X", GUILayout.Width(20), GUILayout.Height(16)))
                 {
-                    question.optionsEN.RemoveAt(i);
-                    question.optionsFR.RemoveAt(i);
+                    question.options.RemoveAt(i);
                     question.correctAnswers.Remove(i);
                     for (int j = 0; j < question.correctAnswers.Count; j++)
                     {
@@ -506,18 +489,14 @@ namespace WiseTwin.Editor
 
                 EditorGUILayout.EndHorizontal();
 
-                EditorGUI.indentLevel++;
-                question.optionsEN[i] = EditorGUILayout.TextField("EN", question.optionsEN[i]);
-                question.optionsFR[i] = EditorGUILayout.TextField("FR", question.optionsFR[i]);
-                EditorGUI.indentLevel--;
+                question.options[i] = EditorGUILayout.TextField("Text", question.options[i]);
 
                 EditorGUILayout.EndVertical();
             }
 
             if (GUILayout.Button("+ Add Option", GUILayout.Height(20)))
             {
-                question.optionsEN.Add("");
-                question.optionsFR.Add("");
+                question.options.Add("");
             }
 
             EditorGUILayout.Space(4);
@@ -534,18 +513,12 @@ namespace WiseTwin.Editor
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField("Correct Feedback", EditorStyles.miniBoldLabel);
-                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
-                question.feedbackEN = EditorGUILayout.TextArea(question.feedbackEN, textAreaStyle, GUILayout.Height(45));
-                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
-                question.feedbackFR = EditorGUILayout.TextArea(question.feedbackFR, textAreaStyle, GUILayout.Height(45));
+                question.feedback = EditorGUILayout.TextArea(question.feedback, textAreaStyle, GUILayout.Height(45));
 
                 EditorGUILayout.Space(2);
 
                 EditorGUILayout.LabelField("Incorrect Feedback", EditorStyles.miniBoldLabel);
-                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
-                question.incorrectFeedbackEN = EditorGUILayout.TextArea(question.incorrectFeedbackEN, textAreaStyle, GUILayout.Height(45));
-                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
-                question.incorrectFeedbackFR = EditorGUILayout.TextArea(question.incorrectFeedbackFR, textAreaStyle, GUILayout.Height(45));
+                question.incorrectFeedback = EditorGUILayout.TextArea(question.incorrectFeedback, textAreaStyle, GUILayout.Height(45));
                 EditorGUI.indentLevel--;
             }
         }
@@ -566,21 +539,13 @@ namespace WiseTwin.Editor
                 EditorGUI.DrawRect(genRect, new Color(0.2f, 0.4f, 0.25f, 0.15f));
 
                 EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
-                EditorGUI.indentLevel++;
-                procedure.titleEN = EditorGUILayout.TextField("EN", procedure.titleEN);
-                procedure.titleFR = EditorGUILayout.TextField("FR", procedure.titleFR);
-                EditorGUI.indentLevel--;
+                procedure.title = EditorGUILayout.TextField("Title", procedure.title);
 
                 EditorGUILayout.Space(2);
 
                 GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
                 EditorGUILayout.LabelField("Description", EditorStyles.miniBoldLabel);
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
-                procedure.descriptionEN = EditorGUILayout.TextArea(procedure.descriptionEN, textAreaStyle, GUILayout.Height(45));
-                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
-                procedure.descriptionFR = EditorGUILayout.TextArea(procedure.descriptionFR, textAreaStyle, GUILayout.Height(45));
-                EditorGUI.indentLevel--;
+                procedure.description = EditorGUILayout.TextArea(procedure.description, textAreaStyle, GUILayout.Height(45));
 
                 EditorGUILayout.EndVertical();
             }
@@ -630,7 +595,7 @@ namespace WiseTwin.Editor
             bool isOpen = IsAccordionOpen(accordionGroup, sectionKey);
 
             // Preview text
-            string preview = !string.IsNullOrEmpty(step.textFR) ? step.textFR : step.textEN;
+            string preview = step.text ?? "";
             if (preview.Length > 50) preview = preview.Substring(0, 47) + "...";
             if (string.IsNullOrEmpty(preview)) preview = "(empty step)";
 
@@ -709,12 +674,7 @@ namespace WiseTwin.Editor
                 // Step text
                 GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
                 EditorGUILayout.LabelField("Text", EditorStyles.miniBoldLabel);
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
-                step.textEN = EditorGUILayout.TextArea(step.textEN, textAreaStyle, GUILayout.Height(40));
-                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
-                step.textFR = EditorGUILayout.TextArea(step.textFR, textAreaStyle, GUILayout.Height(40));
-                EditorGUI.indentLevel--;
+                step.text = EditorGUILayout.TextArea(step.text, textAreaStyle, GUILayout.Height(40));
 
                 // Highlight, Blink, Images, Fake Objects: only for Click validation
                 if (step.validationType == ValidationType.Click)
@@ -737,10 +697,8 @@ namespace WiseTwin.Editor
                     if (imgOpen)
                     {
                         EditorGUI.indentLevel++;
-                        step.imageEN = (Sprite)EditorGUILayout.ObjectField("Image EN", step.imageEN, typeof(Sprite), false);
-                        step.imageFR = (Sprite)EditorGUILayout.ObjectField("Image FR", step.imageFR, typeof(Sprite), false);
-                        if (step.imageEN != null) step.imagePathEN = AssetDatabase.GetAssetPath(step.imageEN);
-                        if (step.imageFR != null) step.imagePathFR = AssetDatabase.GetAssetPath(step.imageFR);
+                        step.image = (Sprite)EditorGUILayout.ObjectField("Image", step.image, typeof(Sprite), false);
+                        if (step.image != null) step.imagePath = AssetDatabase.GetAssetPath(step.image);
                         EditorGUI.indentLevel--;
                     }
 
@@ -795,8 +753,7 @@ namespace WiseTwin.Editor
             if (EditorGUI.EndChangeCheck() && fake.fakeObject != null)
                 fake.fakeObjectName = fake.fakeObject.name;
             fake.fakeObjectName = EditorGUILayout.TextField("Object Name", fake.fakeObjectName);
-            fake.errorMessageEN = EditorGUILayout.TextField("Error EN", fake.errorMessageEN);
-            fake.errorMessageFR = EditorGUILayout.TextField("Error FR", fake.errorMessageFR);
+            fake.errorMessage = EditorGUILayout.TextField("Error Message", fake.errorMessage);
 
             EditorGUILayout.EndVertical();
         }
@@ -817,10 +774,7 @@ namespace WiseTwin.Editor
                 EditorGUI.DrawRect(tgRect, new Color(0.55f, 0.35f, 0.1f, 0.15f));
 
                 EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
-                EditorGUI.indentLevel++;
-                text.titleEN = EditorGUILayout.TextField("EN", text.titleEN);
-                text.titleFR = EditorGUILayout.TextField("FR", text.titleFR);
-                EditorGUI.indentLevel--;
+                text.title = EditorGUILayout.TextField("Title", text.title);
 
                 EditorGUILayout.EndVertical();
             }
@@ -837,12 +791,7 @@ namespace WiseTwin.Editor
                 EditorGUI.DrawRect(tcRect, new Color(0.55f, 0.35f, 0.1f, 0.15f));
 
                 GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField("EN", EditorStyles.miniLabel);
-                text.contentEN = EditorGUILayout.TextArea(text.contentEN, textAreaStyle, GUILayout.Height(120));
-                EditorGUILayout.LabelField("FR", EditorStyles.miniLabel);
-                text.contentFR = EditorGUILayout.TextArea(text.contentFR, textAreaStyle, GUILayout.Height(120));
-                EditorGUI.indentLevel--;
+                text.content = EditorGUILayout.TextArea(text.content, textAreaStyle, GUILayout.Height(120));
 
                 EditorGUILayout.EndVertical();
             }
@@ -873,7 +822,7 @@ namespace WiseTwin.Editor
                     for (int i = 0; i < data.dialogues.Count; i++)
                     {
                         var d = data.dialogues[i];
-                        string title = !string.IsNullOrEmpty(d.titleEN) ? d.titleEN : d.dialogueId;
+                        string title = !string.IsNullOrEmpty(d.title) ? d.title : d.dialogueId;
                         options[i + 1] = $"{d.dialogueId} - {title}";
                         if (d.dialogueId == dialogue.dialogueId) currentSelection = i + 1;
                     }
@@ -890,8 +839,7 @@ namespace WiseTwin.Editor
                         {
                             var selected = data.dialogues[newSelection - 1];
                             dialogue.dialogueId = selected.dialogueId;
-                            dialogue.titleEN = selected.titleEN;
-                            dialogue.titleFR = selected.titleFR;
+                            dialogue.title = selected.title;
                             dialogue.graphDataJSON = selected.graphDataJSON;
                         }
                     }
@@ -900,10 +848,7 @@ namespace WiseTwin.Editor
                 EditorGUILayout.Space(2);
 
                 EditorGUILayout.LabelField("Title", EditorStyles.miniBoldLabel);
-                EditorGUI.indentLevel++;
-                dialogue.titleEN = EditorGUILayout.TextField("EN", dialogue.titleEN);
-                dialogue.titleFR = EditorGUILayout.TextField("FR", dialogue.titleFR);
-                EditorGUI.indentLevel--;
+                dialogue.title = EditorGUILayout.TextField("Title", dialogue.title);
 
                 dialogue.dialogueId = EditorGUILayout.TextField("Dialogue ID", dialogue.dialogueId);
 
@@ -1133,16 +1078,12 @@ namespace WiseTwin.Editor
 
             if (questionDict.ContainsKey("questionText"))
             {
-                var textDict = GetDictionary(questionDict["questionText"]);
-                question.questionTextEN = GetString(textDict, "en");
-                question.questionTextFR = GetString(textDict, "fr");
+                question.questionText = GetFlatString(questionDict["questionText"]);
             }
 
             if (questionDict.ContainsKey("options"))
             {
-                var optionsDict = GetDictionary(questionDict["options"]);
-                question.optionsEN = GetStringList(optionsDict, "en");
-                question.optionsFR = GetStringList(optionsDict, "fr");
+                question.options = GetFlatStringList(questionDict["options"]);
             }
 
             if (questionDict.ContainsKey("correctAnswers"))
@@ -1157,28 +1098,21 @@ namespace WiseTwin.Editor
 
             if (questionDict.ContainsKey("feedback"))
             {
-                var feedbackDict = GetDictionary(questionDict["feedback"]);
-                question.feedbackEN = GetString(feedbackDict, "en");
-                question.feedbackFR = GetString(feedbackDict, "fr");
+                question.feedback = GetFlatString(questionDict["feedback"]);
             }
 
             if (questionDict.ContainsKey("incorrectFeedback"))
             {
-                var feedbackDict = GetDictionary(questionDict["incorrectFeedback"]);
-                question.incorrectFeedbackEN = GetString(feedbackDict, "en");
-                question.incorrectFeedbackFR = GetString(feedbackDict, "fr");
+                question.incorrectFeedback = GetFlatString(questionDict["incorrectFeedback"]);
             }
 
             if (questionDict.ContainsKey("hint"))
             {
-                var hintDict = GetDictionary(questionDict["hint"]);
-                question.hintEN = GetString(hintDict, "en");
-                question.hintFR = GetString(hintDict, "fr");
+                question.hint = GetFlatString(questionDict["hint"]);
             }
             else
             {
-                question.hintEN = "";
-                question.hintFR = "";
+                question.hint = "";
             }
         }
 
@@ -1189,16 +1123,12 @@ namespace WiseTwin.Editor
 
             if (procedureDict.ContainsKey("title"))
             {
-                var titleDict = GetDictionary(procedureDict["title"]);
-                procedure.titleEN = GetString(titleDict, "en");
-                procedure.titleFR = GetString(titleDict, "fr");
+                procedure.title = GetFlatString(procedureDict["title"]);
             }
 
             if (procedureDict.ContainsKey("description"))
             {
-                var descDict = GetDictionary(procedureDict["description"]);
-                procedure.descriptionEN = GetString(descDict, "en");
-                procedure.descriptionFR = GetString(descDict, "fr");
+                procedure.description = GetFlatString(procedureDict["description"]);
             }
 
             if (procedureDict.ContainsKey("steps"))
@@ -1213,9 +1143,7 @@ namespace WiseTwin.Editor
 
                         if (stepDict.ContainsKey("text"))
                         {
-                            var textDict = GetDictionary(stepDict["text"]);
-                            step.textEN = GetString(textDict, "en");
-                            step.textFR = GetString(textDict, "fr");
+                            step.text = GetFlatString(stepDict["text"]);
                         }
 
                         if (stepDict.ContainsKey("targetObjectName"))
@@ -1249,21 +1177,16 @@ namespace WiseTwin.Editor
 
                         if (stepDict.ContainsKey("imagePath"))
                         {
-                            var imagePathDict = GetDictionary(stepDict["imagePath"]);
-                            step.imagePathEN = GetString(imagePathDict, "en");
-                            step.imagePathFR = GetString(imagePathDict, "fr");
+                            step.imagePath = GetFlatString(stepDict["imagePath"]);
                         }
 
                         if (stepDict.ContainsKey("hint"))
                         {
-                            var hintDict = GetDictionary(stepDict["hint"]);
-                            step.hintEN = GetString(hintDict, "en");
-                            step.hintFR = GetString(hintDict, "fr");
+                            step.hint = GetFlatString(stepDict["hint"]);
                         }
                         else
                         {
-                            step.hintEN = "";
-                            step.hintFR = "";
+                            step.hint = "";
                         }
 
                         if (stepDict.ContainsKey("fakeObjects"))
@@ -1281,9 +1204,7 @@ namespace WiseTwin.Editor
 
                                     if (fakeDict.ContainsKey("errorMessage"))
                                     {
-                                        var errorDict = GetDictionary(fakeDict["errorMessage"]);
-                                        fake.errorMessageEN = GetString(errorDict, "en");
-                                        fake.errorMessageFR = GetString(errorDict, "fr");
+                                        fake.errorMessage = GetFlatString(fakeDict["errorMessage"]);
                                     }
 
                                     step.fakeObjects.Add(fake);
@@ -1311,9 +1232,7 @@ namespace WiseTwin.Editor
 
                         if (fakeDict.ContainsKey("errorMessage"))
                         {
-                            var errorDict = GetDictionary(fakeDict["errorMessage"]);
-                            fake.errorMessageEN = GetString(errorDict, "en");
-                            fake.errorMessageFR = GetString(errorDict, "fr");
+                            fake.errorMessage = GetFlatString(fakeDict["errorMessage"]);
                         }
 
                         procedure.fakeObjects.Add(fake);
@@ -1329,16 +1248,12 @@ namespace WiseTwin.Editor
 
             if (textDict.ContainsKey("title"))
             {
-                var titleDict = GetDictionary(textDict["title"]);
-                text.titleEN = GetString(titleDict, "en");
-                text.titleFR = GetString(titleDict, "fr");
+                text.title = GetFlatString(textDict["title"]);
             }
 
             if (textDict.ContainsKey("content"))
             {
-                var contentDict = GetDictionary(textDict["content"]);
-                text.contentEN = GetString(contentDict, "en");
-                text.contentFR = GetString(contentDict, "fr");
+                text.content = GetFlatString(textDict["content"]);
             }
         }
 
@@ -1349,9 +1264,7 @@ namespace WiseTwin.Editor
 
             if (dialogueDict.ContainsKey("title"))
             {
-                var titleDict = GetDictionary(dialogueDict["title"]);
-                dialogue.titleEN = GetString(titleDict, "en");
-                dialogue.titleFR = GetString(titleDict, "fr");
+                dialogue.title = GetFlatString(dialogueDict["title"]);
             }
 
             dialogue.graphDataJSON = jObject.ToString(Newtonsoft.Json.Formatting.Indented);
@@ -1360,30 +1273,55 @@ namespace WiseTwin.Editor
                 dialogue.dialogueId = $"dialogue_{targetData.dialogues.Count + 1}";
         }
 
-        private Dictionary<string, object> GetDictionary(object obj)
+        /// <summary>
+        /// Read a string value from a JSON token. Accepts a flat string (current format)
+        /// or a legacy multi-language object {en, fr} (uses "en" if present, else "fr").
+        /// </summary>
+        private string GetFlatString(object obj)
         {
-            if (obj == null) return new Dictionary<string, object>();
-            if (obj is Dictionary<string, object> dict) return dict;
-            if (obj is Newtonsoft.Json.Linq.JObject jObj) return jObj.ToObject<Dictionary<string, object>>();
-            return new Dictionary<string, object>();
-        }
-
-        private string GetString(Dictionary<string, object> dict, string key)
-        {
-            if (dict != null && dict.ContainsKey(key))
-                return dict[key]?.ToString() ?? "";
-            return "";
-        }
-
-        private List<string> GetStringList(Dictionary<string, object> dict, string key)
-        {
-            if (dict != null && dict.ContainsKey(key))
+            if (obj == null) return "";
+            if (obj is string s) return s;
+            if (obj is Newtonsoft.Json.Linq.JValue jv) return jv.Value?.ToString() ?? "";
+            if (obj is Newtonsoft.Json.Linq.JObject jObj)
             {
-                var value = dict[key];
-                if (value is Newtonsoft.Json.Linq.JArray jArray)
-                    return jArray.ToObject<List<string>>();
-                else if (value is List<object> objList)
-                    return objList.Select(o => o?.ToString() ?? "").ToList();
+                var en = jObj["en"]?.ToString();
+                if (!string.IsNullOrEmpty(en)) return en;
+                var fr = jObj["fr"]?.ToString();
+                return fr ?? "";
+            }
+            if (obj is Dictionary<string, object> dict)
+            {
+                if (dict.TryGetValue("en", out var ven) && ven != null) return ven.ToString();
+                if (dict.TryGetValue("fr", out var vfr) && vfr != null) return vfr.ToString();
+                return "";
+            }
+            return obj.ToString() ?? "";
+        }
+
+        /// <summary>
+        /// Read a string list from a JSON token. Accepts a flat array (current format)
+        /// or a legacy multi-language object {en: [...], fr: [...]} (prefers "en").
+        /// </summary>
+        private List<string> GetFlatStringList(object obj)
+        {
+            if (obj == null) return new List<string>();
+            if (obj is Newtonsoft.Json.Linq.JArray jArray)
+                return jArray.ToObject<List<string>>();
+            if (obj is List<object> objList)
+                return objList.Select(o => o?.ToString() ?? "").ToList();
+            if (obj is Newtonsoft.Json.Linq.JObject jObj)
+            {
+                var en = jObj["en"] as Newtonsoft.Json.Linq.JArray;
+                if (en != null && en.Count > 0) return en.ToObject<List<string>>();
+                var fr = jObj["fr"] as Newtonsoft.Json.Linq.JArray;
+                if (fr != null) return fr.ToObject<List<string>>();
+            }
+            if (obj is Dictionary<string, object> dict)
+            {
+                if (dict.TryGetValue("en", out var ven) && ven is Newtonsoft.Json.Linq.JArray jen)
+                    return jen.ToObject<List<string>>();
+                if (dict.TryGetValue("fr", out var vfr) && vfr is Newtonsoft.Json.Linq.JArray jfr)
+                    return jfr.ToObject<List<string>>();
             }
             return new List<string>();
         }
