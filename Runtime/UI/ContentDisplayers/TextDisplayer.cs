@@ -169,7 +169,7 @@ namespace WiseTwin.UI
                 buttonContainer.style.alignItems = Align.Center;
 
                 var continueButton = UIStyles.CreatePrimaryButton(
-                    "\u2192",
+                    "",
                     () =>
                     {
                         if (currentTextData != null)
@@ -182,6 +182,7 @@ namespace WiseTwin.UI
                         Close();
                     }
                 );
+                UIStyles.SetButtonIcon(continueButton, WiseTwinIcons.ArrowRight(20, UIStyles.TextOnAccent));
                 continueButton.style.width = 200;
                 UIStyles.SetBorderRadius(continueButton, UIStyles.RadiusPill);
                 buttonContainer.Add(continueButton);
@@ -291,14 +292,14 @@ namespace WiseTwin.UI
         {
             var bulletContainer = new VisualElement();
             bulletContainer.style.flexDirection = FlexDirection.Row;
+            bulletContainer.style.alignItems = Align.Center;
             bulletContainer.style.marginBottom = UIStyles.SpaceSM;
             bulletContainer.style.marginLeft = UIStyles.SpaceLG;
 
-            var bullet = new Label("\u2022");
-            bullet.style.fontSize = UIStyles.FontBase;
-            bullet.style.color = UIStyles.Accent;
+            // Drawn bullet \u2014 Unicode \u2022 is missing from WebGL bundled fonts
+            var bullet = WiseTwinIcons.Bullet(6, UIStyles.Accent);
             bullet.style.marginRight = UIStyles.SpaceSM;
-            bullet.style.width = 15;
+            bullet.style.flexShrink = 0;
 
             var contentLabel = UIStyles.CreateBodyText(text, UIStyles.FontBase);
             contentLabel.style.color = UIStyles.TextSecondary;

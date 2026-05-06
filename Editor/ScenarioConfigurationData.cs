@@ -23,7 +23,8 @@ namespace WiseTwin.Editor
     {
         Click,
         Manual,
-        Zone
+        Zone,
+        Group  // Touch every object in the list (any order). Step advances when all touched.
     }
 
     [Serializable]
@@ -82,6 +83,12 @@ namespace WiseTwin.Editor
         public Sprite image = null;
         public string imagePath = "";
         public List<FakeObject> fakeObjects = new List<FakeObject>();
+
+        // Used only when validationType == Group: every object in this list must be clicked
+        // (in any order) for the step to advance. Names are kept in sync so the runtime
+        // can resolve them via GameObject.Find.
+        public List<GameObject> targetObjects = new List<GameObject>();
+        public List<string> targetObjectNames = new List<string>();
     }
 
     [Serializable]

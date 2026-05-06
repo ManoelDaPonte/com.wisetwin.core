@@ -274,6 +274,7 @@ namespace WiseTwin
 
             // Trigger event
             OnScenarioStarted?.Invoke(currentScenarioIndex, scenario);
+            WiseTwinAPI.RaiseScenarioStarted(currentScenarioIndex, scenario);
         }
 
         /// <summary>

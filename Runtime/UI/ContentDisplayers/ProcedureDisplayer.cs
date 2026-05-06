@@ -41,6 +41,9 @@ namespace WiseTwin.UI
         private Dictionary<Renderer, Material> originalMaterials;
         private List<GameObject> currentHighlightedObjects = new List<GameObject>(); // Objets surlignés à l'étape actuelle
         private GameObject currentCorrectObject; // L'objet correct de l'étape actuelle
+        // Used only for "group" steps: tracks which target objects are still pending. The step
+        // advances when this set becomes empty (all objects clicked, in any order).
+        private HashSet<GameObject> currentGroupRemaining = new HashSet<GameObject>();
         private bool shouldHighlight = true; // Contrôle si on doit surligner ou non
         private bool keepProgressOnOtherClick = false; // Ne pas réinitialiser à 0 si on clique ailleurs
 
@@ -74,12 +77,16 @@ namespace WiseTwin.UI
             public bool completed = false;
             public Color highlightColor = Color.yellow;
             public bool useBlinking = true;
-            public string validationType = "click"; // "click", "manual", "zone"
+            public string validationType = "click"; // "click", "manual", "zone", "group"
             public string zoneObjectName; // Name of the zone trigger object (when validationType == "zone")
             public GameObject zoneObject; // Resolved zone trigger GameObject
             public bool requireManualValidation => validationType == "manual"; // Backward compat read-only
             public string imagePath; // Path to the image for this step
             public List<FakeObjectData> fakeObjects = new List<FakeObjectData>(); // Fake objects specific to this step
+
+            // Used only when validationType == "group": every object in this list must be touched.
+            public List<string> targetObjectNames = new List<string>();
+            public List<GameObject> targetObjects = new List<GameObject>();
         }
 
         public class FakeObjectData
@@ -205,6 +212,27 @@ namespace WiseTwin.UI
                         Debug.LogWarning($"[ProcedureDisplayer] Could not find zone GameObject with name: {step.zoneObjectName}");
                     }
                 }
+
+                // Resolve every GameObject in a group step
+                if (step.validationType == "group" && step.targetObjectNames != null)
+                {
+                    step.targetObjects = new List<GameObject>();
+                    foreach (var name in step.targetObjectNames)
+                    {
+                        if (string.IsNullOrEmpty(name)) continue;
+                        var go = GameObject.Find(name);
+                        if (go != null)
+                        {
+                            step.targetObjects.Add(go);
+                            allSequenceObjects.Add(go);
+                            StoreOriginalMaterials(go);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[ProcedureDisplayer] Group step: GameObject '{name}' not found");
+                        }
+                    }
+                }
             }
 
             // Trouver les fake objects par nom
@@ -258,18 +286,22 @@ namespace WiseTwin.UI
             modalContainer.style.justifyContent = Justify.Center;
             modalContainer.pickingMode = PickingMode.Position;
 
-            // Instruction panel (docked right), responsive width
+            // Instruction panel (docked right). Auto-sizes vertically to its content so a
+            // short instruction like "Turn the valve" produces a compact card instead of a
+            // floor-to-ceiling sidebar. The ScrollView inside still takes over if the
+            // content exceeds maxHeight (long descriptions or step images).
             var instructionPanel = new VisualElement();
             instructionPanel.style.width = Length.Percent(28);
-            instructionPanel.style.minWidth = 340;
-            instructionPanel.style.maxWidth = 440;
-            instructionPanel.style.height = Length.Percent(90);
-            instructionPanel.style.maxHeight = 800;
+            instructionPanel.style.minWidth = 320;
+            instructionPanel.style.maxWidth = 420;
+            instructionPanel.style.minHeight = 140;
+            instructionPanel.style.maxHeight = Length.Percent(85);
             UIStyles.ApplyCardStyle(instructionPanel, UIStyles.RadiusXL);
             instructionPanel.style.marginRight = UIStyles.SpaceLG;
             instructionPanel.style.borderLeftWidth = 3;
             instructionPanel.style.borderLeftColor = UIStyles.Accent;
             instructionPanel.style.flexDirection = FlexDirection.Column;
+            instructionPanel.style.flexShrink = 1;
 
             // Header
             var headerSection = new VisualElement();
@@ -324,9 +356,12 @@ namespace WiseTwin.UI
 
             instructionPanel.Add(progressSection);
 
-            // Main scrollable section
+            // Main scrollable section. flexShrink:1 lets it collapse to content size when
+            // text is short; flexGrow:1 ensures it takes the remaining space when the panel
+            // hits its maxHeight cap (so the scrollbar appears only when needed).
             var mainSection = new ScrollView();
             mainSection.style.flexGrow = 1;
+            mainSection.style.flexShrink = 1;
             mainSection.style.paddingTop = UIStyles.SpaceLG;
             mainSection.style.paddingBottom = UIStyles.SpaceLG;
             mainSection.style.paddingLeft = UIStyles.SpaceXL;
@@ -390,11 +425,11 @@ namespace WiseTwin.UI
             buttonSection.style.display = DisplayStyle.None;
 
             // Manual validation button (icon only, compact)
-            validateButton = UIStyles.CreatePrimaryButton("\u2713");
+            validateButton = UIStyles.CreatePrimaryButton("");
+            UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.Check(20, UIStyles.TextOnAccent));
             validateButton.style.alignSelf = Align.Center;
             validateButton.style.width = 80;
             validateButton.style.height = 44;
-            validateButton.style.fontSize = UIStyles.FontLG;
             validateButton.clicked += OnValidateButtonClicked;
             buttonSection.Add(validateButton);
 
@@ -465,7 +500,7 @@ namespace WiseTwin.UI
                 validateButton.style.display = currentStep.validationType == "manual"
                     ? DisplayStyle.Flex
                     : DisplayStyle.None;
-                validateButton.text = "\u2713";
+                UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.Check(20, UIStyles.TextOnAccent));
             }
 
             // Mettre à jour la barre de progression
@@ -501,6 +536,7 @@ namespace WiseTwin.UI
 
             currentHighlightedObjects.Clear();
             currentCorrectObject = null;
+            currentGroupRemaining.Clear();
 
             // Configurer l'étape selon le type de validation
             switch (currentStep.validationType)
@@ -577,6 +613,51 @@ namespace WiseTwin.UI
                 case "manual":
                     // Manual validation mode - no object highlighting or click handlers needed
                     Debug.Log("[ProcedureDisplayer] Manual validation mode - no object interaction required");
+                    break;
+
+                case "group":
+                    // Group mode: highlight every target object and add a click handler on each.
+                    // Step advances when all objects in currentGroupRemaining have been clicked.
+                    if (currentStep.targetObjects != null && currentStep.targetObjects.Count > 0)
+                    {
+                        foreach (var obj in currentStep.targetObjects)
+                        {
+                            if (obj == null) continue;
+                            currentGroupRemaining.Add(obj);
+
+                            if (shouldHighlight && currentStep.useBlinking)
+                            {
+                                HighlightObject(obj, currentStep.useBlinking);
+                            }
+                            currentHighlightedObjects.Add(obj);
+
+                            var clickHandler = obj.AddComponent<ProcedureStepClickHandler>();
+                            clickHandler.Initialize(this, currentStepIndex, obj);
+                        }
+
+                        // Fake objects for groups behave the same as click steps
+                        if (currentStep.fakeObjects != null)
+                        {
+                            foreach (var fake in currentStep.fakeObjects)
+                            {
+                                if (fake.gameObject == null) continue;
+                                if (shouldHighlight && currentStep.useBlinking)
+                                {
+                                    HighlightObject(fake.gameObject, currentStep.useBlinking);
+                                }
+                                currentHighlightedObjects.Add(fake.gameObject);
+                                var fakeHandler = fake.gameObject.AddComponent<ProcedureStepClickHandler>();
+                                fakeHandler.Initialize(this, currentStepIndex, fake.gameObject);
+                            }
+                        }
+
+                        Debug.Log($"[ProcedureDisplayer] Group step: waiting for {currentGroupRemaining.Count} objects to be clicked");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[ProcedureDisplayer] Group step has no target objects — auto-validating");
+                        ValidateCurrentStep(success: true);
+                    }
                     break;
             }
         }
@@ -680,14 +761,16 @@ namespace WiseTwin.UI
 
             string message;
 
-            // Use custom message if provided, otherwise minimal icon-only feedback
+            // Use custom message if provided, otherwise minimal counter-only feedback.
+            // We use plain ASCII "x" instead of \u2717 (\u2717) \u2014 Unicode dingbat glyphs are
+            // missing from the WebGL bundled font and produce empty squares in production.
             if (!string.IsNullOrEmpty(customMessage))
             {
-                message = $"{customMessage}  \u2717 {wrongClicksCount}";
+                message = $"{customMessage}  x{wrongClicksCount}";
             }
             else
             {
-                message = $"\u2717 {wrongClicksCount}";
+                message = $"x{wrongClicksCount}";
             }
 
             errorFeedbackLabel.text = message;
@@ -706,7 +789,12 @@ namespace WiseTwin.UI
             }
         }
 
-        public void ValidateCurrentStep(GameObject clickedObject)
+        /// <summary>
+        /// Called by ProcedureStepClickHandler when the user clicks an object in the scene.
+        /// Checks whether the clicked object matches the current step's expected object,
+        /// and either advances the procedure or records a wrong click + error feedback.
+        /// </summary>
+        public void OnObjectClicked(GameObject clickedObject)
         {
             if (currentStepIndex >= steps.Count) return;
 
@@ -715,19 +803,36 @@ namespace WiseTwin.UI
             // Guard: zone steps are validated via ProcedureZoneTrigger, not clicks
             if (currentStep.validationType == "zone") return;
 
-            // Vérifier si l'objet cliqué est le bon
-            if (clickedObject != currentCorrectObject)
+            // Group step: each click in the set "consumes" one target. The step advances
+            // when the set becomes empty.
+            if (currentStep.validationType == "group")
             {
-                // Mauvaise réponse ! Incrémenter les erreurs
+                if (currentGroupRemaining.Contains(clickedObject))
+                {
+                    currentGroupRemaining.Remove(clickedObject);
+
+                    // Stop blinking + remove the click handler on this specific object
+                    if (shouldHighlight)
+                    {
+                        RemoveHighlight(clickedObject);
+                    }
+                    var handler = clickedObject.GetComponent<ProcedureStepClickHandler>();
+                    if (handler != null) Destroy(handler);
+
+                    Debug.Log($"[ProcedureDisplayer] Group: '{clickedObject.name}' clicked, {currentGroupRemaining.Count} remaining");
+
+                    if (currentGroupRemaining.Count == 0)
+                    {
+                        ValidateCurrentStep(success: true);
+                    }
+                    return;
+                }
+
+                // Otherwise it's a fake (or stale) click — fall through to the wrong-click path
                 wrongClicksCount++;
                 totalWrongClicksInProcedure++;
 
-                Debug.Log($"[ProcedureDisplayer] Wrong object clicked! Expected: {currentCorrectObject?.name}, Got: {clickedObject?.name}. Wrong clicks: {wrongClicksCount}");
-
-                // NEW: Check if the clicked object is a fake and show its specific error message
                 string customErrorMessage = null;
-
-                // First check step-specific fake objects
                 if (currentStep.fakeObjects != null)
                 {
                     foreach (var fake in currentStep.fakeObjects)
@@ -739,8 +844,30 @@ namespace WiseTwin.UI
                         }
                     }
                 }
+                ShowErrorFeedback(customErrorMessage);
+                return;
+            }
 
-                // Fallback to global fake objects if no step-specific fake found
+            // Wrong object → record error and stay on current step
+            if (clickedObject != currentCorrectObject)
+            {
+                wrongClicksCount++;
+                totalWrongClicksInProcedure++;
+
+                Debug.Log($"[ProcedureDisplayer] Wrong object clicked! Expected: {currentCorrectObject?.name}, Got: {clickedObject?.name}. Wrong clicks: {wrongClicksCount}");
+
+                string customErrorMessage = null;
+                if (currentStep.fakeObjects != null)
+                {
+                    foreach (var fake in currentStep.fakeObjects)
+                    {
+                        if (fake.gameObject == clickedObject)
+                        {
+                            customErrorMessage = fake.errorMessage;
+                            break;
+                        }
+                    }
+                }
                 if (customErrorMessage == null && fakeObjects != null)
                 {
                     foreach (var fake in fakeObjects)
@@ -753,52 +880,78 @@ namespace WiseTwin.UI
                     }
                 }
 
-                // Afficher le feedback d'erreur (custom ou générique)
                 ShowErrorFeedback(customErrorMessage);
-
-                // Ne PAS passer à l'étape suivante, laisser l'utilisateur réessayer
                 return;
             }
 
-            // Bonne réponse !
-            currentStep.completed = true;
-
-            // NEW: If manual validation is NOT required, we track and proceed automatically
-            if (!currentStep.requireManualValidation)
+            // Right object: only auto-validate when not in manual mode (manual = wait for button)
+            if (currentStep.requireManualValidation)
             {
-                // Calculer la durée de cette étape
-                float stepDuration = Time.time - stepStartTime;
+                Debug.Log("[ProcedureDisplayer] Step with manual validation - waiting for validate button");
+                return;
+            }
 
-                // Créer les données de cette étape pour le tracking
-                var stepData = new ProcedureStepData
-                {
-                    stepNumber = currentStepIndex + 1,
-                    stepKey = $"step_{currentStepIndex + 1}",
-                    targetObjectId = currentStep.targetObjectName,
-                    completed = true,
-                    duration = stepDuration,
-                    wrongClicksOnThisStep = wrongClicksCount
-                };
+            ValidateCurrentStep(success: true);
+        }
 
-                // Ajouter l'étape à la liste
-                completedSteps.Add(stepData);
+        /// <summary>
+        /// Single funnel that finalises the current step (records analytics, advances to the next step).
+        /// Called internally by OnObjectClicked, OnZoneEntered, and OnValidateButtonClicked.
+        /// Also exposed via WiseTwinAPI.ValidateCurrentStep() so external scripts can validate a step
+        /// from custom 3D logic (e.g. an object reaching a target position).
+        /// </summary>
+        /// <param name="success">true if the step is completed successfully, false to record a failed step</param>
+        /// <returns>true if a step was advanced; false if there is no current step</returns>
+        public bool ValidateCurrentStep(bool success = true)
+        {
+            if (steps == null || currentStepIndex >= steps.Count) return false;
 
-                // Ajouter l'étape au tracking global de la procédure
-                if (TrainingAnalytics.Instance != null)
-                {
-                    TrainingAnalytics.Instance.AddProcedureStepData(stepData);
-                }
+            var currentStep = steps[currentStepIndex];
+            currentStep.completed = success;
 
-                Debug.Log($"[ProcedureDisplayer] Step {stepData.stepNumber} completed CORRECTLY - Duration: {stepDuration}s, Wrong clicks on this step: {wrongClicksCount}");
+            float stepDuration = Time.time - stepStartTime;
+            string targetId = currentStep.validationType == "zone"
+                ? currentStep.zoneObjectName
+                : currentStep.targetObjectName;
 
-                // Attendre un peu avant de passer à l'étape suivante
+            var stepData = new ProcedureStepData
+            {
+                stepNumber = currentStepIndex + 1,
+                stepKey = $"step_{currentStepIndex + 1}",
+                targetObjectId = targetId,
+                completed = success,
+                duration = stepDuration,
+                wrongClicksOnThisStep = wrongClicksCount
+            };
+
+            completedSteps.Add(stepData);
+
+            if (TrainingAnalytics.Instance != null)
+            {
+                TrainingAnalytics.Instance.AddProcedureStepData(stepData);
+            }
+
+            if (errorFeedbackLabel != null)
+            {
+                errorFeedbackLabel.style.display = DisplayStyle.None;
+            }
+
+            Debug.Log($"[ProcedureDisplayer] Step {stepData.stepNumber} validated (success: {success}, duration: {stepDuration:F2}s, wrong clicks: {wrongClicksCount})");
+
+            WiseTwinAPI.RaiseStepValidated(currentStepIndex, success);
+
+            // Click steps get a small visual delay; zone/manual advance immediately
+            if (currentStep.validationType == "click")
+            {
                 StartCoroutine(NextStepAfterDelay(0.5f));
             }
             else
             {
-                // Manual validation required - we DON'T track yet, that will be done when validate button is clicked
-                Debug.Log("[ProcedureDisplayer] Step with manual validation - object click not required, tracking will be done on validation");
+                currentStepIndex++;
+                StartCurrentStep();
             }
+
+            return true;
         }
 
         System.Collections.IEnumerator NextStepAfterDelay(float delay)
@@ -850,105 +1003,20 @@ namespace WiseTwin.UI
             StartCurrentStep();
         }
 
-        // NEW: Handle validate button click
         void OnValidateButtonClicked()
         {
-            if (currentStepIndex >= steps.Count) return;
-
-            var currentStep = steps[currentStepIndex];
-
-            // For manual validation, we don't need to check if an object was clicked
-            // The user just needs to press the validation button
-            Debug.Log("[ProcedureDisplayer] Manual validation button clicked, proceeding to next step");
-
-            // Mark the step as completed
-            currentStep.completed = true;
-
-            // Calculate step duration
-            float stepDuration = Time.time - stepStartTime;
-
-            // Create step data for tracking
-            var stepData = new ProcedureStepData
-            {
-                stepNumber = currentStepIndex + 1,
-                stepKey = $"step_{currentStepIndex + 1}",
-                targetObjectId = currentStep.targetObjectName,
-                completed = true,
-                duration = stepDuration,
-                wrongClicksOnThisStep = wrongClicksCount
-            };
-
-            // Add to completed steps
-            completedSteps.Add(stepData);
-
-            // Track in analytics
-            if (TrainingAnalytics.Instance != null)
-            {
-                TrainingAnalytics.Instance.AddProcedureStepData(stepData);
-            }
-
-            // Hide any feedback
-            if (errorFeedbackLabel != null)
-            {
-                errorFeedbackLabel.style.display = DisplayStyle.None;
-            }
-
-            // Proceed to the next step
-            currentStepIndex++;
-            StartCurrentStep();
+            ValidateCurrentStep(success: true);
         }
 
         /// <summary>
-        /// Called by ProcedureZoneTrigger when the player enters the zone
+        /// Called by ProcedureZoneTrigger when the player enters the zone.
         /// </summary>
-        public void ValidateZoneStep()
+        public void OnZoneEntered()
         {
             if (currentStepIndex >= steps.Count) return;
+            if (steps[currentStepIndex].validationType != "zone") return;
 
-            var currentStep = steps[currentStepIndex];
-
-            // Guard: only process if this is a zone step
-            if (currentStep.validationType != "zone") return;
-
-            Debug.Log($"[ProcedureDisplayer] Zone step {currentStepIndex + 1} validated");
-
-            // Mark the step as completed
-            currentStep.completed = true;
-
-            // Calculate step duration
-            float stepDuration = Time.time - stepStartTime;
-
-            // Create step data for tracking (zone = 0 wrong clicks)
-            var stepData = new ProcedureStepData
-            {
-                stepNumber = currentStepIndex + 1,
-                stepKey = $"step_{currentStepIndex + 1}",
-                targetObjectId = currentStep.zoneObjectName,
-                completed = true,
-                duration = stepDuration,
-                wrongClicksOnThisStep = 0
-            };
-
-            // Add to completed steps
-            completedSteps.Add(stepData);
-
-            // Track in analytics
-            if (TrainingAnalytics.Instance != null)
-            {
-                TrainingAnalytics.Instance.AddProcedureStepData(stepData);
-            }
-
-            Debug.Log($"[ProcedureDisplayer] Zone step {stepData.stepNumber} completed - Duration: {stepDuration}s");
-
-            // Hide any feedback
-            if (errorFeedbackLabel != null)
-            {
-                errorFeedbackLabel.style.display = DisplayStyle.None;
-            }
-
-            // Proceed to the next step
-            currentStepIndex++;
-            StartCurrentStep();
+            ValidateCurrentStep(success: true);
         }
 
         /// <summary>
@@ -1070,18 +1138,14 @@ namespace WiseTwin.UI
                 zoomedImage.style.backgroundPositionX = new BackgroundPosition(BackgroundPositionKeyword.Center);
                 zoomedImage.style.backgroundPositionY = new BackgroundPosition(BackgroundPositionKeyword.Center);
 
-                // Close hint (icon only)
-                var closeLabel = new Label();
-                closeLabel.text = "\u2715";
-                closeLabel.style.position = Position.Absolute;
-                closeLabel.style.top = 20;
-                closeLabel.style.right = 20;
-                closeLabel.style.color = UIStyles.TextPrimary;
-                closeLabel.style.fontSize = UIStyles.FontMD;
-                closeLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+                // Close hint (drawn icon \u2014 Unicode \u2715 is missing from WebGL fonts)
+                var closeIcon = WiseTwinIcons.CloseX(20, UIStyles.TextPrimary);
+                closeIcon.style.position = Position.Absolute;
+                closeIcon.style.top = 20;
+                closeIcon.style.right = 20;
 
                 overlay.Add(zoomedImage);
-                overlay.Add(closeLabel);
+                overlay.Add(closeIcon);
 
                 // Add to root of UI (full screen)
                 uiDocument.Add(overlay);
@@ -1319,6 +1383,16 @@ namespace WiseTwin.UI
                                     objectName = ExtractString(fakeData, "objectName"),
                                     errorMessage = ExtractLocalizedText(fakeData, "errorMessage", language)
                                 });
+                            }
+                        }
+
+                        // Group target list (only used when validationType == "group")
+                        if (stepData.ContainsKey("targetObjectNames") && stepData["targetObjectNames"] is Newtonsoft.Json.Linq.JArray namesArr)
+                        {
+                            foreach (var n in namesArr)
+                            {
+                                string objName = n?.ToString();
+                                if (!string.IsNullOrEmpty(objName)) step.targetObjectNames.Add(objName);
                             }
                         }
 

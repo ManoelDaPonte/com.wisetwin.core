@@ -53,7 +53,7 @@ namespace WiseTwin
             // Deactivate immediately to prevent double-trigger
             isActive = false;
 
-            procedureDisplayer.ValidateZoneStep();
+            procedureDisplayer.OnZoneEntered();
             ZoneCollectEffect.Play(gameObject);
         }
 

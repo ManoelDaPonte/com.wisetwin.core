@@ -60,12 +60,23 @@ namespace WiseTwin
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
                 InitializeComponents();
+                EnsureAnalyticsInstance();
             }
             else
             {
                 DebugLog("WiseTwinManager instance already exists. Destroying duplicate.");
                 Destroy(gameObject);
             }
+        }
+
+        void EnsureAnalyticsInstance()
+        {
+            if (Analytics.TrainingAnalytics.Instance != null) return;
+
+            var analyticsGO = new GameObject("TrainingAnalytics");
+            analyticsGO.transform.SetParent(transform);
+            analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
+            DebugLog("✅ TrainingAnalytics created");
         }
         
         void Start()
@@ -240,20 +251,77 @@ namespace WiseTwin
         }
         
         /// <summary>
-        /// Complete the training and notify the web application
+        /// Complete the training: show the completion screen (with score + analytics) and
+        /// notify the web application. Safe to call from external scripts via WiseTwinAPI.
+        ///
+        /// The completion screen handles the analytics export and the WebGL bridge call
+        /// internally (TrainingCompletionUI.NotifyTrainingCompletion). When the screen
+        /// can't be shown (no UIDocument / panel settings available), we fall back to a
+        /// direct notification so the SaaS still receives the completion event.
         /// </summary>
         /// <param name="trainingName">Optional training name</param>
         public void CompleteTraining(string trainingName = null)
         {
-            if (completionNotifier == null)
-            {
-                DebugLog("❌ Cannot complete training: TrainingCompletionNotifier not available");
-                return;
-            }
-            
             DebugLog($"🎉 Training completed: {trainingName ?? SceneName}");
-            completionNotifier.FormationCompleted(trainingName);
+
+            var completionUI = EnsureCompletionUI();
+            if (completionUI != null)
+            {
+                float elapsed = Analytics.TrainingAnalytics.Instance != null
+                    ? Analytics.TrainingAnalytics.Instance.SessionDurationSeconds
+                    : 0f;
+                int modules = Analytics.TrainingAnalytics.Instance != null
+                    ? Analytics.TrainingAnalytics.Instance.GetTotalInteractions()
+                    : 0;
+                completionUI.ShowCompletionScreen(elapsed, modules);
+            }
+            else if (completionNotifier != null)
+            {
+                completionNotifier.FormationCompleted(trainingName);
+            }
+            else
+            {
+                DebugLog("⚠️ Cannot complete training: no UI nor completion notifier available");
+            }
+
             OnTrainingCompleted?.Invoke();
+            WiseTwinAPI.RaiseTrainingCompleted();
+        }
+
+        /// <summary>
+        /// Find or create the TrainingCompletionUI instance. Borrows the panel settings
+        /// from the TrainingHUD UIDocument so the completion screen renders correctly.
+        /// </summary>
+        UI.TrainingCompletionUI EnsureCompletionUI()
+        {
+            var existing = UI.TrainingCompletionUI.Instance;
+            if (existing != null) return existing;
+
+            // Need panel settings from somewhere — try TrainingHUD, then any UIDocument in the scene
+            UnityEngine.UIElements.PanelSettings panelSettings = null;
+            var hud = TrainingHUD.Instance;
+            if (hud != null)
+            {
+                var hudDoc = hud.GetComponent<UnityEngine.UIElements.UIDocument>();
+                if (hudDoc != null) panelSettings = hudDoc.panelSettings;
+            }
+            if (panelSettings == null)
+            {
+                var anyDoc = FindFirstObjectByType<UnityEngine.UIElements.UIDocument>();
+                if (anyDoc != null) panelSettings = anyDoc.panelSettings;
+            }
+            if (panelSettings == null)
+            {
+                DebugLog("⚠️ Cannot create TrainingCompletionUI: no PanelSettings found in scene");
+                return null;
+            }
+
+            var go = new GameObject("TrainingCompletionUI");
+            go.transform.SetParent(transform);
+            var ui = go.AddComponent<UI.TrainingCompletionUI>();
+            var doc = go.AddComponent<UnityEngine.UIElements.UIDocument>();
+            doc.panelSettings = panelSettings;
+            return ui;
         }
         
         /// <summary>
@@ -373,7 +441,7 @@ namespace WiseTwin
                     status.AppendLine($"Scenarios: {scenarios.Count}");
                     foreach (var scenario in scenarios)
                     {
-                        status.AppendLine($"  • {scenario.id} ({scenario.type})");
+                        status.AppendLine($"  - {scenario.id} ({scenario.type})");
                     }
                 }
                 else

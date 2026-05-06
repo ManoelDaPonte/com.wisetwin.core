@@ -1,6 +1,6 @@
 {
   "name": "com.wisetwin.core",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "displayName": "WiseTwin Core Package",
   "description": "Core utilities and components for WiseTwin Unity projects",
   "unity": "2021.3",
@@ -20,5 +20,12 @@
   },
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Custom Scripting Example",
+      "description": "Demonstrates the WiseTwinAPI public façade with a working script (validate steps, log custom score events, react to training events).",
+      "path": "Samples~/CustomScripting"
+    }
+  ]
 }

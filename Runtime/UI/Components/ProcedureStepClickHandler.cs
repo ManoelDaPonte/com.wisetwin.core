@@ -158,12 +158,10 @@ namespace WiseTwin
                 }
                 StartCoroutine(RestoreColorsAfterDelay(originalColors, 0.1f));
 
-                // Passer l'objet associé au displayer pour vérification
-                procedureDisplayer.ValidateCurrentStep(associatedObject);
-
-                // Ne désactiver ce handler que si c'était la bonne réponse
-                // Si mauvaise réponse, ValidateCurrentStep retournera sans passer à l'étape suivante
-                // et le handler restera actif pour permettre de réessayer
+                // Pass the clicked object to the displayer for verification.
+                // OnObjectClicked records a wrong click and stays on the current step on mismatch,
+                // and routes through ValidateCurrentStep on a correct click.
+                procedureDisplayer.OnObjectClicked(associatedObject);
             }
         }
 

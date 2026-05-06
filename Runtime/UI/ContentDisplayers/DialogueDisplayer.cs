@@ -261,7 +261,7 @@ namespace WiseTwin.UI
                 choicesSection.style.display = DisplayStyle.None;
                 choicesContainer.Clear();
 
-                continueButton.text = "\u2192";
+                UIStyles.SetButtonIcon(continueButton, WiseTwinIcons.ArrowRight(20, UIStyles.TextOnAccent));
                 continueButton.style.display = DisplayStyle.Flex;
                 continueButton.clickable = new Clickable(() =>
                 {
@@ -455,10 +455,8 @@ namespace WiseTwin.UI
 
             var container = UIStyles.CreateSelectableOption(UIStyles.RadiusMD);
 
-            // Arrow indicator
-            var arrow = new Label("\u203A");
-            arrow.style.fontSize = UIStyles.FontLG;
-            arrow.style.color = UIStyles.TextMuted;
+            // Chevron indicator (drawn \u2014 Unicode \u203A is missing from WebGL fonts)
+            var arrow = WiseTwinIcons.Chevron(14, UIStyles.TextMuted);
             arrow.style.marginRight = UIStyles.SpaceSM;
             arrow.style.flexShrink = 0;
             arrow.pickingMode = PickingMode.Ignore;

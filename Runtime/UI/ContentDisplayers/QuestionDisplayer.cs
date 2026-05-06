@@ -351,13 +351,13 @@ namespace WiseTwin.UI
             questionBox.Add(feedbackContainer);
 
             // Compact validate button (icon only)
-            validateButton = UIStyles.CreatePrimaryButton("\u2713", ValidateAnswer);
+            validateButton = UIStyles.CreatePrimaryButton("", ValidateAnswer);
+            UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.Check(20, UIStyles.TextOnAccent));
             validateButton.name = "validate-button";
             validateButton.style.marginTop = UIStyles.SpaceLG;
             validateButton.style.alignSelf = Align.Center;
             validateButton.style.width = 64;
             validateButton.style.height = 44;
-            validateButton.style.fontSize = UIStyles.FontLG;
             validateButton.SetEnabled(false);
             validateButton.style.opacity = 0.5f;
             questionBox.Add(validateButton);
@@ -579,7 +579,7 @@ namespace WiseTwin.UI
                     feedbackContainer.style.display = DisplayStyle.None;
 
                     // Réinitialiser le bouton valider
-                    validateButton.text = "\u2713";
+                    UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.Check(20, UIStyles.TextOnAccent));
                     validateButton.style.backgroundColor = UIStyles.Accent;
                     validateButton.clicked -= NextQuestion;
                     validateButton.clicked -= ValidateAnswer;
@@ -688,13 +688,13 @@ namespace WiseTwin.UI
             questionBox.Add(feedbackContainer);
 
             // Compact validate button (icon only)
-            validateButton = UIStyles.CreatePrimaryButton("\u2713", ValidateAnswer);
+            validateButton = UIStyles.CreatePrimaryButton("", ValidateAnswer);
+            UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.Check(20, UIStyles.TextOnAccent));
             validateButton.name = "validate-button";
             validateButton.style.marginTop = UIStyles.SpaceLG;
             validateButton.style.alignSelf = Align.Center;
             validateButton.style.width = 64;
             validateButton.style.height = 44;
-            validateButton.style.fontSize = UIStyles.FontLG;
             validateButton.SetEnabled(false);
             validateButton.style.opacity = 0.5f;
 
@@ -913,16 +913,12 @@ namespace WiseTwin.UI
                     indicator.style.backgroundColor = UIStyles.Success;
                     UIStyles.SetBorderColor(indicator, UIStyles.Success);
 
-                    var checkmark = option.Q<Label>("checkmark");
-                    if (checkmark == null)
+                    if (option.Q("checkmark-icon") == null)
                     {
-                        checkmark = new Label("\u2713");
-                        checkmark.name = "checkmark";
-                        checkmark.style.fontSize = UIStyles.FontLG;
-                        checkmark.style.color = UIStyles.Success;
-                        checkmark.style.unityFontStyleAndWeight = FontStyle.Bold;
-                        checkmark.style.marginLeft = UIStyles.SpaceSM;
-                        option.Add(checkmark);
+                        var checkmarkIcon = WiseTwinIcons.Check(20, UIStyles.Success);
+                        checkmarkIcon.name = "checkmark-icon";
+                        checkmarkIcon.style.marginLeft = UIStyles.SpaceSM;
+                        option.Add(checkmarkIcon);
                     }
                 }
                 else if (isUserSelected)
@@ -931,16 +927,12 @@ namespace WiseTwin.UI
                     indicator.style.backgroundColor = UIStyles.Danger;
                     UIStyles.SetBorderColor(indicator, UIStyles.Danger);
 
-                    var crossmark = option.Q<Label>("crossmark");
-                    if (crossmark == null)
+                    if (option.Q("crossmark-icon") == null)
                     {
-                        crossmark = new Label("\u2717");
-                        crossmark.name = "crossmark";
-                        crossmark.style.fontSize = UIStyles.FontLG;
-                        crossmark.style.color = UIStyles.Danger;
-                        crossmark.style.unityFontStyleAndWeight = FontStyle.Bold;
-                        crossmark.style.marginLeft = UIStyles.SpaceSM;
-                        option.Add(crossmark);
+                        var crossmarkIcon = WiseTwinIcons.Cross(20, UIStyles.Danger);
+                        crossmarkIcon.name = "crossmark-icon";
+                        crossmarkIcon.style.marginLeft = UIStyles.SpaceSM;
+                        option.Add(crossmarkIcon);
                     }
                 }
                 else
@@ -1040,15 +1032,17 @@ namespace WiseTwin.UI
                 // Si on a plusieurs questions, passer à la suivante
                 if (questionKeys != null && questionKeys.Count > 1)
                 {
-                    // Icon-only: arrow for next, check for finish
-                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1 ? "\u2192" : "\u2713";
+                    bool isLastQuestion = currentQuestionIndex >= questionKeys.Count - 1;
+                    UIStyles.SetButtonIcon(validateButton,
+                        isLastQuestion ? WiseTwinIcons.Check(20, UIStyles.TextOnAccent)
+                                       : WiseTwinIcons.ArrowRight(20, UIStyles.TextOnAccent));
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += NextQuestion;
                 }
                 else
                 {
                     // Question unique - bouton icône continue
-                    validateButton.text = "\u2192";
+                    UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.ArrowRight(20, UIStyles.TextOnAccent));
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += () => {
                         OnCompleted?.Invoke(currentObjectId, true);
@@ -1084,15 +1078,17 @@ namespace WiseTwin.UI
                 // Changer le bouton en "Suivant" - pas de retry
                 if (questionKeys != null && questionKeys.Count > 1)
                 {
-                    // Icon-only: arrow for next, check for finish
-                    validateButton.text = currentQuestionIndex < questionKeys.Count - 1 ? "\u2192" : "\u2713";
+                    bool isLastQuestion = currentQuestionIndex >= questionKeys.Count - 1;
+                    UIStyles.SetButtonIcon(validateButton,
+                        isLastQuestion ? WiseTwinIcons.Check(20, UIStyles.TextOnAccent)
+                                       : WiseTwinIcons.ArrowRight(20, UIStyles.TextOnAccent));
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += NextQuestion;
                 }
                 else
                 {
                     // Question unique - bouton icône continue
-                    validateButton.text = "\u2192";
+                    UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.ArrowRight(20, UIStyles.TextOnAccent));
                     validateButton.clicked -= ValidateAnswer;
                     validateButton.clicked += () => {
                         OnCompleted?.Invoke(currentObjectId, true);

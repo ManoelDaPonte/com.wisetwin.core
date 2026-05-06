@@ -75,22 +75,6 @@ namespace WiseTwin.UI
         {
             contentDisplayers = new Dictionary<ContentType, IContentDisplayer>();
 
-            // S'assurer que TrainingAnalytics existe pour capturer les métriques
-            if (Analytics.TrainingAnalytics.Instance == null)
-            {
-                var analyticsGO = new GameObject("TrainingAnalytics");
-                analyticsGO.AddComponent<Analytics.TrainingAnalytics>();
-
-                // Si on a un parent WiseTwinSystem, mettre TrainingAnalytics dedans
-                var wiseTwinSystem = GameObject.Find("WiseTwinSystem");
-                if (wiseTwinSystem != null)
-                {
-                    analyticsGO.transform.SetParent(wiseTwinSystem.transform);
-                }
-
-                if (debugMode) Debug.Log("[ContentDisplayManager] Created TrainingAnalytics instance");
-            }
-
             // Créer les afficheurs pour chaque type
             var questionDisplayer = new GameObject("QuestionDisplayer").AddComponent<QuestionDisplayer>();
             questionDisplayer.transform.SetParent(transform);
@@ -334,6 +318,7 @@ namespace WiseTwin.UI
 
         public bool IsDisplaying => isDisplaying;
         public ContentType CurrentContentType => currentContentType;
+        public IContentDisplayer CurrentDisplayer => currentDisplayer;
     }
 
     /// <summary>

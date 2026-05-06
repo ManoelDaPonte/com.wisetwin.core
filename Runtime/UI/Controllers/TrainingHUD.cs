@@ -71,9 +71,46 @@ namespace WiseTwin
 
         void Start()
         {
-            if (showOnStart)
+            // Only auto-show if we actually have scenarios to track. API-only trainings
+            // (no scenarios in metadata) shouldn't display the progress bar — there's
+            // nothing to progress through.
+            if (!showOnStart) return;
+
+            var loader = MetadataLoader.Instance;
+            if (loader == null)
+            {
+                if (debugMode) Debug.Log("[TrainingHUD] MetadataLoader missing — skipping auto-show");
+                return;
+            }
+
+            if (loader.IsLoaded)
+            {
+                ShowIfScenariosExist();
+            }
+            else
+            {
+                // Defer until metadata loads, then check
+                loader.OnMetadataLoaded += HandleMetadataLoadedForAutoShow;
+            }
+        }
+
+        void HandleMetadataLoadedForAutoShow(Dictionary<string, object> _)
+        {
+            var loader = MetadataLoader.Instance;
+            if (loader != null) loader.OnMetadataLoaded -= HandleMetadataLoadedForAutoShow;
+            ShowIfScenariosExist();
+        }
+
+        void ShowIfScenariosExist()
+        {
+            var scenarios = MetadataLoader.Instance?.GetScenarios();
+            if (scenarios != null && scenarios.Count > 0)
             {
                 Show();
+            }
+            else if (debugMode)
+            {
+                Debug.Log("[TrainingHUD] No scenarios in metadata — HUD stays hidden");
             }
         }
 
@@ -132,7 +169,8 @@ namespace WiseTwin
             hudContainer.pickingMode = PickingMode.Position;
 
             // ===== Bouton Restart (gauche) =====
-            resetButton = UIStyles.CreateIconButton("\u21BB", 36, UIStyles.Danger, () => OnResetButtonClicked());
+            resetButton = UIStyles.CreateIconButton("", 36, UIStyles.Danger, () => OnResetButtonClicked());
+            UIStyles.SetButtonIcon(resetButton, WiseTwinIcons.Reset(20, UIStyles.TextOnAccent));
             resetButton.name = "reset-button";
             resetButton.style.marginRight = UIStyles.SpaceMD;
             resetButton.style.flexShrink = 0;
@@ -213,10 +251,25 @@ namespace WiseTwin
             UIStyles.SetPadding(dialog, UIStyles.Space2XL);
             dialog.style.alignItems = Align.Center;
 
-            var messageLabel = new Label();
+            // Warning icon at the top of the dialog
+            var warningIcon = WiseTwinIcons.Warning(48, UIStyles.Danger);
+            warningIcon.style.marginBottom = UIStyles.SpaceMD;
+            dialog.Add(warningIcon);
+
+            // Title — kept short and in English (intentional fallback for destructive actions)
+            var titleLabel = new Label("Restart Training?");
+            titleLabel.name = "restart-title";
+            titleLabel.style.fontSize = UIStyles.FontLG;
+            titleLabel.style.color = UIStyles.TextPrimary;
+            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            titleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            titleLabel.style.marginBottom = UIStyles.SpaceXS;
+            dialog.Add(titleLabel);
+
+            var messageLabel = new Label("Your progress will be lost.");
             messageLabel.name = "restart-message";
-            messageLabel.style.fontSize = UIStyles.FontMD;
-            messageLabel.style.color = UIStyles.TextPrimary;
+            messageLabel.style.fontSize = UIStyles.FontSM;
+            messageLabel.style.color = UIStyles.TextSecondary;
             messageLabel.style.whiteSpace = WhiteSpace.Normal;
             messageLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             messageLabel.style.marginBottom = UIStyles.SpaceXL;
@@ -248,23 +301,18 @@ namespace WiseTwin
         {
             if (confirmationOverlay == null) return;
 
-            var messageLabel = confirmationOverlay.Q<Label>("restart-message");
-            if (messageLabel != null)
-            {
-                // Warning icon only (mono-language)
-                messageLabel.text = "\u26A0";
-            }
-
+            // Title and message are now static English text set at construction time \u2014
+            // see CreateRestartConfirmationDialog. Buttons get drawn icons (WebGL-safe).
             var cancelBtn = confirmationOverlay.Q<Button>("cancel-restart-button");
             if (cancelBtn != null)
             {
-                cancelBtn.text = "\u2715";
+                UIStyles.SetButtonIcon(cancelBtn, WiseTwinIcons.CloseX(18, UIStyles.TextSecondary));
             }
 
             var restartBtn = confirmationOverlay.Q<Button>("confirm-restart-button");
             if (restartBtn != null)
             {
-                restartBtn.text = "\u21BB";
+                UIStyles.SetButtonIcon(restartBtn, WiseTwinIcons.Reset(20, UIStyles.TextOnAccent));
             }
         }
 

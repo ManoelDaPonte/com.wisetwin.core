@@ -126,9 +126,9 @@ namespace WiseTwin
 
         public void ShowStartPanel(int totalScenarios)
         {
-            titleLabel.text = "\u25B6";
+            titleLabel.text = "";
             subtitleLabel.text = "";
-            actionButton.text = "\u25B6";
+            UIStyles.SetButtonIcon(actionButton, WiseTwinIcons.PlayTriangle(22, UIStyles.TextOnAccent));
 
             ShowInternal();
         }
@@ -137,7 +137,7 @@ namespace WiseTwin
         {
             titleLabel.text = $"{completedIndex + 1} / {totalScenarios}";
             subtitleLabel.text = nextScenarioName ?? "";
-            actionButton.text = "\u2192";
+            UIStyles.SetButtonIcon(actionButton, WiseTwinIcons.ArrowRight(22, UIStyles.TextOnAccent));
 
             ShowInternal();
         }

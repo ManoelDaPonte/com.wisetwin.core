@@ -52,7 +52,6 @@ public class WiseTwinEditor : EditorWindow
             SyncWithSceneManager();
         };
         LoadExistingJSONContent();
-        MergeDialogueDataFromMetadata();
         InitializeUnityContent();
     }
 
@@ -139,6 +138,12 @@ public class WiseTwinEditor : EditorWindow
             var dialoguesList = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(json);
             if (dialoguesList == null) return;
 
+            // One-shot cleanup: previous versions of the editor could spawn many dialogues with
+            // identical graphDataJSON content but different generated IDs (dialogue_3, dialogue_4...)
+            // each time the editor reopened. Dedupe by content here so the library settles down.
+            var seenContent = new HashSet<string>();
+            int duplicatesDropped = 0;
+
             foreach (var dict in dialoguesList)
             {
                 // Backward compat: old format stored "titleEN" / "titleFR"
@@ -153,7 +158,23 @@ public class WiseTwinEditor : EditorWindow
                     title = title,
                     graphDataJSON = dict.ContainsKey("graphDataJSON") ? dict["graphDataJSON"] : ""
                 };
+
+                if (!string.IsNullOrEmpty(dialogue.graphDataJSON))
+                {
+                    if (seenContent.Contains(dialogue.graphDataJSON))
+                    {
+                        duplicatesDropped++;
+                        continue;
+                    }
+                    seenContent.Add(dialogue.graphDataJSON);
+                }
                 data.dialogues.Add(dialogue);
+            }
+
+            if (duplicatesDropped > 0)
+            {
+                Debug.Log($"[WiseTwin] Dropped {duplicatesDropped} duplicate dialogue(s) from the library on load. Saving cleaned version.");
+                SaveDialogueData();
             }
         }
         catch (System.Exception e)
@@ -162,36 +183,6 @@ public class WiseTwinEditor : EditorWindow
         }
     }
 
-    /// <summary>
-    /// After loading metadata JSON, merge any dialogue data from scenarios
-    /// into the existing dialogues list (loaded from persistent file).
-    /// </summary>
-    void MergeDialogueDataFromMetadata()
-    {
-        // Build lookup of existing dialogues by ID
-        var existing = new HashSet<string>();
-        foreach (var d in data.dialogues)
-        {
-            if (!string.IsNullOrEmpty(d.dialogueId))
-                existing.Add(d.dialogueId);
-        }
-
-        // Check scenarios for dialogue type that might have loaded from metadata
-        // and add any missing dialogues
-        foreach (var scenario in data.scenarios)
-        {
-            if (scenario.type == WiseTwin.Editor.ScenarioType.Dialogue &&
-                scenario.dialogueData != null &&
-                !string.IsNullOrEmpty(scenario.dialogueData.dialogueId) &&
-                !existing.Contains(scenario.dialogueData.dialogueId))
-            {
-                data.dialogues.Add(scenario.dialogueData);
-                existing.Add(scenario.dialogueData.dialogueId);
-            }
-        }
-    }
-    
-    
     void InitializeSceneId()
     {
         // Get current scene name
@@ -561,6 +552,25 @@ public class WiseTwinEditor : EditorWindow
                 if (stepDict.ContainsKey("zoneObjectName"))
                     step.zoneObjectName = stepDict["zoneObjectName"]?.ToString();
 
+                // Load group target object names (only when validationType == Group)
+                if (stepDict.ContainsKey("targetObjectNames"))
+                {
+                    step.targetObjectNames = new List<string>();
+                    step.targetObjects = new List<GameObject>();
+                    if (stepDict["targetObjectNames"] is Newtonsoft.Json.Linq.JArray arr)
+                    {
+                        foreach (var n in arr)
+                        {
+                            string objName = n?.ToString();
+                            if (!string.IsNullOrEmpty(objName))
+                            {
+                                step.targetObjectNames.Add(objName);
+                                step.targetObjects.Add(null); // resolved at runtime, kept null in editor
+                            }
+                        }
+                    }
+                }
+
                 // Load image path
                 if (stepDict.ContainsKey("imagePath"))
                 {
@@ -638,36 +648,42 @@ public class WiseTwinEditor : EditorWindow
         var jObject = Newtonsoft.Json.Linq.JObject.FromObject(dialogueObj);
         var dialogueDict = jObject.ToObject<Dictionary<string, object>>();
 
-        // Load title
         if (dialogueDict.ContainsKey("title"))
         {
             dialogue.title = GetFlatString(dialogueDict["title"]);
         }
 
-        // Store the entire dialogue JSON for the graph editor
-        dialogue.graphDataJSON = jObject.ToString(Formatting.Indented);
+        // Resolve a stable dialogueId: prefer the one written to metadata, fall back to a slug
+        // derived from the title so old metadata files (without dialogueId) still match an existing
+        // library entry on subsequent reloads instead of spawning new ones.
+        string idFromMetadata = dialogueDict.ContainsKey("dialogueId") ? GetFlatString(dialogueDict["dialogueId"]) : "";
+        dialogue.dialogueId = !string.IsNullOrEmpty(idFromMetadata)
+            ? idFromMetadata
+            : DeriveDialogueIdFromTitle(dialogue.title);
 
-        // Generate a dialogue ID if not already set
-        if (string.IsNullOrEmpty(dialogue.dialogueId))
-        {
-            dialogue.dialogueId = $"dialogue_{data.dialogues.Count + 1}";
-        }
-
-        // Also add to the dialogues list if not already there
-        bool exists = false;
+        // Link to existing library entry by id; if none exists, add a single new entry.
+        // The persistent library file is the source of truth — we never create duplicates here.
+        WiseTwin.Editor.DialogueScenarioData libraryEntry = null;
         foreach (var d in data.dialogues)
         {
             if (d.dialogueId == dialogue.dialogueId)
             {
-                exists = true;
-                // Update existing
-                d.title = dialogue.title;
-                d.graphDataJSON = dialogue.graphDataJSON;
+                libraryEntry = d;
                 break;
             }
         }
-        if (!exists)
+
+        if (libraryEntry != null)
         {
+            // Library wins for graph data — preserves editor-format positions across reloads
+            dialogue.title = libraryEntry.title;
+            dialogue.graphDataJSON = libraryEntry.graphDataJSON;
+        }
+        else
+        {
+            // First time we see this dialogue — register it in the library so it's reusable.
+            // Runtime-format JSON is auto-imported to editor format on first graph editor open.
+            dialogue.graphDataJSON = jObject.ToString(Formatting.Indented);
             data.dialogues.Add(new WiseTwin.Editor.DialogueScenarioData
             {
                 dialogueId = dialogue.dialogueId,
@@ -675,6 +691,25 @@ public class WiseTwinEditor : EditorWindow
                 graphDataJSON = dialogue.graphDataJSON
             });
         }
+    }
+
+    /// <summary>
+    /// Derive a stable, slug-style dialogueId from a title (e.g. "Safety Briefing" → "dialogue_safety_briefing").
+    /// Used as a fallback when metadata files don't carry a dialogueId field (old format).
+    /// </summary>
+    string DeriveDialogueIdFromTitle(string title)
+    {
+        if (string.IsNullOrEmpty(title)) return "dialogue_untitled";
+
+        var sb = new System.Text.StringBuilder("dialogue_");
+        bool lastWasUnderscore = true;
+        foreach (char c in title.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c)) { sb.Append(c); lastWasUnderscore = false; }
+            else if (!lastWasUnderscore) { sb.Append('_'); lastWasUnderscore = true; }
+        }
+        string result = sb.ToString().TrimEnd('_');
+        return result == "dialogue" ? "dialogue_untitled" : result;
     }
 
     // Helper methods for JSON parsing
@@ -1095,6 +1130,17 @@ public class WiseTwinEditor : EditorWindow
                 stepDict["zoneObjectName"] = step.zoneObjectName;
             }
 
+            // Add the list of target objects when validation type is Group
+            if (step.validationType == WiseTwin.Editor.ValidationType.Group && step.targetObjectNames != null)
+            {
+                var groupNames = new List<string>();
+                foreach (var name in step.targetObjectNames)
+                {
+                    if (!string.IsNullOrEmpty(name)) groupNames.Add(name);
+                }
+                stepDict["targetObjectNames"] = groupNames;
+            }
+
             // Add image path if it exists
             if (!string.IsNullOrEmpty(step.imagePath))
             {
@@ -1145,23 +1191,37 @@ public class WiseTwinEditor : EditorWindow
 
     Dictionary<string, object> ConvertDialogueDataToJSON(WiseTwin.Editor.DialogueScenarioData dialogue)
     {
-        if (!string.IsNullOrEmpty(dialogue.graphDataJSON))
+        // When a scenario is linked to a library dialogue by id, the library entry is the source
+        // of truth. The scenario's inline graphDataJSON copy may be stale (e.g. user edited via
+        // the Dialogue tab after the link was made), so always prefer the live library entry.
+        var source = dialogue;
+        if (!string.IsNullOrEmpty(dialogue.dialogueId))
+        {
+            var lib = data.dialogues.FirstOrDefault(d => d.dialogueId == dialogue.dialogueId);
+            if (lib != null && !string.IsNullOrEmpty(lib.graphDataJSON))
+            {
+                source = lib;
+            }
+        }
+
+        Dictionary<string, object> result = null;
+
+        if (!string.IsNullOrEmpty(source.graphDataJSON))
         {
             try
             {
-                // Try to parse as editor format first (has "nodes" with "position" fields and "edges" array)
-                var editorData = WiseTwin.Editor.DialogueEditor.DialogueGraphSerializer.DeserializeEditorData(dialogue.graphDataJSON);
+                var editorData = WiseTwin.Editor.DialogueEditor.DialogueGraphSerializer.DeserializeEditorData(source.graphDataJSON);
                 if (editorData != null && editorData.nodes.Count > 0)
                 {
-                    // Convert editor format to runtime format for metadata export
-                    return WiseTwin.Editor.DialogueEditor.DialogueGraphSerializer.ConvertToRuntimeFormat(
-                        editorData, dialogue.title);
+                    result = WiseTwin.Editor.DialogueEditor.DialogueGraphSerializer.ConvertToRuntimeFormat(
+                        editorData, source.title);
                 }
-
-                // Fallback: try as raw runtime format (backward compatibility)
-                var rawData = JsonConvert.DeserializeObject<Dictionary<string, object>>(dialogue.graphDataJSON);
-                if (rawData != null && rawData.ContainsKey("startNodeId"))
-                    return rawData;
+                else
+                {
+                    var rawData = JsonConvert.DeserializeObject<Dictionary<string, object>>(source.graphDataJSON);
+                    if (rawData != null && rawData.ContainsKey("startNodeId"))
+                        result = rawData;
+                }
             }
             catch (System.Exception e)
             {
@@ -1169,26 +1229,39 @@ public class WiseTwinEditor : EditorWindow
             }
         }
 
-        // Fallback: create a minimal dialogue structure
-        return new Dictionary<string, object>
+        // Fallback: minimal valid dialogue structure
+        if (result == null)
         {
-            ["title"] = dialogue.title ?? "",
-            ["startNodeId"] = "node_001",
-            ["nodes"] = new List<object>
+            result = new Dictionary<string, object>
             {
-                new Dictionary<string, object>
+                ["title"] = source.title ?? "",
+                ["startNodeId"] = "node_001",
+                ["nodes"] = new List<object>
                 {
-                    ["id"] = "node_001",
-                    ["type"] = "start",
-                    ["nextNodeId"] = "node_002"
-                },
-                new Dictionary<string, object>
-                {
-                    ["id"] = "node_002",
-                    ["type"] = "end"
+                    new Dictionary<string, object>
+                    {
+                        ["id"] = "node_001",
+                        ["type"] = "start",
+                        ["nextNodeId"] = "node_002"
+                    },
+                    new Dictionary<string, object>
+                    {
+                        ["id"] = "node_002",
+                        ["type"] = "end"
+                    }
                 }
-            }
-        };
+            };
+        }
+
+        // Embed the dialogueId so reloading this metadata in any project (the same one or a
+        // different one) can re-link to the existing library entry instead of creating a duplicate.
+        // The runtime DialogueDisplayer ignores this field, so it stays forward-compatible.
+        if (!string.IsNullOrEmpty(source.dialogueId))
+        {
+            result["dialogueId"] = source.dialogueId;
+        }
+
+        return result;
     }
 
     string ColorToHex(Color color)

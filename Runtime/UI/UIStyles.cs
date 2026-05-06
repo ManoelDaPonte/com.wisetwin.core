@@ -271,6 +271,35 @@ namespace WiseTwin.UI
             return btn;
         }
 
+        /// <summary>
+        /// Replaces a button's text with a centered VisualElement icon (typically from
+        /// <see cref="WiseTwinIcons"/>). Use this instead of setting <c>btn.text = "▶"</c>
+        /// to avoid font-fallback issues that produce empty boxes in WebGL builds.
+        ///
+        /// Calling this multiple times on the same button replaces any previously set icon.
+        /// </summary>
+        public static void SetButtonIcon(Button btn, VisualElement icon)
+        {
+            if (btn == null || icon == null) return;
+
+            btn.text = "";
+
+            // Remove any previously installed icon child so we don't stack
+            for (int i = btn.childCount - 1; i >= 0; i--)
+            {
+                if (btn[i].name != null && btn[i].name.StartsWith("icon-"))
+                {
+                    btn.RemoveAt(i);
+                }
+            }
+
+            // Center the icon in the button
+            btn.style.alignItems = Align.Center;
+            btn.style.justifyContent = Justify.Center;
+            icon.style.alignSelf = Align.Center;
+            btn.Add(icon);
+        }
+
         // =====================================================================
         // BUILDER METHODS - Text
         // =====================================================================

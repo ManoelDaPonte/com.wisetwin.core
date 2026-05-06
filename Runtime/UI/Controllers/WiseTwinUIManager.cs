@@ -734,7 +734,8 @@ namespace WiseTwin
         public void CompleteTraining()
         {
             UpdateProgress(totalSteps, totalSteps);
-            ShowNotification("Training Completed! 🎉", NotificationType.Success, 5f);
+            // Plain text — emoji is outside the BMP and renders as a tofu box in WebGL
+            ShowNotification("Training Completed!", NotificationType.Success, 5f);
             
             // Trigger completion in WiseTwinManager
             if (WiseTwin.WiseTwinManager.Instance != null)

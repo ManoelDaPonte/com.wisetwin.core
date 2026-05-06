@@ -600,7 +600,8 @@ namespace WiseTwin.Editor
             if (string.IsNullOrEmpty(preview)) preview = "(empty step)";
 
             string valBadge = step.validationType == ValidationType.Click ? "[Click]" :
-                              step.validationType == ValidationType.Manual ? "[Manual]" : "[Zone]";
+                              step.validationType == ValidationType.Manual ? "[Manual]" :
+                              step.validationType == ValidationType.Zone ? "[Zone]" : "[Group]";
 
             // Box with visible colored background
             Rect stepRect = EditorGUILayout.BeginVertical("box");
@@ -671,13 +672,55 @@ namespace WiseTwin.Editor
                     step.zoneObjectName = EditorGUILayout.TextField("Zone Name", step.zoneObjectName);
                 }
 
+                // Group fields: list of GameObjects to touch in any order
+                if (step.validationType == ValidationType.Group)
+                {
+                    EditorGUILayout.HelpBox("Group: every object below must be clicked (in any order). Step advances when all are touched.", MessageType.Info);
+
+                    // Keep targetObjects and targetObjectNames in sync (objectNames is what gets serialized to metadata)
+                    while (step.targetObjectNames.Count < step.targetObjects.Count) step.targetObjectNames.Add("");
+                    while (step.targetObjectNames.Count > step.targetObjects.Count) step.targetObjectNames.RemoveAt(step.targetObjectNames.Count - 1);
+
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField($"Targets ({step.targetObjects.Count})", EditorStyles.miniBoldLabel);
+                    if (GUILayout.Button("+", GUILayout.Width(22), GUILayout.Height(16)))
+                    {
+                        step.targetObjects.Add(null);
+                        step.targetObjectNames.Add("");
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    for (int i = 0; i < step.targetObjects.Count; i++)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUI.BeginChangeCheck();
+                        step.targetObjects[i] = (GameObject)EditorGUILayout.ObjectField($"  #{i + 1}", step.targetObjects[i], typeof(GameObject), true);
+                        if (EditorGUI.EndChangeCheck() && step.targetObjects[i] != null)
+                            step.targetObjectNames[i] = step.targetObjects[i].name;
+
+                        step.targetObjectNames[i] = EditorGUILayout.TextField(step.targetObjectNames[i], GUILayout.MaxWidth(160));
+
+                        GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+                        if (GUILayout.Button("X", GUILayout.Width(22)))
+                        {
+                            step.targetObjects.RemoveAt(i);
+                            step.targetObjectNames.RemoveAt(i);
+                            GUI.backgroundColor = Color.white;
+                            EditorGUILayout.EndHorizontal();
+                            break;
+                        }
+                        GUI.backgroundColor = Color.white;
+                        EditorGUILayout.EndHorizontal();
+                    }
+                }
+
                 // Step text
                 GUIStyle textAreaStyle = new GUIStyle(EditorStyles.textArea) { wordWrap = true };
                 EditorGUILayout.LabelField("Text", EditorStyles.miniBoldLabel);
                 step.text = EditorGUILayout.TextArea(step.text, textAreaStyle, GUILayout.Height(40));
 
-                // Highlight, Blink, Images, Fake Objects: only for Click validation
-                if (step.validationType == ValidationType.Click)
+                // Highlight, Blink, Images, Fake Objects: for Click and Group validation
+                if (step.validationType == ValidationType.Click || step.validationType == ValidationType.Group)
                 {
                     EditorGUILayout.Space(2);
 
@@ -869,7 +912,15 @@ namespace WiseTwin.Editor
                 GUI.backgroundColor = new Color(0.3f, 0.7f, 1f);
                 if (GUILayout.Button("Open Graph Editor", GUILayout.Height(28)))
                 {
-                    WiseTwin.Editor.DialogueEditor.DialogueEditorWindow.OpenWithDialogue(dialogue);
+                    // When the scenario is linked to a library dialogue, edit the library entry
+                    // directly so the change persists (the scenario keeps a stale copy otherwise).
+                    DialogueScenarioData target = dialogue;
+                    if (!string.IsNullOrEmpty(dialogue.dialogueId))
+                    {
+                        var lib = data.dialogues.FirstOrDefault(d => d.dialogueId == dialogue.dialogueId);
+                        if (lib != null) target = lib;
+                    }
+                    WiseTwin.Editor.DialogueEditor.DialogueEditorWindow.OpenWithDialogue(target);
                 }
                 GUI.backgroundColor = Color.white;
 

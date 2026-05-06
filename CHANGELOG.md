@@ -2,6 +2,36 @@
 
 All notable changes to the WiseTwin Core Package will be documented in this file.
 
+## [1.5.0] - 2026-05-06
+
+### Added
+- **Public API (`WiseTwinAPI`)** — Static facade exposing 7 methods (`ValidateCurrentStep`, `SkipCurrentScenario`, `CompleteTraining`, `GetCurrentScenarioInfo`, `GetCurrentScore`, `IsTrainingActive`, `LogCustomEvent`) and 5 events (`OnStepValidated`, `OnScoreChanged`, `OnScenarioStarted`, `OnTrainingCompleted`, `OnCustomEventLogged`) for hybrid trainings where external scripts need to drive flow alongside the package's UI. Internal managers may change between versions; this façade is preserved.
+- **Sample script** — `Samples~/CustomScripting/CustomTrainingExample.cs`, importable via Package Manager. Demonstrates every API method with keyboard shortcuts (V/S/M/B/C) and event subscriptions.
+- **Score Debug Monitor** — `ScoreDebugMonitor` MonoBehaviour with live on-screen overlay (color-coded score, rolling event log) and console mirroring. Toggle via inspector checkbox or menu `WiseTwin > Debug > Add Score Monitor to Scene`.
+- **Group validation type for procedures** — `validationType: "group"` lets a step require multiple objects to be clicked in any order. Step advances when all are touched. Editor UI exposes a list of target GameObjects.
+- **`WiseTwinIcons` factory** — VisualElement and Texture2D-based icon shapes (`PlayTriangle`, `ArrowRight`/`ArrowLeft`, `Check`, `Cross`, `CloseX`, `Reset`, `Warning`, `Chevron`, `Bullet`) plus `UIStyles.SetButtonIcon` helper.
+- **Custom event support in analytics** — `TrainingAnalytics.LogCustomEvent(eventId, success, weight, description)` records score-affecting events from external 3D logic. Counts in `CalculateScore()` proportionally to weight.
+- **`API.md` and `README.md`** — Public API reference (with quick reference + 4 recipes) and package overview.
+
+### Changed
+- **`CompleteTraining` shows the completion UI** — Calling `WiseTwinManager.CompleteTraining` (and therefore `WiseTwinAPI.CompleteTraining`) now displays the score screen and exports analytics, just like the end-of-progression flow. Falls back to a direct WebGL notification if no panel settings are available in the scene.
+- **Procedure right-side panel auto-sizes to content** — Short instructions like "Turn the valve" produce a compact card instead of a floor-to-ceiling sidebar. Long instructions still scroll inside a max-85%-screen-height panel.
+- **`ProcedureDisplayer` validation paths unified** — All three paths (click / zone / manual) now funnel through a single `ValidateCurrentStep(success)` method, ensuring consistent analytics handling and enabling external API control. Renamed `ValidateCurrentStep(GameObject)` → `OnObjectClicked(GameObject)` and `ValidateZoneStep()` → `OnZoneEntered()` (internal-only callers updated).
+- **Reset confirmation dialog** — Now shows "Restart Training?" + "Your progress will be lost." text alongside the warning icon. Intentional exception to the mono-language icon-based design for destructive actions where icons alone were ambiguous.
+- **`TrainingHUD` only auto-shows when scenarios exist** — API-only trainings (no scenarios in metadata) no longer display the top progress bar.
+- **`TrainingAnalytics` auto-creation moved to `WiseTwinManager`** — Single point of responsibility instead of being created lazily by `ContentDisplayManager`.
+- **Score-impact events now fire `OnCustomEventLogged` and `OnScoreChanged`** — Used by `ScoreDebugMonitor` and any subscribed external HUD.
+
+### Fixed
+- **WebGL: missing icons across the entire UI** — Replaced every Unicode glyph used as a visible label (▶ ⚠ ↻ ✕ ✓ ✗ → ← › • plus the 🎉 emoji) with drawn `WiseTwinIcons` shapes. The bundled font in WebGL builds was missing these glyphs, producing empty boxes in production while rendering fine in the Editor (which falls back to system fonts).
+- **Dialogue editor: duplicates spawning on every reload** — `LoadDialogueDataFromJSON` was generating fresh `dialogue_N` IDs every time the metadata was parsed and adding them to the library, causing linear growth per session. Now embeds `dialogueId` in the metadata JSON for stable cross-reload identity, with a slug fallback derived from the title for older metadata files. Added a one-shot deduplication of existing duplicates by `graphDataJSON` content on load.
+- **Dialogue editor: edits not visible at runtime** — Library entries (the Dialogue tab) are now the source of truth at metadata generation. The per-scenario inline copy is only used as a fallback when no library match exists.
+- **Dialogue editor: editor positions lost on reload** — Reload no longer overwrites the editor-format `graphDataJSON` with the runtime format from `metadata.json`.
+- **Tutorial: WASD letters off-center in their boxes** — Labels now use absolute fill positioning with explicit `unityTextAlign = MiddleCenter` and zero padding/margin.
+- **Tutorial: mouse silhouette proportions** — Divider and scroll wheel positions now derive from `bodyW`/`bodyH` constants for guaranteed symmetry.
+- **Sample crash on Input System-only projects** — `CustomTrainingExample` uses `UnityEngine.InputSystem.Keyboard` instead of legacy `UnityEngine.Input` (which throws at runtime when Active Input Handling is set to Input System Package only).
+- **`.gitignore`: `*~` pattern was matching `Samples~/`** — Replaced with a more specific pattern so the sample folder is properly tracked.
+
 ## [1.4.0] - 2026-03-05
 
 ### Added

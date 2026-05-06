@@ -199,10 +199,10 @@ namespace WiseTwin
             descLabel.style.marginBottom = UIStyles.Space2XL;
             panel.Add(descLabel);
 
-            var nextButton = UIStyles.CreatePrimaryButton("\u2192", ShowTutorialPanel);
+            var nextButton = UIStyles.CreatePrimaryButton("", ShowTutorialPanel);
+            UIStyles.SetButtonIcon(nextButton, WiseTwinIcons.ArrowRight(28, UIStyles.TextOnAccent));
             nextButton.style.width = 140;
             nextButton.style.height = 52;
-            nextButton.style.fontSize = UIStyles.Font2XL;
             panel.Add(nextButton);
 
             return panel;
@@ -285,17 +285,17 @@ namespace WiseTwin
             buttonRow.style.justifyContent = Justify.Center;
             buttonRow.style.marginTop = UIStyles.SpaceLG;
 
-            var backButton = UIStyles.CreateSecondaryButton("\u2190", ShowWelcomePanel);
+            var backButton = UIStyles.CreateSecondaryButton("", ShowWelcomePanel);
+            UIStyles.SetButtonIcon(backButton, WiseTwinIcons.ArrowLeft(22, UIStyles.TextSecondary));
             backButton.style.width = 100;
             backButton.style.height = 48;
-            backButton.style.fontSize = UIStyles.FontXL;
             backButton.style.marginRight = UIStyles.SpaceLG;
             buttonRow.Add(backButton);
 
-            var playButton = UIStyles.CreatePrimaryButton("\u25B6", OnPlayButtonClicked);
+            var playButton = UIStyles.CreatePrimaryButton("", OnPlayButtonClicked);
+            UIStyles.SetButtonIcon(playButton, WiseTwinIcons.PlayTriangle(24, UIStyles.TextOnAccent));
             playButton.style.width = 140;
             playButton.style.height = 52;
-            playButton.style.fontSize = UIStyles.Font2XL;
             buttonRow.Add(playButton);
 
             panel.Add(buttonRow);
@@ -350,46 +350,45 @@ namespace WiseTwin
         {
             var card = MakeCardShell(isSelected);
 
-            // Mouse shape: a rounded vertical rectangle with two chambers on top + a small scroll dot.
+            // Mouse silhouette: a rounded vertical capsule. The vertical divider runs from
+            // the top of the body down to about the middle (button line), with the scroll
+            // wheel as a coloured accent pill straddling that divider near the top — every
+            // measurement is derived from bodyW/bodyH so the shape stays symmetric.
+            const float bodyW = 64f;
+            const float bodyH = 94f;
+
             var mouseBody = new VisualElement();
-            mouseBody.style.width = 60;
-            mouseBody.style.height = 90;
+            mouseBody.style.width = bodyW;
+            mouseBody.style.height = bodyH;
             mouseBody.style.backgroundColor = UIStyles.BgDeep;
-            UIStyles.SetBorderRadius(mouseBody, 30);
+            UIStyles.SetBorderRadius(mouseBody, 26);
             UIStyles.SetBorderWidth(mouseBody, 2);
             UIStyles.SetBorderColor(mouseBody, UIStyles.TextSecondary);
             mouseBody.style.marginBottom = UIStyles.SpaceMD;
             mouseBody.pickingMode = PickingMode.Ignore;
 
-            // Left/Right button divider (top half)
+            // Vertical divider: top → mid-body. Centered horizontally on the body.
+            const float dividerW = 2f;
             var divider = new VisualElement();
             divider.style.position = Position.Absolute;
-            divider.style.left = 29;
-            divider.style.top = 2;
-            divider.style.width = 2;
-            divider.style.height = 34;
+            divider.style.left = (bodyW - dividerW) * 0.5f;
+            divider.style.top = 6f;
+            divider.style.width = dividerW;
+            divider.style.height = bodyH * 0.50f - 6f;
             divider.style.backgroundColor = UIStyles.TextSecondary;
             mouseBody.Add(divider);
 
-            // Horizontal separator between buttons and body
-            var horizSep = new VisualElement();
-            horizSep.style.position = Position.Absolute;
-            horizSep.style.left = 2;
-            horizSep.style.right = 2;
-            horizSep.style.top = 36;
-            horizSep.style.height = 1;
-            horizSep.style.backgroundColor = UIStyles.TextSecondary;
-            mouseBody.Add(horizSep);
-
-            // Scroll wheel (small pill in the middle)
+            // Scroll wheel: coloured pill straddling the divider, near the top.
+            const float wheelW = 10f;
+            const float wheelH = 18f;
             var wheel = new VisualElement();
             wheel.style.position = Position.Absolute;
-            wheel.style.left = 26;
-            wheel.style.top = 16;
-            wheel.style.width = 8;
-            wheel.style.height = 14;
+            wheel.style.left = (bodyW - wheelW) * 0.5f;
+            wheel.style.top = 14f;
+            wheel.style.width = wheelW;
+            wheel.style.height = wheelH;
             wheel.style.backgroundColor = UIStyles.Accent;
-            UIStyles.SetBorderRadius(wheel, 4);
+            UIStyles.SetBorderRadius(wheel, 5);
             mouseBody.Add(wheel);
 
             card.Add(mouseBody);
@@ -422,23 +421,41 @@ namespace WiseTwin
 
         VisualElement BuildKey(string letter)
         {
+            const int keySize = 42;
+
             var key = new VisualElement();
-            key.style.width = 38;
-            key.style.height = 38;
-            key.style.marginLeft = 3;
-            key.style.marginRight = 3;
-            key.style.alignItems = Align.Center;
-            key.style.justifyContent = Justify.Center;
+            key.style.width = keySize;
+            key.style.height = keySize;
+            key.style.marginLeft = 4;
+            key.style.marginRight = 4;
             key.style.backgroundColor = UIStyles.BgDeep;
             UIStyles.SetBorderRadius(key, UIStyles.RadiusSM);
             UIStyles.SetBorderWidth(key, 2);
             UIStyles.SetBorderColor(key, UIStyles.TextSecondary);
             key.pickingMode = PickingMode.Ignore;
 
+            // Label fills the key (absolute, all sides 0) and centers the glyph in both axes.
+            // All padding / margin explicitly zeroed so the line-height box doesn't push the
+            // letter off-center. Explicit fontSize (instead of FontMD) keeps the glyph from
+            // being cropped at small key sizes.
             var label = new Label(letter);
-            label.style.fontSize = UIStyles.FontMD;
+            label.style.position = Position.Absolute;
+            label.style.left = 0;
+            label.style.right = 0;
+            label.style.top = 0;
+            label.style.bottom = 0;
+            label.style.paddingTop = 0;
+            label.style.paddingBottom = 0;
+            label.style.paddingLeft = 0;
+            label.style.paddingRight = 0;
+            label.style.marginTop = 0;
+            label.style.marginBottom = 0;
+            label.style.marginLeft = 0;
+            label.style.marginRight = 0;
+            label.style.fontSize = 18;
             label.style.color = UIStyles.TextPrimary;
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
             label.pickingMode = PickingMode.Ignore;
             key.Add(label);
 

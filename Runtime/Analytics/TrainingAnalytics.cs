@@ -28,6 +28,21 @@ namespace WiseTwin.Analytics
         private float totalDuration;
         private string completionStatus = "in_progress";
 
+        /// <summary>Elapsed seconds since the session started — useful for completion screens
+        /// when no other timer is running (e.g. API-only trainings without TrainingHUD).</summary>
+        public float SessionDurationSeconds
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(startTime)) return 0f;
+                if (DateTime.TryParse(startTime, null, System.Globalization.DateTimeStyles.RoundtripKind, out var start))
+                {
+                    return (float)(DateTime.UtcNow - start).TotalSeconds;
+                }
+                return 0f;
+            }
+        }
+
         // Interactions tracking
         private List<InteractionData> interactions;
         private InteractionData currentInteraction;
@@ -139,6 +154,8 @@ namespace WiseTwin.Analytics
                 LogDebug($"Ended interaction: {currentInteraction.interactionId} - Success: {success}, Duration: {currentInteraction.duration}s");
 
                 currentInteraction = null;
+
+                WiseTwinAPI.RaiseScoreChanged(CalculateScore());
             }
         }
 
@@ -298,6 +315,53 @@ namespace WiseTwin.Analytics
         }
 
         /// <summary>
+        /// Logs a custom event from an external script (e.g. player entered a forbidden zone in 3D).
+        /// Creates a standalone interaction with type="custom" that participates in score calculation.
+        /// </summary>
+        /// <param name="eventId">Unique identifier for the event (e.g. "forbidden_zone_entered")</param>
+        /// <param name="success">true if the event represents a positive action, false for a mistake</param>
+        /// <param name="weight">Score weight: 1.0 = counts as one normal interaction, 3.0 = counts as three. Use 0 to track without affecting score.</param>
+        /// <param name="description">Optional human-readable description shown in the SaaS export</param>
+        public void LogCustomEvent(string eventId, bool success, float weight = 1.0f, string description = null)
+        {
+            if (string.IsNullOrEmpty(eventId))
+            {
+                LogError("LogCustomEvent called with empty eventId");
+                return;
+            }
+
+            string interactionId = $"custom_{eventId}_{DateTime.UtcNow.Ticks}";
+            var customInteraction = new InteractionData(interactionId, "custom", eventId, eventId);
+            customInteraction.AddData("eventId", eventId);
+            customInteraction.AddData("weight", weight);
+            customInteraction.AddData("finalScore", success ? 100f : 0f);
+            if (!string.IsNullOrEmpty(description))
+            {
+                customInteraction.AddData("description", description);
+            }
+            customInteraction.attempts = 1;
+            customInteraction.EndInteraction(success);
+
+            interactions.Add(customInteraction);
+            totalInteractions++;
+            totalAttempts++;
+            if (success)
+            {
+                successfulInteractions++;
+            }
+            else
+            {
+                failedInteractions++;
+                totalFailedAttempts++;
+            }
+
+            LogDebug($"Custom event logged: {eventId} (success: {success}, weight: {weight})");
+
+            WiseTwinAPI.RaiseCustomEventLogged(eventId, success, weight, description);
+            WiseTwinAPI.RaiseScoreChanged(CalculateScore());
+        }
+
+        /// <summary>
         /// Track l'affichage d'un texte
         /// </summary>
         public void TrackTextDisplay(string objectId, string contentKey, TextInteractionData textData)
@@ -454,23 +518,29 @@ namespace WiseTwin.Analytics
         {
             if (interactions.Count == 0) return 100f;
 
-            int totalPoints = 0;
-            int totalInteractionWeight = 0;
+            float totalPoints = 0f;
+            float totalInteractionWeight = 0f;
 
             foreach (var interaction in interactions)
             {
                 if (interaction.type == "procedure")
                 {
-                    // Pour les procédures, chaque étape compte
                     int totalSteps = GetIntValue(interaction.data, "totalSteps", 0);
                     int perfectSteps = GetIntValue(interaction.data, "perfectStepsCount", 0);
 
                     totalInteractionWeight += totalSteps;
                     totalPoints += perfectSteps;
                 }
+                else if (interaction.type == "custom")
+                {
+                    float weight = GetFloatValue(interaction.data, "weight", 1.0f);
+                    if (weight <= 0f) continue;
+
+                    totalInteractionWeight += weight;
+                    if (interaction.success) totalPoints += weight;
+                }
                 else
                 {
-                    // Pour les autres interactions (question, text), 1 point si parfait
                     totalInteractionWeight += 1;
 
                     if (interaction.data != null && interaction.data.ContainsKey("finalScore"))
@@ -480,15 +550,14 @@ namespace WiseTwin.Analytics
                     }
                     else
                     {
-                        totalPoints += 1; // Par défaut parfait
+                        totalPoints += 1;
                     }
                 }
             }
 
-            if (totalInteractionWeight == 0) return 100f;
+            if (totalInteractionWeight == 0f) return 100f;
 
-            // Score = (points obtenus / poids total) × 100
-            return (float)totalPoints / totalInteractionWeight * 100f;
+            return totalPoints / totalInteractionWeight * 100f;
         }
 
         /// <summary>

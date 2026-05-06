@@ -8,7 +8,9 @@
 # Temporary files
 *.tmp
 *.temp
-*~
+# Note: do NOT use a bare *~ pattern here — it would match Unity's Samples~ folder
+# convention and exclude package samples from the repo.
+*.bak~
 
 # IDE files
 .vscode/
