@@ -284,7 +284,11 @@ namespace WiseTwin.UI
             modalContainer.style.backgroundColor = UIStyles.BackdropLight;
             modalContainer.style.alignItems = Align.FlexEnd;
             modalContainer.style.justifyContent = Justify.Center;
-            modalContainer.pickingMode = PickingMode.Position;
+            // Let 3D clicks pass through the full-screen backdrop so host interaction scripts
+            // (and the package's own ProcedureStepClickHandler) can validate steps by clicking
+            // the world. The instructionPanel keeps the default Position pickingMode, so its
+            // own area stays clickable for buttons inside the panel.
+            modalContainer.pickingMode = PickingMode.Ignore;
 
             // Instruction panel (docked right). Auto-sizes vertically to its content so a
             // short instruction like "Turn the valve" produces a compact card instead of a

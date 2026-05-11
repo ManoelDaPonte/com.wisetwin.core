@@ -210,8 +210,12 @@ namespace WiseTwin.UI
             currentDisplayer = contentDisplayers[contentType];
             isDisplaying = true;
 
-            // Bloquer les clics pendant l'affichage
-            root.pickingMode = PickingMode.Position;
+            // Root stays PickingMode.Ignore so host scripts that use EventSystem.IsPointerOverGameObject()
+            // aren't told the whole screen is UI. Each displayer is responsible for adding its own
+            // full-screen backdrop in PickingMode.Position when it needs to block 3D clicks
+            // (Question / Dialogue / Video / Tutorial / Completion). The procedure displayer
+            // deliberately keeps its backdrop in Ignore so the player can click 3D targets to
+            // validate steps.
 
             if (debugMode)
             {
