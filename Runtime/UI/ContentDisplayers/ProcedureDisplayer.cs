@@ -615,8 +615,16 @@ namespace WiseTwin.UI
                     break;
 
                 case "manual":
-                    // Manual validation mode - no object highlighting or click handlers needed
+                    // Manual validation mode - no object highlighting or click handlers needed.
+                    // The footer "Validate Step" button is shown so the player can advance.
                     Debug.Log("[ProcedureDisplayer] Manual validation mode - no object interaction required");
+                    break;
+
+                case "external":
+                    // External validation mode - the step is advanced only by an external call
+                    // to WiseTwinAPI.ValidateCurrentStep(). No highlight, no zone, no validate
+                    // button: the package does not give the player any way to skip the step.
+                    Debug.Log("[ProcedureDisplayer] External validation mode - waiting for WiseTwinAPI.ValidateCurrentStep()");
                     break;
 
                 case "group":

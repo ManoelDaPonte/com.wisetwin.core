@@ -601,7 +601,8 @@ namespace WiseTwin.Editor
 
             string valBadge = step.validationType == ValidationType.Click ? "[Click]" :
                               step.validationType == ValidationType.Manual ? "[Manual]" :
-                              step.validationType == ValidationType.Zone ? "[Zone]" : "[Group]";
+                              step.validationType == ValidationType.Zone ? "[Zone]" :
+                              step.validationType == ValidationType.Group ? "[Group]" : "[External]";
 
             // Box with visible colored background
             Rect stepRect = EditorGUILayout.BeginVertical("box");
@@ -651,6 +652,14 @@ namespace WiseTwin.Editor
 
                 // Validation type FIRST so user picks mode before seeing irrelevant fields
                 step.validationType = (ValidationType)EditorGUILayout.EnumPopup("Validation", step.validationType);
+
+                if (step.validationType == ValidationType.External)
+                {
+                    EditorGUILayout.HelpBox(
+                        "External: the step shows its instructions but has no highlight, no zone, and no validate button. " +
+                        "Call WiseTwinAPI.ValidateCurrentStep(true) from your custom script when your conditions are met.",
+                        MessageType.Info);
+                }
 
                 // Target Object (only for Click - for Manual/Zone it's not relevant)
                 if (step.validationType == ValidationType.Click)

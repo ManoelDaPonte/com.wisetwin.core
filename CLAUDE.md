@@ -73,7 +73,7 @@ TrainingAnalytics → tracks all interactions → exports JSON
 ### UI Displayers (`Runtime/UI/ContentDisplayers/`)
 - `ContentDisplayManager.cs` - Coordinator, dispatches scenarios to appropriate displayer
 - `QuestionDisplayer.cs` - Question rendering with single/multiple choice, validation, feedback
-- `ProcedureDisplayer.cs` - Step-by-step procedure with 3 validation types (click, manual, zone)
+- `ProcedureDisplayer.cs` - Step-by-step procedure with 5 validation types (click, manual, zone, group, external)
 - `TextDisplayer.cs` - Simple text/information display
 - `DialogueDisplayer.cs` - Interactive branching dialogue with chat-bubble UI, evaluated/neutral choices, analytics
 - `VideoDisplayer.cs` - Fullscreen video player overlay
@@ -167,6 +167,8 @@ Each procedure step has a `validationType`:
 | `click` | Player clicks highlighted 3D object | `ValidationType.Click` |
 | `manual` | Player clicks "Validate Step" button | `ValidationType.Manual` |
 | `zone` | Player walks into a trigger zone (CharacterController) | `ValidationType.Zone` |
+| `group` | Player clicks every object in the list (any order) | `ValidationType.Group` |
+| `external` | Step advances only when `WiseTwinAPI.ValidateCurrentStep()` is called from custom 3D logic — no highlight, no zone, no validate button | `ValidationType.External` |
 
 Zone validation uses `ProcedureZoneTrigger` component added at runtime to the zone GameObject. When validated, `ZoneCollectEffect.Play()` triggers a 3-phase animation (white flash → cubic ease-in implosion → deactivate). The zone auto-reactivates if the step is replayed. The zone object must have a Collider set to `isTrigger`. Use menu `WiseTwin > Create Validation Zone Prefab` to generate a prefab with:
 - **SphereCollider** (isTrigger, radius 1.5m, centered at Y=1)

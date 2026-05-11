@@ -24,7 +24,8 @@ namespace WiseTwin.Editor
         Click,
         Manual,
         Zone,
-        Group  // Touch every object in the list (any order). Step advances when all touched.
+        Group,    // Touch every object in the list (any order). Step advances when all touched.
+        External  // No package-side validation: only WiseTwinAPI.ValidateCurrentStep advances the step.
     }
 
     [Serializable]
