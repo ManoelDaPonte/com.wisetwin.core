@@ -43,6 +43,10 @@ namespace WiseTwin.Editor
             // Difficulty (dropdown)
             data.difficultyIndex = EditorGUILayout.Popup("Difficulty", data.difficultyIndex, data.difficultyOptions);
 
+            // Language (mono-language per build). Each build has a single language;
+            // for multilingual training, duplicate the build and translate the copy.
+            data.languageIndex = EditorGUILayout.Popup("Language", data.languageIndex, data.languageOptions);
+
             data.imageUrl = EditorGUILayout.TextField("Image URL", data.imageUrl);
 
             EditorGUILayout.EndVertical();

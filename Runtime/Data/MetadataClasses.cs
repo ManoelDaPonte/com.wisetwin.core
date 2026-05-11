@@ -10,6 +10,12 @@ public class FormationMetadataComplete
     public string title;
     public string description;
     public string version;
+
+    // Language code of the training content (mono-language per build).
+    // ISO 639-1 ("fr", "en", "es", ...). Optional — omitted from JSON when empty.
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string language;
+
     public string duration;
     public string difficulty;
     public List<string> tags;

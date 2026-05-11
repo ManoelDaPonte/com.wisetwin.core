@@ -27,6 +27,7 @@ namespace WiseTwin.Editor
         public string projectVersion = "1.0.0";
         public int durationMinutes = 30;
         public int difficultyIndex = 1;
+        public int languageIndex = 0; // index dans languageOptions ci-dessous
         public string imageUrl = "";
         public List<string> tags = new List<string> { "training", "interactive" };
         public bool includeTimestamp = true;
@@ -57,6 +58,14 @@ namespace WiseTwin.Editor
 
         // Difficulty options (en français)
         public readonly string[] difficultyOptions = { "Facile", "Intermédiaire", "Avancé", "Expert" };
+
+        // Language options : code ISO 639-1. Couverture Europe élargie (industrie B2B).
+        // Ordre : langues principales d'abord, puis pays nordiques, puis Europe centrale.
+        public readonly string[] languageOptions = {
+            "fr", "en", "es", "de", "it", "pt", "nl",
+            "sv", "da", "no", "fi",
+            "pl", "cs", "ro", "hu"
+        };
 
         public WiseTwinEditorData()
         {

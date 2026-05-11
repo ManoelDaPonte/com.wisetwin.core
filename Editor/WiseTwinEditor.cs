@@ -258,6 +258,9 @@ public class WiseTwinEditor : EditorWindow
             var difficultyStr = root["difficulty"]?.ToString();
             if (!string.IsNullOrEmpty(difficultyStr)) ParseDifficultyFromString(difficultyStr);
 
+            var languageStr = root["language"]?.ToString();
+            if (!string.IsNullOrEmpty(languageStr)) ParseLanguageFromString(languageStr);
+
             var tagsToken = root["tags"] as Newtonsoft.Json.Linq.JArray;
             if (tagsToken != null && tagsToken.Count > 0)
                 data.tags = tagsToken.ToObject<List<string>>();
@@ -796,6 +799,19 @@ public class WiseTwinEditor : EditorWindow
         }
         data.difficultyIndex = 1; // Default "Intermediate"
     }
+
+    void ParseLanguageFromString(string languageStr)
+    {
+        for (int i = 0; i < data.languageOptions.Length; i++)
+        {
+            if (string.Equals(data.languageOptions[i], languageStr, System.StringComparison.OrdinalIgnoreCase))
+            {
+                data.languageIndex = i;
+                return;
+            }
+        }
+        data.languageIndex = 0; // Default "fr"
+    }
     
     void InitializeUnityContent()
     {
@@ -934,6 +950,7 @@ public class WiseTwinEditor : EditorWindow
             title = data.projectTitle,
             description = data.projectDescription,
             version = data.projectVersion,
+            language = data.languageOptions[data.languageIndex], // ISO 639-1 ("fr", "en", ...)
             duration = $"{data.durationMinutes} minutes", // Auto formatting
             difficulty = data.difficultyOptions[data.difficultyIndex], // Get from dropdown (déjà en français)
             tags = new List<string>(data.tags),
