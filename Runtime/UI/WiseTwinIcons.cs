@@ -395,5 +395,31 @@ namespace WiseTwin.UI
             dot.style.borderBottomRightRadius = size * 0.5f;
             return dot;
         }
+
+        /// <summary>6-dot grip glyph (2 rows × 3 dots) used to hint that an element is draggable.</summary>
+        public static VisualElement DragHandle(int size, Color color)
+        {
+            var container = new VisualElement { name = "icon-drag-handle" };
+            container.style.width = size;
+            container.style.height = size * 0.45f;
+            container.style.flexDirection = FlexDirection.Column;
+            container.style.justifyContent = Justify.SpaceBetween;
+            container.style.alignItems = Align.Center;
+
+            int dotSize = Mathf.Max(2, Mathf.RoundToInt(size * 0.13f));
+            for (int row = 0; row < 2; row++)
+            {
+                var rowEl = new VisualElement();
+                rowEl.style.flexDirection = FlexDirection.Row;
+                rowEl.style.justifyContent = Justify.SpaceBetween;
+                rowEl.style.width = size * 0.6f;
+                for (int col = 0; col < 3; col++)
+                {
+                    rowEl.Add(Bullet(dotSize, color));
+                }
+                container.Add(rowEl);
+            }
+            return container;
+        }
     }
 }

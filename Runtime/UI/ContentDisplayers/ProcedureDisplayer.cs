@@ -60,6 +60,16 @@ namespace WiseTwin.UI
         private VisualElement imageElement; // NEW: The actual image element
         private bool imageZoomed = false; // NEW: Track image zoom state
 
+        // Draggable instruction panel
+        private VisualElement instructionPanel;
+        private VisualElement dragHandleArea;
+        private bool isDraggingPanel;
+        private Vector2 dragPointerOffset;
+        private int dragPointerId = -1;
+        // Static so the panel keeps its position across successive procedures in the same session.
+        private static Vector2 savedPanelPosition;
+        private static bool hasSavedPanelPosition;
+
         // Analytics tracking
         private float stepStartTime;
         private int wrongClicksCount = 0; // Erreurs sur l'étape en cours
@@ -290,26 +300,50 @@ namespace WiseTwin.UI
             // own area stays clickable for buttons inside the panel.
             modalContainer.pickingMode = PickingMode.Ignore;
 
-            // Instruction panel (docked right). Auto-sizes vertically to its content so a
-            // short instruction like "Turn the valve" produces a compact card instead of a
-            // floor-to-ceiling sidebar. The ScrollView inside still takes over if the
-            // content exceeds maxHeight (long descriptions or step images).
-            var instructionPanel = new VisualElement();
+            // Instruction panel (default: docked right, but draggable from its header so the
+            // player can move it anywhere on screen if it covers a relevant 3D object).
+            // Auto-sizes vertically to its content so a short instruction like "Turn the valve"
+            // produces a compact card instead of a floor-to-ceiling sidebar. The ScrollView
+            // inside still takes over if the content exceeds maxHeight.
+            instructionPanel = new VisualElement();
+            instructionPanel.name = "procedure-instruction-panel";
             instructionPanel.style.width = Length.Percent(28);
             instructionPanel.style.minWidth = 320;
             instructionPanel.style.maxWidth = 420;
             instructionPanel.style.minHeight = 140;
             instructionPanel.style.maxHeight = Length.Percent(85);
             UIStyles.ApplyCardStyle(instructionPanel, UIStyles.RadiusXL);
-            instructionPanel.style.marginRight = UIStyles.SpaceLG;
             instructionPanel.style.borderLeftWidth = 3;
             instructionPanel.style.borderLeftColor = UIStyles.Accent;
             instructionPanel.style.flexDirection = FlexDirection.Column;
             instructionPanel.style.flexShrink = 1;
 
+            if (hasSavedPanelPosition)
+            {
+                // Restore the position the user dragged the panel to in a previous scenario.
+                instructionPanel.style.position = Position.Absolute;
+                instructionPanel.style.left = savedPanelPosition.x;
+                instructionPanel.style.top = savedPanelPosition.y;
+            }
+            else
+            {
+                // Default layout: right-docked via parent's flex alignment.
+                instructionPanel.style.marginRight = UIStyles.SpaceLG;
+            }
+
+            // Drag-handle row at the top of the panel (6 grip dots). Hints that the
+            // header is draggable. The whole header area below is the actual hit target.
+            dragHandleArea = new VisualElement();
+            dragHandleArea.style.paddingTop = UIStyles.SpaceSM;
+            dragHandleArea.style.paddingBottom = 2;
+            dragHandleArea.style.alignItems = Align.Center;
+            dragHandleArea.style.justifyContent = Justify.Center;
+            dragHandleArea.Add(WiseTwinIcons.DragHandle(22, UIStyles.TextMuted));
+            instructionPanel.Add(dragHandleArea);
+
             // Header
             var headerSection = new VisualElement();
-            headerSection.style.paddingTop = UIStyles.SpaceLG;
+            headerSection.style.paddingTop = UIStyles.SpaceXS;
             headerSection.style.paddingBottom = UIStyles.SpaceMD;
             headerSection.style.paddingLeft = UIStyles.SpaceXL;
             headerSection.style.paddingRight = UIStyles.SpaceXL;
@@ -441,6 +475,87 @@ namespace WiseTwin.UI
             modalContainer.Add(instructionPanel);
 
             rootElement.Add(modalContainer);
+
+            // Wire drag events on the grip strip + header. Either area starts a drag,
+            // and pointer capture routes subsequent move/up events back to the same element.
+            RegisterDragHandlers(dragHandleArea);
+            RegisterDragHandlers(headerSection);
+        }
+
+        void RegisterDragHandlers(VisualElement handle)
+        {
+            handle.RegisterCallback<PointerDownEvent>(OnPanelDragStart);
+            handle.RegisterCallback<PointerMoveEvent>(OnPanelDragMove);
+            handle.RegisterCallback<PointerUpEvent>(OnPanelDragEnd);
+            handle.RegisterCallback<PointerCaptureOutEvent>(OnPanelDragCancel);
+        }
+
+        void OnPanelDragStart(PointerDownEvent evt)
+        {
+            if (evt.button != 0 || instructionPanel == null) return;
+
+            // Switch from parent-flex positioning to absolute, freezing the current on-screen position.
+            if (instructionPanel.resolvedStyle.position != Position.Absolute)
+            {
+                var panelRect = instructionPanel.worldBound;
+                var parentRect = instructionPanel.parent.worldBound;
+                instructionPanel.style.position = Position.Absolute;
+                instructionPanel.style.left = panelRect.x - parentRect.x;
+                instructionPanel.style.top = panelRect.y - parentRect.y;
+                instructionPanel.style.marginRight = 0;
+            }
+
+            isDraggingPanel = true;
+            dragPointerId = evt.pointerId;
+            var rect = instructionPanel.worldBound;
+            dragPointerOffset = new Vector2(evt.position.x - rect.x, evt.position.y - rect.y);
+
+            var target = evt.currentTarget as VisualElement;
+            target?.CapturePointer(evt.pointerId);
+            evt.StopPropagation();
+        }
+
+        void OnPanelDragMove(PointerMoveEvent evt)
+        {
+            if (!isDraggingPanel || evt.pointerId != dragPointerId || instructionPanel == null) return;
+
+            var parentRect = instructionPanel.parent.worldBound;
+            float newLeft = evt.position.x - dragPointerOffset.x - parentRect.x;
+            float newTop = evt.position.y - dragPointerOffset.y - parentRect.y;
+
+            float panelWidth = instructionPanel.resolvedStyle.width;
+            float panelHeight = instructionPanel.resolvedStyle.height;
+            newLeft = Mathf.Clamp(newLeft, 0f, Mathf.Max(0f, parentRect.width - panelWidth));
+            newTop = Mathf.Clamp(newTop, 0f, Mathf.Max(0f, parentRect.height - panelHeight));
+
+            instructionPanel.style.left = newLeft;
+            instructionPanel.style.top = newTop;
+
+            savedPanelPosition = new Vector2(newLeft, newTop);
+            hasSavedPanelPosition = true;
+        }
+
+        void OnPanelDragEnd(PointerUpEvent evt)
+        {
+            if (!isDraggingPanel || evt.pointerId != dragPointerId) return;
+            EndDrag(evt.currentTarget as VisualElement, evt.pointerId);
+            evt.StopPropagation();
+        }
+
+        void OnPanelDragCancel(PointerCaptureOutEvent evt)
+        {
+            if (!isDraggingPanel || evt.pointerId != dragPointerId) return;
+            EndDrag(evt.currentTarget as VisualElement, evt.pointerId);
+        }
+
+        void EndDrag(VisualElement target, int pointerId)
+        {
+            isDraggingPanel = false;
+            dragPointerId = -1;
+            if (target != null && target.HasPointerCapture(pointerId))
+            {
+                target.ReleasePointer(pointerId);
+            }
         }
 
         void StartCurrentStep()
