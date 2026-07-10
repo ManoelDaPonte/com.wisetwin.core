@@ -168,10 +168,10 @@ namespace WiseTwin.UI
             // Trouver les GameObjects pour chaque étape par nom
             foreach (var step in steps)
             {
-                // Chercher l'objet target par nom
+                // Chercher l'objet target par nom (y compris les objets inactifs)
                 if (!string.IsNullOrEmpty(step.targetObjectName))
                 {
-                    step.targetObject = GameObject.Find(step.targetObjectName);
+                    step.targetObject = GameObjectFinder.FindByName(step.targetObjectName);
 
                     if (step.targetObject != null)
                     {
@@ -193,7 +193,7 @@ namespace WiseTwin.UI
                     {
                         if (string.IsNullOrEmpty(fake.objectName)) continue;
 
-                        fake.gameObject = GameObject.Find(fake.objectName);
+                        fake.gameObject = GameObjectFinder.FindByName(fake.objectName);
 
                         if (fake.gameObject != null)
                         {
@@ -209,10 +209,10 @@ namespace WiseTwin.UI
                     }
                 }
 
-                // Find zone trigger object for this step
+                // Find zone trigger object for this step (y compris les objets inactifs)
                 if (step.validationType == "zone" && !string.IsNullOrEmpty(step.zoneObjectName))
                 {
-                    step.zoneObject = GameObject.Find(step.zoneObjectName);
+                    step.zoneObject = GameObjectFinder.FindByName(step.zoneObjectName);
                     if (step.zoneObject != null)
                     {
                         Debug.Log($"[ProcedureDisplayer] Found zone object for step: {step.zoneObjectName}");
@@ -223,14 +223,14 @@ namespace WiseTwin.UI
                     }
                 }
 
-                // Resolve every GameObject in a group step
+                // Resolve every GameObject in a group step (y compris les objets inactifs)
                 if (step.validationType == "group" && step.targetObjectNames != null)
                 {
                     step.targetObjects = new List<GameObject>();
                     foreach (var name in step.targetObjectNames)
                     {
                         if (string.IsNullOrEmpty(name)) continue;
-                        var go = GameObject.Find(name);
+                        var go = GameObjectFinder.FindByName(name);
                         if (go != null)
                         {
                             step.targetObjects.Add(go);
@@ -245,14 +245,14 @@ namespace WiseTwin.UI
                 }
             }
 
-            // Trouver les fake objects par nom
+            // Trouver les fake objects par nom (y compris les objets inactifs)
             if (fakeObjects != null)
             {
                 foreach (var fake in fakeObjects)
                 {
                     if (string.IsNullOrEmpty(fake.objectName)) continue;
 
-                    fake.gameObject = GameObject.Find(fake.objectName);
+                    fake.gameObject = GameObjectFinder.FindByName(fake.objectName);
 
                     if (fake.gameObject != null)
                     {

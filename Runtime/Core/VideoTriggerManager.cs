@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using Newtonsoft.Json.Linq;
 
 namespace WiseTwin
@@ -97,8 +96,8 @@ namespace WiseTwin
         {
             foreach (var trigger in videoTriggers)
             {
-                // Use FindGameObjectByName to find inactive objects too
-                GameObject targetObject = FindGameObjectByName(trigger.targetObjectName);
+                // Use GameObjectFinder to find inactive objects too
+                GameObject targetObject = GameObjectFinder.FindByName(trigger.targetObjectName);
                 if (targetObject != null)
                 {
                     // Add handler if not already present
@@ -117,48 +116,6 @@ namespace WiseTwin
                     DebugLog($"Target object '{trigger.targetObjectName}' not found in scene");
                 }
             }
-        }
-
-        /// <summary>
-        /// Find a GameObject by name, including inactive objects
-        /// </summary>
-        GameObject FindGameObjectByName(string name)
-        {
-            // First try the fast method for active objects
-            GameObject obj = GameObject.Find(name);
-            if (obj != null) return obj;
-
-            // Search in all root objects of all loaded scenes (includes inactive)
-            for (int i = 0; i < SceneManager.sceneCount; i++)
-            {
-                Scene scene = SceneManager.GetSceneAt(i);
-                if (!scene.isLoaded) continue;
-
-                foreach (GameObject rootObj in scene.GetRootGameObjects())
-                {
-                    GameObject found = FindInChildren(rootObj.transform, name);
-                    if (found != null) return found;
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Recursively search for a GameObject by name in children
-        /// </summary>
-        GameObject FindInChildren(Transform parent, string name)
-        {
-            if (parent.name == name)
-                return parent.gameObject;
-
-            for (int i = 0; i < parent.childCount; i++)
-            {
-                GameObject found = FindInChildren(parent.GetChild(i), name);
-                if (found != null) return found;
-            }
-
-            return null;
         }
 
         /// <summary>
