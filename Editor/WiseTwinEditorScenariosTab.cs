@@ -660,8 +660,14 @@ namespace WiseTwin.Editor
                 {
                     EditorGUILayout.HelpBox(
                         "External: the step shows its instructions but has no highlight, no zone, and no validate button. " +
-                        "Call WiseTwinAPI.ValidateCurrentStep(true) from your custom script when your conditions are met.",
+                        "Call WiseTwinAPI.ValidateExternalStep(id) from your custom script when your conditions are met.",
                         MessageType.Info);
+
+                    // External Validation ID field
+                    EditorGUILayout.Space(2);
+                    EditorGUILayout.LabelField("External Validation ID", EditorStyles.miniBoldLabel);
+                    step.externalValidationId = EditorGUILayout.TextField("Validation ID", step.externalValidationId);
+                    EditorGUILayout.LabelField(" ", "e.g. nacelle.epi_casque, nacelle.batterie_connectee", EditorStyles.miniLabel);
                 }
 
                 // Target Object (only for Click - for Manual/Zone it's not relevant)

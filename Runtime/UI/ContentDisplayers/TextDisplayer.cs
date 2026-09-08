@@ -198,7 +198,7 @@ namespace WiseTwin.UI
                 footer.style.borderBottomLeftRadius = UIStyles.RadiusXL;
                 footer.style.borderBottomRightRadius = UIStyles.RadiusXL;
 
-                var continueButton = UIStyles.CreatePrimaryButton(
+                var continueButton = UIStyles.CreateWarningButton(
                     "",
                     () =>
                     {

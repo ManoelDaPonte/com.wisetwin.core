@@ -573,6 +573,10 @@ public class WiseTwinEditor : EditorWindow
                 if (stepDict.ContainsKey("zoneObjectName"))
                     step.zoneObjectName = stepDict["zoneObjectName"]?.ToString();
 
+                // Load external validation ID (only when validationType == External)
+                if (stepDict.ContainsKey("externalValidationId"))
+                    step.externalValidationId = stepDict["externalValidationId"]?.ToString() ?? "";
+
                 // Load group target object names (only when validationType == Group)
                 if (stepDict.ContainsKey("targetObjectNames"))
                 {
@@ -1262,6 +1266,12 @@ public class WiseTwinEditor : EditorWindow
                     if (!string.IsNullOrEmpty(name)) groupNames.Add(name);
                 }
                 stepDict["targetObjectNames"] = groupNames;
+            }
+
+            // Add external validation ID when validation type is External
+            if (step.validationType == WiseTwin.Editor.ValidationType.External && !string.IsNullOrEmpty(step.externalValidationId))
+            {
+                stepDict["externalValidationId"] = step.externalValidationId;
             }
 
             // Illustration image: embed in the build (Resources) and store the relative path

@@ -97,6 +97,11 @@ namespace WiseTwin.Editor
         // can resolve them via GameObject.Find.
         public List<GameObject> targetObjects = new List<GameObject>();
         public List<string> targetObjectNames = new List<string>();
+
+        // Used only when validationType == External: the step advances only when
+        // WiseTwinAPI.ValidateExternalStep(id) is called with a matching ID.
+        // If empty, any call to ValidateCurrentStep() advances the step (backward compat).
+        public string externalValidationId = "";
     }
 
     [Serializable]

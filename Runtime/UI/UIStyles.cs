@@ -25,6 +25,7 @@ namespace WiseTwin.UI
         public static readonly Color Danger = new Color(0.85f, 0.25f, 0.25f, 1f);        // red
         public static readonly Color DangerBg = new Color(0.5f, 0.1f, 0.1f, 0.25f);
         public static readonly Color Warning = new Color(0.92f, 0.7f, 0.2f, 1f);         // amber
+        public static readonly Color WarningHover = new Color(1f, 0.8f, 0.3f, 1f);       // lighter amber on hover
         public static readonly Color WarningBg = new Color(0.8f, 0.5f, 0.1f, 0.15f);
         public static readonly Color Info = new Color(0.3f, 0.6f, 0.95f, 1f);            // blue
         public static readonly Color InfoBg = new Color(0.2f, 0.4f, 0.6f, 0.15f);
@@ -173,6 +174,40 @@ namespace WiseTwin.UI
             btn.RegisterCallback<MouseLeaveEvent>(evt =>
             {
                 btn.style.backgroundColor = Accent;
+                btn.style.scale = new Scale(Vector3.one);
+            });
+
+            return btn;
+        }
+
+        /// <summary>
+        /// Crée un bouton warning/jaune (pour actions de continuation, navigation).
+        /// </summary>
+        public static Button CreateWarningButton(string text, System.Action onClick = null)
+        {
+            var btn = new Button(onClick);
+            btn.text = text;
+            btn.style.height = 52;
+            btn.style.fontSize = FontMD;
+            btn.style.backgroundColor = Warning;
+            btn.style.color = TextOnAccent;
+            btn.style.unityFontStyleAndWeight = FontStyle.Bold;
+            SetBorderRadius(btn, RadiusMD);
+            SetBorderWidth(btn, 0);
+            btn.style.paddingLeft = SpaceXL;
+            btn.style.paddingRight = SpaceXL;
+            btn.style.paddingTop = 0;
+            btn.style.paddingBottom = 0;
+
+            // Hover
+            btn.RegisterCallback<MouseEnterEvent>(evt =>
+            {
+                btn.style.backgroundColor = WarningHover;
+                btn.style.scale = new Scale(new Vector3(1.02f, 1.02f, 1f));
+            });
+            btn.RegisterCallback<MouseLeaveEvent>(evt =>
+            {
+                btn.style.backgroundColor = Warning;
                 btn.style.scale = new Scale(Vector3.one);
             });
 

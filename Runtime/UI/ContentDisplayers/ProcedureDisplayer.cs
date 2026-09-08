@@ -97,6 +97,11 @@ namespace WiseTwin.UI
             // Used only when validationType == "group": every object in this list must be touched.
             public List<string> targetObjectNames = new List<string>();
             public List<GameObject> targetObjects = new List<GameObject>();
+
+            // Used only when validationType == "external": the step advances only when
+            // WiseTwinAPI.ValidateExternalStep(id) is called with a matching ID.
+            // If empty, any call to ValidateCurrentStep() advances the step (backward compat).
+            public string externalValidationId = "";
         }
 
         public class FakeObjectData
@@ -463,8 +468,8 @@ namespace WiseTwin.UI
             buttonSection.style.borderTopColor = UIStyles.BorderSubtle;
             buttonSection.style.display = DisplayStyle.None;
 
-            // Manual validation button (icon only, compact)
-            validateButton = UIStyles.CreatePrimaryButton("");
+            // Manual validation button (icon only, compact) - jaune pour distinction
+            validateButton = UIStyles.CreateWarningButton("");
             UIStyles.SetButtonIcon(validateButton, WiseTwinIcons.Check(20, UIStyles.TextOnAccent));
             validateButton.style.alignSelf = Align.Center;
             validateButton.style.width = 80;
@@ -1023,6 +1028,35 @@ namespace WiseTwin.UI
         }
 
         /// <summary>
+        /// Validates the current step only if it is waiting for the given external validation ID.
+        /// Called by WiseTwinAPI.ValidateExternalStep().
+        /// </summary>
+        /// <param name="validationId">The ID to match against the current step's externalValidationId</param>
+        /// <returns>true if the step was validated, false if the ID doesn't match or no step is active</returns>
+        public bool ValidateExternalStepById(string validationId)
+        {
+            if (steps == null || currentStepIndex >= steps.Count) return false;
+
+            var currentStep = steps[currentStepIndex];
+
+            // Only handle external validation type
+            if (currentStep.validationType != "external") return false;
+
+            // Check if the ID matches (or if no ID was configured, accept any)
+            if (!string.IsNullOrEmpty(currentStep.externalValidationId))
+            {
+                if (currentStep.externalValidationId != validationId)
+                {
+                    Debug.Log($"[ProcedureDisplayer] External validation ID mismatch. Expected: '{currentStep.externalValidationId}', Got: '{validationId}'");
+                    return false;
+                }
+            }
+
+            Debug.Log($"[ProcedureDisplayer] External validation ID matched: '{validationId}'");
+            return ValidateCurrentStep(success: true);
+        }
+
+        /// <summary>
         /// Single funnel that finalises the current step (records analytics, advances to the next step).
         /// Called internally by OnObjectClicked, OnZoneEntered, and OnValidateButtonClicked.
         /// Also exposed via WiseTwinAPI.ValidateCurrentStep() so external scripts can validate a step
@@ -1443,7 +1477,8 @@ namespace WiseTwin.UI
                             useBlinking = ExtractBool(stepData, "useBlinking", true),
                             validationType = valType,
                             zoneObjectName = ExtractString(stepData, "zoneObjectName"),
-                            imagePath = ExtractLocalizedText(stepData, "imagePath", language)
+                            imagePath = ExtractLocalizedText(stepData, "imagePath", language),
+                            externalValidationId = ExtractString(stepData, "externalValidationId")
                         };
 
                         // NEW: Extract fake objects for this step

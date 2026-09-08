@@ -44,6 +44,12 @@ namespace WiseTwin
         /// <summary>Fires when LogCustomEvent is called. Args: eventId, success, weight, description.</summary>
         public static event Action<string, bool, float, string> OnCustomEventLogged;
 
+        /// <summary>
+        /// Fires when ValidateExternalStep is called. Args: validationId.
+        /// Used internally by ProcedureDisplayer to check if the current step expects this ID.
+        /// </summary>
+        internal static event Action<string> OnExternalValidationRequested;
+
         // Internal raisers — called by managers/displayers. Kept internal so external code
         // cannot fire them directly.
         internal static void RaiseStepValidated(int stepIndex, bool success) => OnStepValidated?.Invoke(stepIndex, success);
@@ -52,6 +58,7 @@ namespace WiseTwin
         internal static void RaiseTrainingCompleted() => OnTrainingCompleted?.Invoke();
         internal static void RaiseTrainingRestarted() => OnTrainingRestarted?.Invoke();
         internal static void RaiseCustomEventLogged(string eventId, bool success, float weight, string description) => OnCustomEventLogged?.Invoke(eventId, success, weight, description);
+        internal static void RaiseExternalValidationRequested(string validationId) => OnExternalValidationRequested?.Invoke(validationId);
 
         // ─────────────────────────────────────────────────────────────
         //  Flow control
@@ -83,6 +90,39 @@ namespace WiseTwin
                 return false;
             }
             return procedure.ValidateCurrentStep(success);
+        }
+
+        /// <summary>
+        /// Validates a procedure step that expects a specific external validation ID.
+        /// Only the step that is currently waiting for this exact ID will be validated.
+        /// If no step expects this ID, the call is silently ignored.
+        /// </summary>
+        /// <param name="validationId">The validation ID to match (e.g. "nacelle.epi_casque")</param>
+        /// <returns>true if a step was validated, false if no step was waiting for this ID</returns>
+        /// <example>
+        /// <code>
+        /// // In NacelleStateManager: when the helmet is equipped
+        /// void OnHelmetEquipped() {
+        ///     WiseTwinAPI.ValidateExternalStep("nacelle.epi_casque");
+        /// }
+        /// </code>
+        /// </example>
+        public static bool ValidateExternalStep(string validationId)
+        {
+            if (string.IsNullOrEmpty(validationId))
+            {
+                Debug.LogWarning("[WiseTwinAPI] ValidateExternalStep called with empty validationId");
+                return false;
+            }
+
+            var procedure = ContentDisplayManager.Instance?.CurrentDisplayer as ProcedureDisplayer;
+            if (procedure == null)
+            {
+                // No active procedure — silently ignore (the event may fire before/after the procedure)
+                return false;
+            }
+
+            return procedure.ValidateExternalStepById(validationId);
         }
 
         /// <summary>
